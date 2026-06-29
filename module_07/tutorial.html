@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Module 07 — Tag & Namespace Confusion | XSS Mastery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Lato:wght@300;400;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0b0f1a;--bg2:#111827;--bg3:#1a2235;--card:#141c2e;--border:#1e3a5f;
+          --gold:#f5c842;--cyan:#38bdf8;--purple:#a78bfa;--red:#f87171;--green:#4ade80;
+          --teal:#0d9488;--orange:#fb923c;--text:#e2e8f0;--muted:#7a9bbf;--code-bg:#060d1a}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:'Lato',sans-serif;font-size:16px;line-height:1.75}
+    .page-wrap{max-width:860px;margin:0 auto;padding:48px 24px 96px}
+    .mod-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.14em;
+               text-transform:uppercase;color:var(--muted);border:1px solid var(--border);
+               border-radius:4px;padding:4px 10px;margin-bottom:20px}
+    h1{font-family:'Playfair Display',serif;font-size:42px;color:var(--gold);line-height:1.2;margin-bottom:12px}
+    h2{font-family:'Playfair Display',serif;font-size:26px;color:var(--cyan);margin:52px 0 16px;padding-top:8px;border-top:1px solid var(--border)}
+    h3{font-size:18px;font-weight:700;color:var(--purple);margin:32px 0 10px}
+    h4{font-size:14px;font-weight:700;color:var(--orange);margin:20px 0 6px;text-transform:uppercase;letter-spacing:.06em}
+    .subtitle{font-size:17px;color:var(--muted);margin-bottom:40px;line-height:1.5}
+    p{margin-bottom:18px}
+    strong{color:var(--text);font-weight:700}
+    em{color:var(--orange);font-style:normal;font-weight:600}
+    a{color:var(--cyan)}
+    ul,ol{padding-left:22px;margin-bottom:18px}
+    li{margin-bottom:6px;font-size:15px}
+    .prereq-bar{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--teal);border-radius:6px;padding:16px 20px;margin-bottom:32px}
+    .prereq-bar strong{color:var(--teal);font-size:12px;text-transform:uppercase;letter-spacing:.1em;display:block;margin-bottom:6px}
+    .prereq-bar p{font-size:14px;color:var(--muted);margin:0}
+    .deliverables{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:20px 24px;margin-bottom:36px}
+    .deliverables strong{color:var(--gold);font-size:13px;text-transform:uppercase;letter-spacing:.1em;display:block;margin-bottom:12px}
+    .deliverables ul{list-style:none;padding:0}
+    .deliverables li{font-size:14px;padding:4px 0 4px 20px;position:relative}
+    .deliverables li::before{content:"→";position:absolute;left:0;color:var(--green);font-weight:700}
+    .callout{border-radius:6px;padding:16px 20px;margin:28px 0;font-size:14.5px;line-height:1.65}
+    .callout .callout-label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px;display:block}
+    .callout.warning{background:#1f0f0f;border-left:4px solid var(--red)}
+    .callout.warning .callout-label{color:var(--red)}
+    .callout.tip{background:#0a1f13;border-left:4px solid var(--green)}
+    .callout.tip .callout-label{color:var(--green)}
+    .callout.insight{background:#0f1240;border-left:4px solid var(--purple)}
+    .callout.insight .callout-label{color:var(--purple)}
+    pre{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:20px;overflow-x:auto;margin:20px 0;font-family:'Source Code Pro',monospace;font-size:13.5px;line-height:1.7}
+    code{font-family:'Source Code Pro',monospace;font-size:13px}
+    p code,li code{background:var(--code-bg);color:var(--cyan);padding:2px 6px;border-radius:3px;border:1px solid var(--border)}
+    .cm{color:#4b5563}.kw{color:#89dceb}.fn{color:#a78bfa}.st{color:#a6e3a1}.nu{color:#fab387}.at{color:#f5c842}.op{color:#f87171}.hl{color:#f5c842;font-weight:700}
+    .steps{list-style:none;counter-reset:step;margin:20px 0;padding:0}
+    .steps li{counter-increment:step;padding:14px 16px 14px 56px;position:relative;background:var(--card);border:1px solid var(--border);border-radius:6px;margin-bottom:10px;font-size:14.5px}
+    .steps li::before{content:counter(step);position:absolute;left:16px;top:14px;width:24px;height:24px;border-radius:50%;background:var(--border);color:var(--cyan);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center}
+    .exercise{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:20px 24px;margin-bottom:14px}
+    .exercise .ex-badge{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:2px 8px;border-radius:3px;margin-bottom:10px;display:inline-block}
+    .ex-warm .ex-badge{background:#1a2f1a;color:var(--green)}
+    .ex-core .ex-badge{background:#1a1a2f;color:var(--cyan)}
+    .ex-stretch .ex-badge{background:#2f1a2f;color:var(--purple)}
+    .exercise h4{margin-top:0}
+    .exercise p,.exercise li{font-size:14.5px}
+    .next-box{background:var(--bg3);border:1px solid var(--border);border-left:4px solid var(--gold);border-radius:6px;padding:22px 24px;margin-top:48px}
+    .next-box strong{color:var(--gold);display:block;font-size:12px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+    .top-nav{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--muted)}
+    .top-nav a{color:var(--cyan);text-decoration:none}
+    table{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px}
+    th{background:var(--card);color:var(--cyan);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border)}
+    td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+    tr:last-child td{border-bottom:none}
+    .ns-html{color:var(--cyan)}
+    .ns-svg{color:var(--purple)}
+    .ns-math{color:var(--gold)}
+  </style>
+</head>
+<body>
+
+<nav class="top-nav">
+  <a href="/">← Lab Home</a>
+  <span>XSS Mastery Course</span>
+  <span>Module 07 of 19</span>
+</nav>
+
+<div class="page-wrap">
+
+  <div class="mod-badge">Module 07 of 19</div>
+  <h1>Tag & Namespace Confusion:<br>SVG, MathML, and iframe</h1>
+  <p class="subtitle">
+    The HTML5 parser is not a single-mode parser. It switches between three
+    parsing namespaces — HTML, SVG, and MathML — as it encounters specific
+    tags. Each namespace has different rules for what is valid, what executes,
+    and what a "safe" tag means. Sanitisers that think in HTML namespace
+    alone miss entire attack surfaces.
+  </p>
+
+  <div class="prereq-bar">
+    <strong>Prerequisites</strong>
+    <p>Modules 01–06 complete. You have fired tag injection, event-handler injection,
+       and URI scheme injection. You understand the HTML5 parsing pipeline from Module 02.</p>
+  </div>
+
+  <div class="deliverables">
+    <strong>What you will build in this module</strong>
+    <ul>
+      <li>Three new injection endpoints: <code>/svg-inject</code>, <code>/math-inject</code>, <code>/iframe-inject</code></li>
+      <li>A 7-step attack demo covering script in SVG, foreignObject, MathML mtext, and srcdoc</li>
+      <li>A namespace reference table showing which vectors survive innerHTML vs server rendering</li>
+      <li>Working SVG animate payload that mutates an href attribute post-parse</li>
+    </ul>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 1 — Three Parsing Namespaces</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    The HTML5 specification defines a tree construction algorithm with a concept
+    called <em>adjusted current node</em>. As the parser processes tokens, it
+    tracks whether the current insertion point is in HTML, SVG, or MathML context.
+    This context — the namespace — determines how subsequent tokens are parsed.
+  </p>
+
+  <p>
+    Three trigger elements switch the namespace:
+  </p>
+
+  <table>
+    <thead><tr><th>Trigger element</th><th>Switches to</th><th>Reverts on</th></tr></thead>
+    <tbody>
+      <tr><td class="ns-html"><code>&lt;html&gt;</code> (root)</td><td>HTML namespace (default)</td><td>N/A</td></tr>
+      <tr><td class="ns-svg"><code>&lt;svg&gt;</code></td><td>SVG namespace</td><td><code>&lt;/svg&gt;</code> or integration points</td></tr>
+      <tr><td class="ns-math"><code>&lt;math&gt;</code></td><td>MathML namespace</td><td><code>&lt;/math&gt;</code> or integration points</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    Namespace switches can be nested. A <code>&lt;foreignObject&gt;</code> inside
+    SVG switches back to HTML. An <code>&lt;annotation-xml&gt;</code> inside MathML
+    can contain SVG. These transitions create the "HTML integration points" and
+    "MathML text integration points" defined in the spec — and exploited in mXSS.
+  </p>
+
+  <div class="callout insight">
+    <span class="callout-label">PhD Insight — Namespace Confusion and Sanitiser Scope</span>
+    Most HTML sanitisers process the document in a single pass, treating it
+    as an HTML document. When a sanitiser encounters an <code>&lt;svg&gt;</code>
+    element it may allowlist it (SVG is legitimate in HTML5 content) without
+    recognising that the content inside is parsed by different rules.
+    A sanitiser that strips <code>&lt;script&gt;</code> from HTML context may
+    not strip <code>&lt;script&gt;</code> from SVG context — or may strip it
+    but leave intact the SVG-specific vectors like <code>&lt;animate&gt;</code>
+    and <code>&lt;set&gt;</code>. This is the core mechanism behind many
+    DOMPurify bypasses reported between 2019–2023, and the setup for Mutation
+    XSS (Module 13).
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 2 — SVG Namespace Vectors</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    SVG is a full XML-based graphics format embedded in HTML5. It has its own
+    element set, its own event model, and — critically — its own script execution
+    model. The key differences from HTML that matter for XSS are:
+  </p>
+
+  <ul>
+    <li><strong>Script execution in SVG context:</strong> A <code>&lt;script&gt;</code> tag inside <code>&lt;svg&gt;</code> in server-rendered HTML executes. The innerHTML restriction does not apply to server-rendered SVG.</li>
+    <li><strong>onload on svg element:</strong> <code>&lt;svg onload=...&gt;</code> fires immediately on element parse — identical to <code>&lt;body onload=...&gt;</code> but injectable anywhere in the document.</li>
+    <li><strong>SVG animation elements:</strong> <code>&lt;animate&gt;</code>, <code>&lt;set&gt;</code>, and <code>&lt;animateTransform&gt;</code> can mutate any attribute on target elements, including <code>href</code>, <code>src</code>, and event handler attributes.</li>
+    <li><strong>foreignObject:</strong> Embeds a full HTML document inside SVG, parsed in HTML namespace. All HTML vectors work inside it.</li>
+    <li><strong>use xlink:href:</strong> The SVG <code>&lt;use&gt;</code> element's href can reference a javascript: URI in some browsers.</li>
+  </ul>
+
+  <pre><span class="cm">// Zero-interaction SVG vectors — all fire without user action:</span>
+
+<span class="cm">// 1. onload on svg tag</span>
+<span class="op">&lt;</span>svg <span class="at">onload</span>=<span class="st">"alert(document.domain)"</span><span class="op">&gt;&lt;/</span>svg<span class="op">&gt;</span>
+
+<span class="cm">// 2. script inside svg (server-rendered only)</span>
+<span class="op">&lt;</span>svg<span class="op">&gt;&lt;</span>script<span class="op">&gt;</span><span class="fn">alert</span>(<span class="nu">1</span>)<span class="op">&lt;/</span>script<span class="op">&gt;&lt;/</span>svg<span class="op">&gt;</span>
+
+<span class="cm">// 3. foreignObject with onerror</span>
+<span class="op">&lt;</span>svg<span class="op">&gt;&lt;</span>foreignObject<span class="op">&gt;&lt;</span>img <span class="at">src</span>=x <span class="at">onerror</span>=<span class="st">"alert(1)"</span><span class="op">&gt;&lt;/</span>foreignObject<span class="op">&gt;&lt;/</span>svg<span class="op">&gt;</span>
+
+<span class="cm">// 4. animate mutating href to javascript: — fires on click</span>
+<span class="op">&lt;</span>svg<span class="op">&gt;&lt;</span>a<span class="op">&gt;&lt;</span>animate <span class="at">attributeName</span>=href <span class="at">values</span>=javascript:alert(1) /<span class="op">&gt;&lt;</span>text <span class="at">y</span>=<span class="nu">20</span><span class="op">&gt;</span>click<span class="op">&lt;/</span>text<span class="op">&gt;&lt;/</span>a<span class="op">&gt;&lt;/</span>svg<span class="op">&gt;</span></pre>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 3 — MathML and HTML Integration Points</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    MathML is the third HTML5 parsing namespace. Most developers have never
+    used MathML intentionally, which makes it an excellent injection surface —
+    it's rarely in anyone's mental threat model and sanitiser test suites often
+    skip it.
+  </p>
+
+  <p>
+    The critical element is <code>&lt;mtext&gt;</code>. In the HTML5 spec,
+    <code>&lt;mtext&gt;</code> is a <em>MathML text integration point</em> —
+    a location where the parser accepts HTML elements as children. Content
+    inside <code>&lt;mtext&gt;</code> is parsed in HTML namespace, meaning:
+  </p>
+
+  <ul>
+    <li>An <code>&lt;img src=x onerror=...&gt;</code> inside <code>&lt;mtext&gt;</code> executes normally</li>
+    <li>Event handlers on HTML elements inside <code>&lt;mtext&gt;</code> fire normally</li>
+    <li>A sanitiser that only processes the MathML structure without recursing into mtext's HTML children will miss these vectors</li>
+  </ul>
+
+  <p>
+    The chain <code>&lt;math&gt;&lt;mtext&gt;&lt;table&gt;&lt;mglyph&gt;&lt;style&gt;</code>
+    is the setup for several mXSS bypasses — the full mechanism is studied in Module 13.
+    Here we focus on the simpler direct injection into mtext.
+  </p>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 4 — iframe srcdoc and the sandbox Misconception</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    The <code>srcdoc</code> attribute specifies an inline HTML document for an
+    iframe to render. Without a <code>sandbox</code> attribute, a srcdoc iframe
+    inherits the parent's origin — scripts inside it can access
+    <code>parent.document.cookie</code>, <code>parent.localStorage</code>,
+    and the parent's full DOM.
+  </p>
+
+  <p>
+    The common developer response is to add <code>sandbox</code>. But the
+    sandbox has flags, and combining the wrong flags negates the security:
+  </p>
+
+  <table>
+    <thead><tr><th>sandbox value</th><th>Scripts allowed?</th><th>Same-origin?</th><th>Risk</th></tr></thead>
+    <tbody>
+      <tr><td><code>sandbox</code> (empty)</td><td>No</td><td>No (unique origin)</td><td>Low — scripts cannot run</td></tr>
+      <tr><td><code>allow-scripts</code></td><td>Yes</td><td>No (unique origin)</td><td>Medium — scripts run but isolated origin</td></tr>
+      <tr><td><code>allow-same-origin</code></td><td>No</td><td>Yes</td><td>Low — no scripts</td></tr>
+      <tr><td><code>allow-scripts allow-same-origin</code></td><td>Yes</td><td>Yes</td><td style="color:var(--red)">CRITICAL — same as no sandbox</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warning">
+    <span class="callout-label">Warning — sandbox="allow-scripts allow-same-origin" Is Not a Mitigation</span>
+    The HTML5 spec explicitly states: "Setting both the allow-scripts and
+    allow-same-origin keywords together when the embedded page has the same
+    origin as the embedding page allows the embedded page to simply remove the
+    sandbox attribute and then reload itself." An iframe with this combination
+    is equivalent to no sandbox at all. Never use both flags together on
+    user-supplied content.
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Build &amp; Run</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <ol class="steps">
+    <li>Start the server: <code>python lab_server.py</code> or <code>node lab_server.js</code></li>
+    <li>Open <a href="http://localhost:5000/attack_04_namespace.html" target="_blank">http://localhost:5000/attack_04_namespace.html</a></li>
+    <li>Step 1: run both demos — note which fires and which doesn't, and why</li>
+    <li>Steps 2–3: both work via the server endpoints — observe zero interaction</li>
+    <li>Step 4: the foreignObject onerror fires in the DOM demo — no server needed</li>
+    <li>Step 5: navigate to <code>/math-inject</code> directly and observe the mtext injection</li>
+    <li>Step 6: after firing the srcdoc script, check the browser tab title — it was changed by the iframe script via <code>parent.document.title</code></li>
+  </ol>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Exercises</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 1 — Map the innerHTML Exception Precisely</h4>
+    <p>
+      Open the Console and run each of these snippets. Record: does each fire alert(1)?
+    </p>
+    <pre><span class="cm">// A: script in HTML namespace via innerHTML</span>
+d1 = document.createElement("div");
+d1.innerHTML = "&lt;script&gt;alert('A')&lt;\/script&gt;";
+document.body.appendChild(d1);
+
+<span class="cm">// B: script inside svg via innerHTML</span>
+d2 = document.createElement("div");
+d2.innerHTML = "&lt;svg&gt;&lt;script&gt;alert('B')&lt;\/script&gt;&lt;/svg&gt;";
+document.body.appendChild(d2);
+
+<span class="cm">// C: svg onload via innerHTML</span>
+d3 = document.createElement("div");
+d3.innerHTML = "&lt;svg onload=alert('C')&gt;&lt;/svg&gt;";
+document.body.appendChild(d3);
+
+<span class="cm">// D: foreignObject onerror via innerHTML</span>
+d4 = document.createElement("div");
+d4.innerHTML = "&lt;svg&gt;&lt;foreignObject&gt;&lt;img src=x onerror=alert('D')&gt;&lt;/foreignObject&gt;&lt;/svg&gt;";
+document.body.appendChild(d4);</pre>
+    <p>
+      Write down exactly which letter(s) fired. Look up the HTML5 spec section
+      on "script elements" and the note about "already started" — find the
+      exact sentence that explains why A and B don't fire via innerHTML
+      but C and D do.
+    </p>
+  </div>
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 2 — Confirm SVG Script Executes Server-Side</h4>
+    <p>
+      Navigate directly to:
+    </p>
+    <pre>/svg-inject?q=&lt;script&gt;document.title='SVG script executed'&lt;/script&gt;</pre>
+    <p>
+      Verify the browser tab title changes to "SVG script executed" — confirming
+      the script ran in the page origin. Then try the same payload via:
+    </p>
+    <pre>/parse-demo?html=&lt;svg&gt;&lt;script&gt;document.title='SVG script via parse-demo'&lt;/script&gt;&lt;/svg&gt;</pre>
+    <p>
+      Does the parse-demo endpoint (from Module 02) also fire the SVG script?
+      Why or why not? (Hint: check how <code>/parse-demo</code> renders the output —
+      does it put the content inside an existing element, or as the entire body?)
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 3 — foreignObject Exfiltration</h4>
+    <p>
+      Build an SVG foreignObject payload that exfiltrates
+      <code>document.cookie</code> to <code>/ping</code>:
+    </p>
+    <ul>
+      <li>The payload must fire with zero user interaction</li>
+      <li>It must work when injected via <code>/svg-inject?q=</code></li>
+      <li>Verify in DevTools → Network that <code>/ping?c=...</code> fires</li>
+    </ul>
+    <p>
+      Then answer: could this same payload be injected via <code>innerHTML</code>
+      in a DOM XSS scenario? Explain why or why not, citing the namespace
+      parsing rules.
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 4 — Safe iframe srcdoc</h4>
+    <p>
+      Add a <code>/iframe-safe</code> endpoint to both servers that renders
+      user-supplied content in an iframe but prevents script execution and
+      same-origin access. The correct configuration is:
+    </p>
+    <pre><span class="cm"># Python — safe iframe</span>
+srcdoc = f<span class="st">'&lt;html&gt;&lt;body&gt;{content}&lt;/body&gt;&lt;/html&gt;'</span>
+<span class="cm"># sandbox with NO allow-scripts and NO allow-same-origin</span>
+iframe = f<span class="st">'&lt;iframe srcdoc="{srcdoc}" sandbox="allow-forms"&gt;&lt;/iframe&gt;'</span></pre>
+    <p>
+      Test that <code>/iframe-safe?q=&lt;script&gt;parent.document.title='HIJACKED'&lt;/script&gt;</code>
+      does NOT change the parent's title. Then test that it also does not fire
+      <code>&lt;img src=x onerror=alert(1)&gt;</code>. Document which sandbox flags
+      you used and why.
+    </p>
+  </div>
+
+  <div class="exercise ex-stretch">
+    <span class="ex-badge">Stretch</span>
+    <h4>Exercise 5 — SVG animate with onbegin (Zero Interaction)</h4>
+    <p>
+      The SVG animate demo in Step 3 requires a click because it mutates an href.
+      Research the <code>onbegin</code> event — it fires when an SVG animation
+      begins, which is immediately on parse. Build a payload that:
+    </p>
+    <ul>
+      <li>Uses <code>&lt;animate onbegin=...&gt;</code> to fire with zero interaction</li>
+      <li>Works when injected inside the SVG context of <code>/svg-inject</code></li>
+      <li>Exfiltrates <code>document.domain</code> to <code>/ping</code></li>
+    </ul>
+    <p>
+      Test in Chrome, then in Firefox. Note any browser-specific differences
+      in how onbegin fires. This vector appears in several historical DOMPurify
+      bypass reports — research one of those reports and explain how the sanitiser
+      failed to catch it.
+    </p>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>What's Next</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <div class="next-box">
+    <strong>Module 08 — Attribute Injection & Context Breaking</strong>
+    <p>
+      Modules 04–07 covered what happens when injection occurs in the document
+      body context or within a specific namespace. Module 08 focuses on
+      attribute context injection — when the attacker's data is placed inside
+      an existing attribute value and must break out of it to inject new
+      attributes or new tags. This covers the classic <code>" onmouseover="</code>
+      pattern, attribute delimiter variations (single-quote vs double-quote vs
+      unquoted), injection into boolean attributes, and the special case of
+      injection into HTML5 data attributes vs handler attributes. This is the
+      full treatment of the attribute context first glimpsed in Module 04.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

