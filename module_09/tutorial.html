@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Module 09 — DOM-Based XSS | XSS Mastery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Lato:wght@300;400;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0b0f1a;--bg2:#111827;--bg3:#1a2235;--card:#141c2e;--border:#1e3a5f;
+          --gold:#f5c842;--cyan:#38bdf8;--purple:#a78bfa;--red:#f87171;--green:#4ade80;
+          --teal:#0d9488;--orange:#fb923c;--text:#e2e8f0;--muted:#7a9bbf;--code-bg:#060d1a}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:'Lato',sans-serif;font-size:16px;line-height:1.75}
+    .page-wrap{max-width:860px;margin:0 auto;padding:48px 24px 96px}
+    .mod-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.14em;
+               text-transform:uppercase;color:var(--muted);border:1px solid var(--border);
+               border-radius:4px;padding:4px 10px;margin-bottom:20px}
+    h1{font-family:'Playfair Display',serif;font-size:42px;color:var(--gold);line-height:1.2;margin-bottom:12px}
+    h2{font-family:'Playfair Display',serif;font-size:26px;color:var(--cyan);margin:52px 0 16px;padding-top:8px;border-top:1px solid var(--border)}
+    h3{font-size:18px;font-weight:700;color:var(--purple);margin:32px 0 10px}
+    h4{font-size:14px;font-weight:700;color:var(--orange);margin:20px 0 6px;text-transform:uppercase;letter-spacing:.06em}
+    .subtitle{font-size:17px;color:var(--muted);margin-bottom:40px;line-height:1.5}
+    p{margin-bottom:18px}
+    strong{color:var(--text);font-weight:700}
+    em{color:var(--orange);font-style:normal;font-weight:600}
+    a{color:var(--cyan)}
+    ul,ol{padding-left:22px;margin-bottom:18px}
+    li{margin-bottom:6px;font-size:15px}
+    .prereq-bar{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--teal);border-radius:6px;padding:16px 20px;margin-bottom:32px}
+    .prereq-bar strong{color:var(--teal);font-size:12px;text-transform:uppercase;letter-spacing:.1em;display:block;margin-bottom:6px}
+    .prereq-bar p{font-size:14px;color:var(--muted);margin:0}
+    .deliverables{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:20px 24px;margin-bottom:36px}
+    .deliverables strong{color:var(--gold);font-size:13px;text-transform:uppercase;letter-spacing:.1em;display:block;margin-bottom:12px}
+    .deliverables ul{list-style:none;padding:0}
+    .deliverables li{font-size:14px;padding:4px 0 4px 20px;position:relative}
+    .deliverables li::before{content:"→";position:absolute;left:0;color:var(--green);font-weight:700}
+    .callout{border-radius:6px;padding:16px 20px;margin:28px 0;font-size:14.5px;line-height:1.65}
+    .callout .callout-label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px;display:block}
+    .callout.warning{background:#1f0f0f;border-left:4px solid var(--red)}
+    .callout.warning .callout-label{color:var(--red)}
+    .callout.tip{background:#0a1f13;border-left:4px solid var(--green)}
+    .callout.tip .callout-label{color:var(--green)}
+    .callout.insight{background:#0f1240;border-left:4px solid var(--purple)}
+    .callout.insight .callout-label{color:var(--purple)}
+    .callout.info{background:#061826;border-left:4px solid var(--cyan)}
+    .callout.info .callout-label{color:var(--cyan)}
+    pre{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:20px;overflow-x:auto;margin:20px 0;font-family:'Source Code Pro',monospace;font-size:13.5px;line-height:1.7}
+    code{font-family:'Source Code Pro',monospace;font-size:13px}
+    p code,li code{background:var(--code-bg);color:var(--cyan);padding:2px 6px;border-radius:3px;border:1px solid var(--border)}
+    .cm{color:#4b5563}.kw{color:#89dceb}.fn{color:#a78bfa}.st{color:#a6e3a1}
+    .at{color:#f5c842}.op{color:#f87171}.hl{color:#f5c842;font-weight:700}
+    .steps{list-style:none;counter-reset:step;margin:20px 0;padding:0}
+    .steps li{counter-increment:step;padding:14px 16px 14px 56px;position:relative;background:var(--card);border:1px solid var(--border);border-radius:6px;margin-bottom:10px;font-size:14.5px}
+    .steps li::before{content:counter(step);position:absolute;left:16px;top:14px;width:24px;height:24px;border-radius:50%;background:var(--border);color:var(--cyan);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center}
+    .exercise{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:20px 24px;margin-bottom:14px}
+    .exercise .ex-badge{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:2px 8px;border-radius:3px;margin-bottom:10px;display:inline-block}
+    .ex-warm .ex-badge{background:#1a2f1a;color:var(--green)}
+    .ex-core .ex-badge{background:#1a1a2f;color:var(--cyan)}
+    .ex-stretch .ex-badge{background:#2f1a2f;color:var(--purple)}
+    .exercise h4{margin-top:0}
+    .exercise p,.exercise li{font-size:14.5px}
+    .next-box{background:var(--bg3);border:1px solid var(--border);border-left:4px solid var(--gold);border-radius:6px;padding:22px 24px;margin-top:48px}
+    .next-box strong{color:var(--gold);display:block;font-size:12px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+    .top-nav{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--muted)}
+    .top-nav a{color:var(--cyan);text-decoration:none}
+    table{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px}
+    th{background:var(--card);color:var(--cyan);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border)}
+    td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+    tr:last-child td{border-bottom:none}
+    td:first-child{font-family:'Source Code Pro',monospace;font-size:12.5px;color:var(--orange)}
+  </style>
+</head>
+<body>
+
+<nav class="top-nav">
+  <a href="/">← Lab Home</a>
+  <span>XSS Mastery Course</span>
+  <span>Module 09 of 19</span>
+</nav>
+
+<div class="page-wrap">
+
+  <div class="mod-badge">Module 09 of 19</div>
+  <h1>DOM-Based XSS<br>& Client-Side Sinks</h1>
+  <p class="subtitle">
+    DOM XSS is the only XSS class where the server is not involved in the
+    exploitation path. The vulnerable code is JavaScript running in the browser.
+    The attacker controls a source (a DOM property the browser exposes),
+    the code passes it to a sink (a function that executes or renders it),
+    and the XSS fires — with no HTTP request reaching the server.
+  </p>
+
+  <div class="prereq-bar">
+    <strong>Prerequisites</strong>
+    <p>Modules 01–08 complete. The data-attribute → DOM sink pattern from Module 08
+       is the direct predecessor to this module's full DOM XSS treatment.</p>
+  </div>
+
+  <div class="deliverables">
+    <strong>What you will build in this module</strong>
+    <ul>
+      <li>A client-side DOM XSS lab (<code>dom_lab.html</code>) with 7 interactive sink demos</li>
+      <li>A <code>/api/search</code> endpoint demonstrating AJAX DOM XSS via JSON response</li>
+      <li>A <code>/message</code> page with a vulnerable <code>postMessage</code> listener</li>
+      <li>A complete source/sink taxonomy table</li>
+    </ul>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 1 — Sources, Sinks, and the DOM XSS Model</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    DOM XSS is best understood through the taint-tracking model: data that
+    originates from an attacker-controlled <em>source</em> flows through
+    JavaScript code and reaches an <em>execution sink</em> without sanitisation.
+    The source and sink are both client-side constructs.
+  </p>
+
+  <p>
+    <strong>Sources</strong> are DOM properties that an attacker can control
+    without a server request. The most important:
+  </p>
+
+  <table>
+    <thead><tr><th>Source</th><th>Attacker control</th><th>Server visibility</th></tr></thead>
+    <tbody>
+      <tr><td>location.search</td><td>Query string in URL</td><td>Visible in server logs</td></tr>
+      <tr><td>location.hash</td><td>Fragment after <code>#</code></td><td>Never sent to server</td></tr>
+      <tr><td>location.href</td><td>Full URL</td><td>Partial (no fragment)</td></tr>
+      <tr><td>document.referrer</td><td>Attacker's page links to victim page</td><td>Visible in Referer header</td></tr>
+      <tr><td>postMessage data</td><td>Attacker's page calls postMessage on victim window</td><td>Not visible</td></tr>
+      <tr><td>localStorage / sessionStorage</td><td>Requires prior stored XSS or MITM</td><td>Not visible</td></tr>
+      <tr><td>window.name</td><td>Set before navigating to victim page</td><td>Not visible</td></tr>
+      <tr><td>IndexedDB / WebSQL</td><td>Requires prior write access</td><td>Not visible</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    <strong>Sinks</strong> are JavaScript functions or properties that render
+    or execute their argument. Reaching a sink with tainted data is the XSS.
+  </p>
+
+  <table>
+    <thead><tr><th>Sink</th><th>Type</th><th>Payload syntax</th><th>Script tag executes?</th></tr></thead>
+    <tbody>
+      <tr><td>innerHTML</td><td>HTML render</td><td>HTML with event handlers</td><td>No (HTML5 restriction)</td></tr>
+      <tr><td>outerHTML</td><td>HTML render</td><td>HTML with event handlers</td><td>No</td></tr>
+      <tr><td>insertAdjacentHTML</td><td>HTML render</td><td>HTML with event handlers</td><td>No</td></tr>
+      <tr><td>document.write</td><td>HTML render</td><td>Full HTML including script</td><td>Yes</td></tr>
+      <tr><td>document.writeln</td><td>HTML render</td><td>Full HTML including script</td><td>Yes</td></tr>
+      <tr><td>eval()</td><td>JS execution</td><td>Raw JavaScript</td><td>N/A — direct JS</td></tr>
+      <tr><td>setTimeout(string)</td><td>JS execution</td><td>Raw JavaScript</td><td>N/A</td></tr>
+      <tr><td>setInterval(string)</td><td>JS execution</td><td>Raw JavaScript</td><td>N/A</td></tr>
+      <tr><td>Function(string)()</td><td>JS execution</td><td>Raw JavaScript</td><td>N/A</td></tr>
+      <tr><td>location / location.href</td><td>Navigation</td><td>javascript: URI</td><td>N/A</td></tr>
+      <tr><td>element.src</td><td>Resource load</td><td>javascript: URI (limited)</td><td>Context-dependent</td></tr>
+      <tr><td>element.setAttribute('href',...)</td><td>Attribute set</td><td>javascript: URI</td><td>N/A</td></tr>
+      <tr><td>jQuery $(), $(html)</td><td>HTML render</td><td>HTML with event handlers</td><td>Via $.parseHTML</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 2 — Why DOM XSS Is Invisible to Server-Side Defences</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    A server-side WAF, output encoding library, or content security review
+    cannot detect DOM XSS in the general case. Consider the canonical
+    hash-based DOM XSS:
+  </p>
+
+  <pre><span class="cm">// Vulnerable page — server sends this (clean, no user data):</span>
+<span class="op">&lt;</span>div <span class="at">id</span>=<span class="st">"output"</span><span class="op">&gt;&lt;/</span>div<span class="op">&gt;</span>
+<span class="op">&lt;</span>script<span class="op">&gt;</span>
+  <span class="kw">const</span> term = <span class="fn">decodeURIComponent</span>(location.<span class="at">hash</span>.<span class="fn">slice</span>(<span class="nu">1</span>));
+  document.<span class="fn">getElementById</span>(<span class="st">'output'</span>).innerHTML = term;
+<span class="op">&lt;/</span>script<span class="op">&gt;</span>
+
+<span class="cm">// Attack URL (hash is never sent to server):
+// http://victim.com/page#&lt;img src=x onerror=alert(document.cookie)&gt;
+//
+// The server receives:  GET /page  HTTP/1.1
+// No payload, no query, no body — server logs show nothing suspicious.
+// The fragment is processed entirely client-side.</span></pre>
+
+  <div class="callout insight">
+    <span class="callout-label">PhD Insight — DOM XSS Detection Requires Static Taint Analysis</span>
+    Server-side tools (WAFs, SAST for server code, output encoding linters) cannot
+    find DOM XSS. The correct detection method is client-side taint analysis:
+    instrument the browser's JavaScript engine to track data flow from sources
+    to sinks. Commercial tools (Burp Suite Pro's DOM Invader, Acunetix's DOM scanner)
+    implement approximate taint analysis. Academic research has explored precise
+    static analysis (e.g., FlowDroid adapted for JS) and dynamic instrumentation.
+    For your intervention research, DOM XSS represents a distinct threat class
+    requiring a distinct detection and mitigation approach — lumping it with
+    reflected/stored XSS in your threat model will understate both the problem
+    and the required solution.
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 3 — postMessage as a DOM XSS Source</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    <code>window.postMessage()</code> allows cross-origin communication between
+    browser windows. A page can receive messages from any origin if it adds a
+    <code>message</code> event listener. If the listener passes received data
+    to an HTML sink without validating the sender's origin, any web page can
+    trigger XSS on the victim page by opening it in a new window and posting
+    a payload.
+  </p>
+
+  <pre><span class="cm">// Victim page — /message (vulnerable listener):</span>
+window.<span class="fn">addEventListener</span>(<span class="st">'message'</span>, <span class="kw">function</span>(e) {
+  <span class="cm">// Missing: if (e.origin !== 'https://trusted.com') return;</span>
+  document.<span class="fn">getElementById</span>(<span class="st">'output'</span>).innerHTML = e.data; <span class="cm">// sink</span>
+});
+
+<span class="cm">// Attacker page — any origin:</span>
+<span class="kw">const</span> victim = window.<span class="fn">open</span>(<span class="st">'http://localhost:5000/message'</span>);
+setTimeout(() =&gt; {
+  victim.<span class="fn">postMessage</span>(
+    <span class="st">'&lt;img src=x onerror=alert(document.cookie)&gt;'</span>,
+    <span class="st">'*'</span>  <span class="cm">// targetOrigin='*' — send to any origin</span>
+  );
+}, <span class="nu">1000</span>); <span class="cm">// wait for victim to load</span></pre>
+
+  <div class="callout warning">
+    <span class="callout-label">Fix — Always Validate e.origin in postMessage Handlers</span>
+    Every <code>message</code> event listener that processes the received data
+    must check <code>e.origin</code> against an explicit allowlist before using
+    <code>e.data</code>. Additionally, even trusted-origin data should be sanitised
+    before being passed to HTML sinks. Trusting origin alone is insufficient if
+    the trusted origin itself can be XSS'd.
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Build &amp; Run</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <ol class="steps">
+    <li>Start the server: <code>python lab_server.py</code> or <code>node lab_server.js</code></li>
+    <li>Open <a href="http://localhost:5000/dom_lab.html" target="_blank">dom_lab.html</a> with DevTools open on <strong>Sources</strong> tab and <strong>Console</strong> tab</li>
+    <li>In DevTools → Sources, find <code>dom_lab.html</code> and set a breakpoint on the <code>innerHTML</code> assignment in S1</li>
+    <li>Fire S1 — execution pauses at the breakpoint. In the Scope panel, inspect the value of <code>payload</code> before it reaches the sink</li>
+    <li>Continue: confirm the onerror fires in the Console</li>
+    <li>Repeat for S4 (eval) and S7 (AJAX) — note how the payload syntax differs</li>
+    <li>Open <code>/message</code> in a second tab. In the Console of the <em>dom_lab.html</em> tab, run the postMessage exploit code to attack the message page</li>
+  </ol>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Exercises</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 1 — Confirm Hash Is Never Sent to Server</h4>
+    <p>
+      Start Burp Suite and proxy your browser through it. Navigate to:
+    </p>
+    <pre>http://localhost:5000/dom_lab.html#test-fragment</pre>
+    <p>
+      In Burp → HTTP history, find the request. Does the fragment
+      (<code>#test-fragment</code>) appear anywhere in the request?
+      Check: the request URL, the Referer header, any other header.
+    </p>
+    <p>
+      Now navigate to the same URL with a payload in the hash:
+    </p>
+    <pre>http://localhost:5000/dom_lab.html#&lt;img src=x onerror=alert(1)&gt;</pre>
+    <p>
+      Confirm in Burp: the payload is not visible in any server request.
+      Then explain how a server-side WAF would respond to this attack.
+    </p>
+  </div>
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 2 — Payload Syntax Differences by Sink Type</h4>
+    <p>
+      Using the DOM lab, fire a payload against S1 (innerHTML) and S4 (eval).
+      For S1, use an event-handler HTML payload. For S4, use a raw JavaScript expression.
+      Then answer:
+    </p>
+    <ul>
+      <li>Why can't you use <code>alert(1)</code> (bare JS) as a payload for the innerHTML sink?</li>
+      <li>Why can't you use <code>&lt;img src=x onerror=alert(1)&gt;</code> as a payload for the eval sink?</li>
+      <li>What property of each sink determines what payload syntax is valid?</li>
+    </ul>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 3 — postMessage Exploit</h4>
+    <p>
+      Open <code>/message</code> in one browser tab. In a different tab
+      (or in the Console of any page on <code>localhost:5000</code>), run:
+    </p>
+    <pre><span class="kw">const</span> victim = window.<span class="fn">open</span>(<span class="st">'http://localhost:5000/message'</span>);
+setTimeout(() =&gt; {
+  victim.<span class="fn">postMessage</span>(
+    <span class="st">'&lt;img src=x onerror="alert(\'postMessage XSS: \' + document.domain)"&gt;'</span>,
+    <span class="st">'*'</span>
+  );
+}, <span class="nu">1500</span>);</pre>
+    <p>
+      Confirm the alert fires in the <code>/message</code> window.
+      Then add the origin check fix to the <code>/message</code> route's
+      event listener. Verify the fix stops the postMessage exploit.
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 4 — AJAX DOM XSS Exfiltration</h4>
+    <p>
+      Using the S7 (JSON API) card, build a payload that:
+    </p>
+    <ul>
+      <li>Fires via the <code>/api/search?q=</code> endpoint</li>
+      <li>Exfiltrates <code>document.cookie</code> to <code>/ping?c=</code></li>
+      <li>Uses zero-interaction execution (onerror on an img tag)</li>
+    </ul>
+    <p>
+      After firing, open DevTools → Network and confirm the
+      <code>/ping?c=...</code> request appears. Note: this is the full
+      AJAX DOM XSS exfil chain — server returns safe JSON, client-side
+      code renders it unsafely, attacker's payload fires and exfiltrates data.
+    </p>
+  </div>
+
+  <div class="exercise ex-stretch">
+    <span class="ex-badge">Stretch</span>
+    <h4>Exercise 5 — DOM Breakpoints for Taint Tracking</h4>
+    <p>
+      Chrome DevTools has a "DOM Breakpoints" feature (Elements panel →
+      right-click element → Break on → Subtree modifications). Use it to:
+    </p>
+    <ul>
+      <li>Set a subtree modification breakpoint on the <code>#s1-out</code> element in the DOM lab</li>
+      <li>Fire the S1 sink</li>
+      <li>When execution pauses, use the Call Stack panel to trace backward:
+          which JavaScript function set innerHTML? What was the call chain from
+          the event handler to the sink?</li>
+    </ul>
+    <p>
+      This is a manual approximation of the taint-tracking that automated DOM XSS
+      scanners perform. Document the call chain you found. Then research how
+      Burp Suite's DOM Invader performs automated DOM XSS taint tracking —
+      what instrumentation technique does it use?
+    </p>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>What's Next</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <div class="next-box">
+    <strong>Module 10 — Stored XSS & Second-Order Attacks</strong>
+    <p>
+      Modules 04–09 covered all the execution mechanism variations using
+      reflected and DOM-based delivery. Module 10 turns to the storage model:
+      XSS payloads that are persisted in a database and served to every
+      subsequent visitor. The lab introduces a minimal in-memory "database"
+      (a Python/Node list) for a comment system, a user-profile store, and
+      an admin panel. Stored XSS payloads are crafted for maximum dwell time —
+      surviving page re-loads, targeting multiple user roles, and escalating
+      to session theft and CSRF. The second-order pattern (payload stored in
+      one context, rendered in a different, more privileged context) is the
+      module's key concept.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

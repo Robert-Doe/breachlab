@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DOM XSS Lab — Module 09</title>
+  <style>
+    :root{--bg:#0b0f1a;--bg2:#111827;--card:#141c2e;--border:#1e3a5f;
+          --gold:#f5c842;--cyan:#38bdf8;--purple:#a78bfa;--red:#f87171;
+          --green:#4ade80;--orange:#fb923c;--text:#e2e8f0;--muted:#7a9bbf}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:32px}
+    .wrap{max-width:900px;margin:0 auto}
+    h1{font-size:26px;color:var(--gold);margin-bottom:6px}
+    .subtitle{color:var(--muted);font-size:13px;margin-bottom:28px}
+    .sink-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px 22px;margin-bottom:14px}
+    .sink-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .sink-name{font-family:'Courier New',monospace;font-size:15px;color:var(--orange);font-weight:700}
+    .badges{display:flex;gap:6px}
+    .badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:.06em}
+    .badge-sink{background:#1a0a0a;color:var(--red);border:1px solid #5a1515}
+    .badge-source{background:#0a1f13;color:var(--green);border:1px solid #1a5a30}
+    .badge-dom{background:#1a0a2e;color:var(--purple);border:1px solid #3a1a5f}
+    .sink-code{background:#060d1a;border:1px solid var(--border);border-radius:4px;
+               padding:10px 14px;font-family:'Courier New',monospace;font-size:12.5px;
+               color:var(--orange);margin:8px 0;line-height:1.6}
+    .sink-code .vuln{color:var(--red);font-weight:700;text-decoration:underline dotted}
+    .sink-code .comment{color:#4b5563}
+    .sink-note{font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.55}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+    .controls input{flex:1;min-width:220px;padding:8px 10px;background:#060d1a;color:var(--text);
+      border:1px solid var(--border);border-radius:4px;font-family:'Courier New',monospace;font-size:12.5px}
+    .controls input:focus{outline:none;border-color:var(--cyan)}
+    .btn{padding:7px 14px;border:none;border-radius:4px;cursor:pointer;font-size:12.5px;font-weight:600}
+    .btn-fire{background:#4a1515;color:var(--red);border:1px solid var(--red)}
+    .btn-clear{background:var(--bg2);color:var(--muted);border:1px solid var(--border)}
+    .result-zone{min-height:36px;padding:8px 10px;border:2px dashed var(--border);
+                 border-radius:4px;font-size:12.5px;color:var(--muted);margin-top:4px}
+    code{font-family:'Courier New',monospace;font-size:11.5px;background:#060d1a;
+         color:var(--cyan);padding:1px 4px;border-radius:2px}
+    .nav{display:flex;justify-content:space-between;font-size:13px;
+         color:var(--muted);margin-bottom:24px}
+    .nav a{color:var(--cyan);text-decoration:none}
+    .section-header{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;
+                    color:var(--muted);margin:28px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+    .flow-diagram{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+                  background:#060d1a;border:1px solid var(--border);border-radius:6px;
+                  padding:12px 16px;margin-bottom:20px;font-size:13px}
+    .flow-node{padding:4px 10px;border-radius:4px;font-family:'Courier New',monospace;font-size:12px}
+    .fn-source{background:#0a1f13;color:var(--green);border:1px solid #1a5a30}
+    .fn-arrow{color:var(--muted)}
+    .fn-proc{background:#1a1a2f;color:var(--cyan);border:1px solid var(--border)}
+    .fn-sink{background:#1a0a0a;color:var(--red);border:1px solid #5a1515}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav">
+    <a href="/">← Lab Home</a>
+    <span>Module 09 — DOM XSS Lab</span>
+    <a href="/message">postMessage page →</a>
+  </nav>
+
+  <h1>DOM XSS Lab</h1>
+  <p class="subtitle">
+    Each card below contains intentionally vulnerable JavaScript. The vulnerability
+    lives entirely in the browser — no server involvement needed.
+  </p>
+
+  <div class="flow-diagram">
+    <span class="fn-source flow-node">SOURCE</span>
+    <span class="fn-arrow">→</span>
+    <span class="fn-proc flow-node">processing / assignment</span>
+    <span class="fn-arrow">→</span>
+    <span class="fn-sink flow-node">SINK (executes)</span>
+    <span style="color:var(--muted);font-size:12px;margin-left:8px">— DOM XSS: attacker controls data flowing from a source to a sink</span>
+  </div>
+
+  <div class="section-header">Sinks — innerHTML family</div>
+
+  <!-- ── Sink 1: innerHTML ── -->
+  <div class="sink-card">
+    <div class="sink-header">
+      <div class="sink-name">innerHTML</div>
+      <div class="badges">
+        <span class="badge badge-sink">SINK</span>
+        <span class="badge badge-source">source: location.hash</span>
+      </div>
+    </div>
+    <div class="sink-note">
+      Reads <code>location.hash</code> (the fragment after <code>#</code> — never sent to server)
+      and assigns it to <code>innerHTML</code>. Hash-based DOM XSS is undetectable in server logs.
+    </div>
+    <div class="sink-code">
+<span class="comment">// Vulnerable code:</span>
+const term = <span class="vuln">location.hash</span>.slice(1);        <span class="comment">// source</span>
+document.getElementById('s1-out').<span class="vuln">innerHTML</span> = term; <span class="comment">// sink</span>
+    </div>
+    <div class="controls">
+      <input id="s1-input" type="text" value="<img src=x onerror=alert('innerHTML sink')>" placeholder="Payload">
+      <button class="btn btn-fire" onclick="fireS1()">Fire</button>
+      <button class="btn btn-clear" onclick="clearS1()">Clear</button>
+    </div>
+    <div class="result-zone" id="s1-out">Output here</div>
+  </div>
+
+  <!-- ── Sink 2: insertAdjacentHTML ── -->
+  <div class="sink-card">
+    <div class="sink-header">
+      <div class="sink-name">insertAdjacentHTML</div>
+      <div class="badges">
+        <span class="badge badge-sink">SINK</span>
+        <span class="badge badge-source">source: URLSearchParams</span>
+      </div>
+    </div>
+    <div class="sink-note">
+      <code>insertAdjacentHTML</code> is functionally identical to <code>innerHTML</code>
+      in terms of script execution rules — it parses and renders HTML including event handlers.
+      Developers sometimes believe it is "safer" than <code>innerHTML</code>. It is not.
+    </div>
+    <div class="sink-code">
+const q = new URLSearchParams(<span class="vuln">location.search</span>).get('q'); <span class="comment">// source</span>
+document.getElementById('s2-out').<span class="vuln">insertAdjacentHTML</span>('beforeend', q); <span class="comment">// sink</span>
+    </div>
+    <div class="controls">
+      <input id="s2-input" type="text" value="<svg onload=alert('insertAdjacentHTML sink')>" placeholder="Payload">
+      <button class="btn btn-fire" onclick="fireS2()">Fire</button>
+      <button class="btn btn-clear" onclick="clearS2()">Clear</button>
+    </div>
+    <div class="result-zone" id="s2-out">Output here</div>
+  </div>
+
+  <!-- ── Sink 3: document.write ── -->
+  <div class="sink-card">
+    <div class="sink-header">
+      <div class="sink-name">document.write</div>
+      <div class="badges">
+        <span class="badge badge-sink">SINK</span>
+        <span class="badge badge-source">source: document.referrer</span>
+      </div>
+    </div>
+    <div class="sink-note">
+      <code>document.write</code> is a legacy DOM API that writes directly into the
+      document stream. It parses its argument as HTML in the current document context.
+      Script tags written via <code>document.write</code> <em>do execute</em> —
+      unlike the innerHTML restriction. Source is <code>document.referrer</code>,
+      which can be controlled by hosting a page that links to this one.
+    </div>
+    <div class="sink-code">
+<span class="comment">// Simulating: const src = document.referrer;</span>
+<span class="comment">// In this demo the source is the input field.</span>
+<span class="vuln">document.write</span>('&lt;div&gt;Came from: ' + userInput + '&lt;/div&gt;'); <span class="comment">// sink</span>
+    </div>
+    <div class="controls">
+      <input id="s3-input" type="text" value="<script>alert('document.write sink')<\/script>" placeholder="Payload">
+      <button class="btn btn-fire" onclick="fireS3()">Fire</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-top:6px">
+      After firing, the entire page is replaced by document.write output — use browser Back to return.
+    </p>
+  </div>
+
+  <div class="section-header">Sinks — JavaScript execution</div>
+
+  <!-- ── Sink 4: eval ── -->
+  <div class="sink-card">
+    <div class="sink-header">
+      <div class="sink-name">eval()</div>
+      <div class="badges">
+        <span class="badge badge-sink">SINK</span>
+        <span class="badge badge-source">source: location.search</span>
+      </div>
+    </div>
+    <div class="sink-note">
+      <code>eval()</code> executes its string argument as JavaScript directly.
+      The payload does not need to be HTML — it is raw JavaScript. This makes
+      eval-based DOM XSS simpler: no HTML tags, no event handlers, just
+      <code>alert(1)</code> directly.
+    </div>
+    <div class="sink-code">
+const expr = new URLSearchParams(<span class="vuln">location.search</span>).get('expr');
+<span class="vuln">eval</span>(expr); <span class="comment">// executes attacker JS directly — no HTML parsing needed</span>
+    </div>
+    <div class="controls">
+      <input id="s4-input" type="text" value="alert('eval() sink — ' + document.domain)" placeholder="JS expression">
+      <button class="btn btn-fire" onclick="fireS4()">Fire</button>
+    </div>
+  </div>
+
+  <!-- ── Sink 5: setTimeout(string) ── -->
+  <div class="sink-card">
+    <div class="sink-header">
+      <div class="sink-name">setTimeout(string)</div>
+      <div class="badges">
+        <span class="badge badge-sink">SINK</span>
+        <span class="badge badge-source">source: location.hash</span>
+      </div>
+    </div>
+    <div class="sink-note">
+      <code>setTimeout</code> and <code>setInterval</code> accept either a function
+      or a string. When passed a string, they behave like <code>eval()</code> —
+      the string is executed as JavaScript after the delay. Developers often use
+      the string form for simplicity and don't recognise it as a sink.
+    </div>
+    <div class="sink-code">
+const code = <span class="vuln">location.hash</span>.slice(1);
+<span class="vuln">setTimeout</span>(code, 100); <span class="comment">// string form — equivalent to eval()</span>
+    </div>
+    <div class="controls">
+      <input id="s5-input" type="text" value="alert('setTimeout(string) sink')" placeholder="JS expression">
+      <button class="btn btn-fire" onclick="fireS5()">Fire</button>
+    </div>
+  </div>
+
+  <!-- ── Sink 6: location assignment ── -->
+  <div class="sink-card">
+    <div class="sink-header">
+      <div class="sink-name">location / location.href</div>
+      <div class="badges">
+        <span class="badge badge-sink">SINK</span>
+        <span class="badge badge-source">source: URLSearchParams</span>
+      </div>
+    </div>
+    <div class="sink-note">
+      When a URL value from a source reaches a location assignment,
+      <code>javascript:</code> scheme executes. This is the most common
+      DOM XSS pattern in single-page applications that implement their own
+      routing using <code>?next=</code> or <code>#return=</code> parameters.
+    </div>
+    <div class="sink-code">
+const next = new URLSearchParams(<span class="vuln">location.search</span>).get('next');
+<span class="vuln">location.href</span> = next; <span class="comment">// if next = "javascript:..." → executes</span>
+    </div>
+    <div class="controls">
+      <input id="s6-input" type="text" value="javascript:alert('location.href sink — ' + document.origin)" placeholder="URL value">
+      <button class="btn btn-fire" onclick="fireS6()">Fire</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-top:6px">
+      After firing, use browser Back to return.
+    </p>
+  </div>
+
+  <div class="section-header">Sources — where attacker data enters the DOM</div>
+
+  <!-- ── Source taxonomy ── -->
+  <div class="sink-card">
+    <div class="sink-header">
+      <div class="sink-name">Source Taxonomy</div>
+      <div class="badges"><span class="badge badge-source">SOURCES</span></div>
+    </div>
+    <div class="sink-note">Click each source to see its value in this page's context:</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+      <button class="btn btn-clear" style="text-align:left;padding:8px 12px" onclick="showSource('location.search')"><code>location.search</code></button>
+      <button class="btn btn-clear" style="text-align:left;padding:8px 12px" onclick="showSource('location.hash')"><code>location.hash</code></button>
+      <button class="btn btn-clear" style="text-align:left;padding:8px 12px" onclick="showSource('location.href')"><code>location.href</code></button>
+      <button class="btn btn-clear" style="text-align:left;padding:8px 12px" onclick="showSource('document.referrer')"><code>document.referrer</code></button>
+      <button class="btn btn-clear" style="text-align:left;padding:8px 12px" onclick="showSource('document.cookie')"><code>document.cookie</code></button>
+      <button class="btn btn-clear" style="text-align:left;padding:8px 12px" onclick="showSource('document.title')"><code>document.title</code></button>
+    </div>
+    <div class="result-zone" id="source-display" style="margin-top:8px;font-family:'Courier New',monospace;color:var(--cyan)">
+      Click a source above to inspect its current value.
+    </div>
+  </div>
+
+  <!-- ── JSON API sink ── -->
+  <div class="sink-card">
+    <div class="sink-header">
+      <div class="sink-name">JSON API → innerHTML</div>
+      <div class="badges">
+        <span class="badge badge-sink">SINK</span>
+        <span class="badge badge-source">source: fetch /api/search</span>
+        <span class="badge badge-dom">DOM XSS via AJAX</span>
+      </div>
+    </div>
+    <div class="sink-note">
+      Fetches <code>/api/search?q=</code> and renders <code>response.query</code>
+      via <code>innerHTML</code>. The server returns the query safely in JSON —
+      the vulnerability is in the client-side rendering.
+    </div>
+    <div class="sink-code">
+fetch('/api/search?q=' + userQuery)
+  .then(r => r.json())
+  .then(data => {
+    el.<span class="vuln">innerHTML</span> = 'Results for: ' + <span class="vuln">data.query</span>; <span class="comment">// sink</span>
+  });
+    </div>
+    <div class="controls">
+      <input id="s7-input" type="text" value="<img src=x onerror=alert('AJAX DOM XSS')>" placeholder="Payload">
+      <button class="btn btn-fire" onclick="fireS7()">Fire via API</button>
+      <button class="btn btn-clear" onclick="clearS7()">Clear</button>
+    </div>
+    <div class="result-zone" id="s7-out">API result renders here</div>
+  </div>
+
+</div>
+
+<script>
+// ── S1: innerHTML ← location.hash
+function fireS1() {
+  const payload = document.getElementById('s1-input').value;
+  document.getElementById('s1-out').innerHTML = payload;
+}
+function clearS1() {
+  document.getElementById('s1-out').innerHTML = '';
+  document.getElementById('s1-out').textContent = 'Cleared.';
+}
+
+// ── S2: insertAdjacentHTML ← URLSearchParams
+function fireS2() {
+  const payload = document.getElementById('s2-input').value;
+  const out = document.getElementById('s2-out');
+  out.innerHTML = '';
+  out.insertAdjacentHTML('beforeend', payload);
+}
+function clearS2() {
+  document.getElementById('s2-out').innerHTML = '';
+  document.getElementById('s2-out').textContent = 'Cleared.';
+}
+
+// ── S3: document.write ← referrer (simulated)
+function fireS3() {
+  const payload = document.getElementById('s3-input').value;
+  document.write('<div style="background:#0b0f1a;color:#e2e8f0;padding:32px;font-family:sans-serif">' +
+    '<p style="color:#7a9bbf;margin-bottom:16px">document.write output — use Back to return</p>' +
+    '<div>Came from: ' + payload + '</div>' +
+    '</div>');
+  document.close();
+}
+
+// ── S4: eval() ← search param (simulated)
+function fireS4() {
+  const expr = document.getElementById('s4-input').value;
+  try { eval(expr); } catch(e) { alert('eval error: ' + e.message); }
+}
+
+// ── S5: setTimeout(string) ← hash (simulated)
+function fireS5() {
+  const code = document.getElementById('s5-input').value;
+  setTimeout(code, 100);
+}
+
+// ── S6: location.href ← search param
+function fireS6() {
+  const url = document.getElementById('s6-input').value;
+  location.href = url;
+}
+
+// ── Source inspector
+function showSource(name) {
+  const values = {
+    'location.search': location.search || '(empty — no query string)',
+    'location.hash': location.hash || '(empty — no fragment)',
+    'location.href': location.href,
+    'document.referrer': document.referrer || '(empty — direct navigation)',
+    'document.cookie': document.cookie || '(empty — no cookies set)',
+    'document.title': document.title,
+  };
+  document.getElementById('source-display').textContent = name + ' = ' + JSON.stringify(values[name]);
+}
+
+// ── S7: JSON API → innerHTML
+function fireS7() {
+  const q = encodeURIComponent(document.getElementById('s7-input').value);
+  fetch('/api/search?q=' + q)
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('s7-out').innerHTML = 'Results for: ' + data.query;
+    });
+}
+function clearS7() {
+  document.getElementById('s7-out').innerHTML = '';
+  document.getElementById('s7-out').textContent = 'Cleared.';
+}
+</script>
+</body>
+</html>
