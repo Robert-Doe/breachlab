@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Module 19 — XSS Payload Bank: 100+ Annotated Attacks</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.7;padding:40px 32px;max-width:900px}
+  h1{font-size:28px;font-weight:800;color:var(--accent);margin-bottom:6px}
+  .sub{font-size:13px;color:var(--muted);margin-bottom:36px;line-height:1.5}
+  h2{font-size:16px;font-weight:700;color:var(--warn);margin:32px 0 12px}
+  p{font-size:14px;color:var(--text);margin-bottom:14px;line-height:1.7}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:8px}
+  .cat-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;text-decoration:none;display:block;transition:border-color .15s}
+  .cat-card:hover{border-color:var(--accent)}
+  .cat-card h3{font-size:15px;font-weight:800;color:var(--accent);margin-bottom:6px}
+  .cat-card p{font-size:12px;color:var(--muted);margin:0;line-height:1.5}
+  .cat-card .count{font-size:11px;font-weight:700;color:var(--warn);margin-top:8px}
+  .cat-card .tags{margin-top:8px;display:flex;flex-wrap:wrap;gap:4px}
+  .tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;display:inline-block}
+  .t1{background:#1a2500;color:var(--ok)}
+  .t2{background:#2a0000;color:var(--danger)}
+  .t3{background:#1a1500;color:var(--warn)}
+  .t4{background:#0d1a30;color:var(--accent)}
+  .t5{background:#1a002a;color:var(--purple)}
+  .callout{border-left:3px solid var(--accent);background:var(--panel);padding:12px 16px;border-radius:0 6px 6px 0;margin:16px 0;font-size:13px;color:var(--muted)}
+  .callout strong{color:var(--text)}
+  .stats{display:flex;gap:24px;margin:24px 0;flex-wrap:wrap}
+  .stat{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px 20px;text-align:center;flex:1;min-width:120px}
+  .stat-n{font-size:28px;font-weight:800;color:var(--accent)}
+  .stat-l{font-size:11px;color:var(--muted);margin-top:2px}
+  .nav{display:flex;gap:12px;margin-top:48px;padding-top:20px;border-top:1px solid var(--border)}
+  .nav a{font-size:13px;color:var(--accent);padding:8px 18px;border:1px solid var(--accent);border-radius:4px;text-decoration:none}
+  a{color:var(--accent)}
+  .how-to{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:18px 22px;margin:20px 0}
+  .how-to h3{font-size:14px;color:var(--accent);margin-bottom:10px}
+  .how-to ol{font-size:13px;color:var(--muted);margin-left:18px}
+  .how-to li{margin-bottom:5px}
+</style>
+</head>
+<body>
+
+<h1>Module 19 — The XSS Payload Bank</h1>
+<div class="sub">
+  100+ attack strings, fully annotated. Each payload tells you: what context it targets, which of the 5 mechanisms it uses,
+  what filter or defense it bypasses, what would stop it, and where it came from.
+  This is a field guide — use it alongside the lab, use it when auditing, use it to build your own payload corpus.
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="stat-n">110+</div><div class="stat-l">Total payloads</div></div>
+  <div class="stat"><div class="stat-n">10</div><div class="stat-l">Categories</div></div>
+  <div class="stat"><div class="stat-n">5</div><div class="stat-l">Execution mechanisms</div></div>
+  <div class="stat"><div class="stat-n">19</div><div class="stat-l">Course modules</div></div>
+</div>
+
+<div class="callout">
+  <strong>How to read each payload entry:</strong>
+  Every payload in the sub-pages follows this structure:
+  <strong>Payload</strong> (copy-paste ready) →
+  <strong>Context</strong> (where in HTML it lands) →
+  <strong>Mechanism</strong> (which of the 5 from M03) →
+  <strong>Bypasses</strong> (what filter/defense it defeats) →
+  <strong>Stopped by</strong> (what would prevent it) →
+  <strong>Origin</strong> (CVE, bug bounty, worm, research).
+</div>
+
+<div class="how-to">
+  <h3>How to use the Payload Bank</h3>
+  <ol>
+    <li>Open a category page below</li>
+    <li>Read the annotation before testing — understand <em>why</em> before you try</li>
+    <li>Start the lab server from any previous module (<code>make py</code>)</li>
+    <li>Test the payload against the appropriate endpoint (noted per payload)</li>
+    <li>Observe: does the alert fire? Check browser DevTools if not — the error tells you which defense blocked it</li>
+    <li>Try the "what stops it" defense — confirm the payload is blocked</li>
+  </ol>
+</div>
+
+<h2>Categories</h2>
+
+<div class="grid">
+
+  <a href="payloads/01_script_tags.html" class="cat-card">
+    <h3>01 — Script Tag Injection</h3>
+    <p>The baseline: &lt;script&gt; tags and all the ways they can be written, encoded, and broken across line boundaries to evade naive filters.</p>
+    <div class="count">12 payloads</div>
+    <div class="tags"><span class="tag t1">TAG PARSING</span><span class="tag t3">BASELINE</span></div>
+  </a>
+
+  <a href="payloads/02_event_handlers.html" class="cat-card">
+    <h3>02 — Event Handler Injection</h3>
+    <p>The real workhorse. 150+ HTML event attributes — this page covers the most powerful, the most surprising, and the ones that bypass script-only filters.</p>
+    <div class="count">15 payloads</div>
+    <div class="tags"><span class="tag t1">EVENT ATTRS</span><span class="tag t2">FILTER BYPASS</span></div>
+  </a>
+
+  <a href="payloads/03_uri_schemes.html" class="cat-card">
+    <h3>03 — URI Scheme Injection</h3>
+    <p>javascript: and data: in href, src, action, formaction, srcdoc. Open redirectors as XSS delivery. Encoding tricks for each.</p>
+    <div class="count">12 payloads</div>
+    <div class="tags"><span class="tag t1">URI SCHEMES</span><span class="tag t3">OPEN REDIRECT</span></div>
+  </a>
+
+  <a href="payloads/04_svg_mathml.html" class="cat-card">
+    <h3>04 — SVG, MathML &amp; Namespace Confusion</h3>
+    <p>Why "it's just an image" is wrong. SVG has its own &lt;script&gt; and full event model. MathML namespace escapes. iframe srcdoc entity decoding.</p>
+    <div class="count">11 payloads</div>
+    <div class="tags"><span class="tag t4">NAMESPACE</span><span class="tag t2">SVG</span></div>
+  </a>
+
+  <a href="payloads/05_dom_sinks.html" class="cat-card">
+    <h3>05 — DOM-Based XSS Sinks</h3>
+    <p>innerHTML, outerHTML, eval, document.write, location.href, location.hash, postMessage, srcdoc — each sink with a matching source and working payload.</p>
+    <div class="count">13 payloads</div>
+    <div class="tags"><span class="tag t4">DOM SINKS</span><span class="tag t5">CLIENT-SIDE</span></div>
+  </a>
+
+  <a href="payloads/06_filter_evasion.html" class="cat-card">
+    <h3>06 — Filter Evasion &amp; Obfuscation</h3>
+    <p>URL encoding, HTML entities, Unicode, null bytes, case mixing, comment injection, string splitting — 15 techniques that make regex/string filters useless.</p>
+    <div class="count">15 payloads</div>
+    <div class="tags"><span class="tag t2">EVASION</span><span class="tag t3">ENCODING</span></div>
+  </a>
+
+  <a href="payloads/07_mxss.html" class="cat-card">
+    <h3>07 — Mutation XSS (mXSS)</h3>
+    <p>Payloads that appear safe to a sanitizer but mutate when round-tripped through innerHTML. Foster parenting, SVG style context, noscript, template.</p>
+    <div class="count">10 payloads</div>
+    <div class="tags"><span class="tag t5">MXSS</span><span class="tag t2">SANITIZER BYPASS</span></div>
+  </a>
+
+  <a href="payloads/08_chaining_payloads.html" class="cat-card">
+    <h3>08 — Chaining &amp; Post-Exploitation</h3>
+    <p>XSS payloads that do real damage: CSRF token theft, password change, cookie exfil, localStorage dump, credential overlay, self-propagating worm skeleton.</p>
+    <div class="count">10 payloads</div>
+    <div class="tags"><span class="tag t2">CHAINING</span><span class="tag t3">ACCOUNT TAKEOVER</span></div>
+  </a>
+
+  <a href="payloads/09_exotic_modern.html" class="cat-card">
+    <h3>09 — Exotic &amp; Modern Vectors</h3>
+    <p>Prototype pollution gadgets, CSS injection for data exfil, dangling markup, import(), WebAssembly, Service Worker injection, Trusted Types bypass attempts.</p>
+    <div class="count">12 payloads</div>
+    <div class="tags"><span class="tag t5">MODERN</span><span class="tag t4">ADVANCED</span></div>
+  </a>
+
+  <a href="payloads/10_real_world_derived.html" class="cat-card">
+    <h3>10 — Real-World Derived</h3>
+    <p>Payloads reconstructed from CVEs, famous bug bounty reports, and the Samy/Twitter worms. Each with the real vulnerability context and what was actually fixed.</p>
+    <div class="count">12 payloads</div>
+    <div class="tags"><span class="tag t2">CVE</span><span class="tag t3">BUG BOUNTY</span><span class="tag t1">WORM</span></div>
+  </a>
+
+</div>
+
+<h2>Quick-Reference: The 5 Mechanisms</h2>
+
+<p>Every payload in this bank reduces to one of these five execution mechanisms (from Module 03). Knowing which mechanism a payload uses tells you immediately which defense stops it.</p>
+
+<table style="font-size:13px;margin-top:12px">
+  <tr>
+    <th>#</th><th>Mechanism</th><th>Example trigger</th><th>Primary defense</th>
+  </tr>
+  <tr>
+    <td>1</td><td><strong>Tag parsing</strong></td>
+    <td><code>&lt;script&gt;…&lt;/script&gt;</code></td>
+    <td>Output encoding, CSP script-src</td>
+  </tr>
+  <tr>
+    <td>2</td><td><strong>Event attributes</strong></td>
+    <td><code>&lt;img onerror=…&gt;</code></td>
+    <td>Output encoding, CSP unsafe-inline off</td>
+  </tr>
+  <tr>
+    <td>3</td><td><strong>URI schemes</strong></td>
+    <td><code>&lt;a href="javascript:…"&gt;</code></td>
+    <td>URL allowlist, CSP script-src</td>
+  </tr>
+  <tr>
+    <td>4</td><td><strong>DOM sinks</strong></td>
+    <td><code>el.innerHTML = location.hash</code></td>
+    <td>Trusted Types, safe DOM API (textContent)</td>
+  </tr>
+  <tr>
+    <td>5</td><td><strong>Context-escape + reparse</strong></td>
+    <td><code>" onmouseover="</code> breaking out of attribute</td>
+    <td>Output encoding in correct context</td>
+  </tr>
+</table>
+
+<div class="nav">
+  <a href="../module_18/tutorial.html">← Module 18: Threat Model</a>
+  <a href="payloads/01_script_tags.html">Start: Script Tag Payloads →</a>
+</div>
+
+</body>
+</html>

