@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>M14 — Prototype Pollution → DOM XSS</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:32px;max-width:900px}
+  h1{font-size:22px;font-weight:800;color:var(--accent);margin-bottom:4px}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:28px}
+  h2{font-size:15px;font-weight:700;color:var(--warn);margin:28px 0 10px}
+  p{font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.6}
+  code{font-family:'Courier New',monospace;font-size:11px;background:#060d1a;color:var(--accent);padding:2px 5px;border-radius:3px}
+  pre{background:#060d1a;border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;line-height:1.7;color:var(--orange);margin:10px 0;overflow-x:auto;white-space:pre-wrap}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:20px}
+  label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
+  input{width:100%;padding:8px 10px;background:#060d1a;color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:13px;font-family:'Courier New',monospace;margin-bottom:10px}
+  button{padding:8px 18px;background:#1e3a5f;color:var(--accent);border:1px solid var(--accent);border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;margin-right:8px}
+  button:hover{background:#244a7a}
+  .out{margin-top:12px;padding:10px 14px;background:#060d1a;border-radius:4px;font-size:12px;font-family:'Courier New',monospace;min-height:28px;border:1px solid var(--border)}
+  .badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:6px;vertical-align:middle}
+  .b-hard{background:#3b0000;color:var(--danger)}
+  .b-live{background:#0d2b1a;color:var(--ok)}
+  .gadget-out{margin-top:10px;padding:10px;background:#060d1a;border:1px solid var(--border);border-radius:4px;min-height:28px}
+  .warn-box{border-left:3px solid var(--warn);background:#1a1500;padding:10px 14px;border-radius:0 4px 4px 0;font-size:12px;color:var(--muted);margin:10px 0}
+  .reset-banner{background:#1a0000;border:1px solid var(--danger);border-radius:5px;padding:10px 14px;font-size:12px;color:var(--danger);margin-bottom:16px;display:none}
+</style>
+</head>
+<body>
+
+<h1>Module 14 — Prototype Pollution → DOM XSS <span class="badge b-hard">HARD</span></h1>
+<div class="sub">Interactive attack demo — all execution is local in this browser tab</div>
+
+<div class="warn-box">
+  <strong style="color:var(--warn)">Important:</strong> Prototype pollution affects the entire page runtime.
+  Each demo section uses <strong>Object.create(null)</strong> for its own state to avoid cross-section interference.
+  Click "Reset Page" between demos if you see unexpected behaviour.
+</div>
+<div id="reset-banner" class="reset-banner">Prototype is polluted from a previous demo. Click Reset Page for a clean state.</div>
+<button onclick="location.reload()" style="margin-bottom:24px">↺ Reset Page</button>
+
+<!-- ─── DEMO 1 ─────────────────────────────────────────────────── -->
+<h2>Demo 1 — Basic Prototype Pollution via deepMerge <span class="badge b-live">LIVE</span></h2>
+<div class="card">
+  <p>Enter a property name and value to merge into <code>Object.prototype</code> via a vulnerable deep-merge function. After merging, observe that every new empty object inherits the value.</p>
+  <label>Property name (try: <code>innerHTML</code>, <code>src</code>, <code>href</code>)</label>
+  <input id="d1-key" value="innerHTML">
+  <label>Property value</label>
+  <input id="d1-val" value="&lt;img src=x onerror=alert('proto-polluted')&gt;">
+  <button onclick="demo1_merge()">Merge into Object.prototype</button>
+  <button onclick="demo1_check()">Check new {}.prop</button>
+  <div class="out" id="d1-out">Results will appear here…</div>
+
+  <div style="margin-top:14px">
+    <p style="margin-bottom:6px">Gadget — app code reads <code>{}.innerHTML</code> → sets div.innerHTML:</p>
+    <div class="gadget-out" id="d1-gadget">(gadget not yet triggered — click "Fire Gadget")</div>
+    <button onclick="demo1_gadget()" style="margin-top:8px">Fire Gadget</button>
+  </div>
+</div>
+
+<!-- ─── DEMO 2 ─────────────────────────────────────────────────── -->
+<h2>Demo 2 — URL Parameter → Nested Object → Pollution <span class="badge b-live">LIVE</span></h2>
+<div class="card">
+  <p>Real apps parse URL query strings into nested objects. The key <code>__proto__[innerHTML]=payload</code> creates <code>{"__proto__": {"innerHTML": "payload"}}</code>, which deepMerge writes to <code>Object.prototype</code>.</p>
+  <label>Simulated query string (edit and click Parse)</label>
+  <input id="d2-qs" value="__proto__[innerHTML]=&lt;img src=x onerror=alert('from-URL')&gt;">
+  <button onclick="demo2_parse()">Parse + Merge</button>
+  <div class="out" id="d2-out">Results will appear here…</div>
+
+  <pre id="d2-code" style="margin-top:12px">// What the app does:
+function parseQuery(search) {
+  const obj = {};
+  new URLSearchParams(search).forEach((val, key) => {
+    const parts = key.split(/[\[\]]+/).filter(Boolean);
+    let cur = obj;
+    parts.forEach((p, i) => {
+      if (i === parts.length - 1) cur[p] = val;
+      else { cur[p] = cur[p] || {}; cur = cur[p]; }
+    });
+  });
+  return obj;
+}
+deepMerge({}, parseQuery(queryString));
+// Parsed: { "__proto__": { "innerHTML": PAYLOAD } }
+// After merge: Object.prototype.innerHTML === PAYLOAD</pre>
+</div>
+
+<!-- ─── DEMO 3 ─────────────────────────────────────────────────── -->
+<h2>Demo 3 — JSON Config Merge <span class="badge b-live">LIVE</span></h2>
+<div class="card">
+  <p>Apps that accept JSON configuration via <code>?settings=…</code> can be polluted via the JSON body. Try the payload below.</p>
+  <label>JSON settings string</label>
+  <input id="d3-json" value='{"__proto__":{"innerHTML":"&lt;b style=color:red&gt;POLLUTED&lt;/b&gt;"}}'>
+  <button onclick="demo3_parse()">Parse JSON + Merge</button>
+  <div class="out" id="d3-out">Results will appear here…</div>
+  <div class="gadget-out" id="d3-gadget" style="margin-top:10px">(gadget output)</div>
+</div>
+
+<!-- ─── DEMO 4 ─────────────────────────────────────────────────── -->
+<h2>Demo 4 — constructor.prototype Bypass <span class="badge b-live">LIVE</span></h2>
+<div class="card">
+  <p>If a merge function blocks <code>__proto__</code> but not <code>constructor</code>, the alternate path <code>constructor.prototype</code> still works. <code>obj.constructor</code> is <code>Object</code>, so <code>obj.constructor.prototype</code> is <code>Object.prototype</code>.</p>
+  <label>Payload (constructor path)</label>
+  <input id="d4-val" value="&lt;img src=x onerror=alert('constructor-path')&gt;">
+  <button onclick="demo4_merge()">Merge via constructor.prototype</button>
+  <div class="out" id="d4-out">Results will appear here…</div>
+  <div class="gadget-out" id="d4-gadget" style="margin-top:10px">(gadget output)</div>
+</div>
+
+<!-- ─── DEFENSE ────────────────────────────────────────────────── -->
+<h2>Defense: Object.create(null) Makes Pollution Irrelevant</h2>
+<div class="card">
+  <p><code>Object.create(null)</code> creates an object with no prototype chain at all. Polluting <code>Object.prototype</code> has no effect on it — the polluted property is simply not in its lookup chain.</p>
+  <button onclick="demo_defense()">Demonstrate Defense</button>
+  <div class="out" id="def-out">Results will appear here…</div>
+</div>
+
+<script>
+// ─── Vulnerable deepMerge ───────────────────────────────────────────────────
+
+function deepMerge(target, source) {
+  for (const key in source) {
+    if (key === '__proto__') {
+      // VULNERABLE: this writes to Object.prototype
+      Object.assign(Object.prototype, source[key]);
+    } else if (typeof source[key] === 'object' && source[key] !== null) {
+      target[key] = target[key] || {};
+      deepMerge(target[key], source[key]);
+    } else {
+      target[key] = source[key];
+    }
+  }
+  return target;
+}
+
+// deepMerge that only blocks __proto__ but NOT constructor
+function deepMergePartial(target, source) {
+  for (const key in source) {
+    if (key === '__proto__') continue; // blocks __proto__ but not constructor
+    if (typeof source[key] === 'object' && source[key] !== null) {
+      target[key] = target[key] || {};
+      deepMergePartial(target[key], source[key]);
+    } else {
+      target[key] = source[key];
+    }
+  }
+  return target;
+}
+
+function parseQuery(search) {
+  const obj = {};
+  new URLSearchParams(search).forEach((val, key) => {
+    const parts = key.split(/[\[\]]+/).filter(Boolean);
+    let cur = obj;
+    parts.forEach((p, i) => {
+      if (i === parts.length - 1) cur[p] = val;
+      else { cur[p] = cur[p] || {}; cur = cur[p]; }
+    });
+  });
+  return obj;
+}
+
+// ─── Demo 1 ────────────────────────────────────────────────────────────────
+
+function demo1_merge() {
+  const k = document.getElementById('d1-key').value.trim();
+  const v = document.getElementById('d1-val').value;
+  const src = {};
+  src['__proto__'] = {};
+  src['__proto__'][k] = v;
+  deepMerge({}, src);
+  const probe = {};
+  document.getElementById('d1-out').textContent =
+    'Merged. new {}.' + k + ' = ' + JSON.stringify(probe[k]);
+  document.getElementById('reset-banner').style.display = 'block';
+}
+
+function demo1_check() {
+  const k = document.getElementById('d1-key').value.trim();
+  const probe = {};
+  document.getElementById('d1-out').textContent =
+    'new {}.' + k + ' = ' + JSON.stringify(probe[k]);
+}
+
+function demo1_gadget() {
+  const config = {};
+  const out = document.getElementById('d1-gadget');
+  if (config.innerHTML !== undefined) {
+    out.innerHTML = config.innerHTML;
+  } else {
+    out.textContent = '(config.innerHTML is undefined — prototype not yet polluted)';
+  }
+}
+
+// ─── Demo 2 ────────────────────────────────────────────────────────────────
+
+function demo2_parse() {
+  const qs = document.getElementById('d2-qs').value;
+  const parsed = parseQuery(qs);
+  const out = document.getElementById('d2-out');
+  out.textContent = 'Parsed object: ' + JSON.stringify(parsed) + '\n';
+  deepMerge({}, parsed);
+  const probe = {};
+  out.textContent += 'After merge — new {}.innerHTML = ' + JSON.stringify(probe.innerHTML);
+  document.getElementById('reset-banner').style.display = 'block';
+}
+
+// ─── Demo 3 ────────────────────────────────────────────────────────────────
+
+function demo3_parse() {
+  const raw = document.getElementById('d3-json').value;
+  const out = document.getElementById('d3-out');
+  const gadget = document.getElementById('d3-gadget');
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch(e) {
+    out.textContent = 'JSON parse error: ' + e.message; return;
+  }
+  deepMerge({}, parsed);
+  const probe = {};
+  out.textContent = 'After merge — new {}.innerHTML = ' + JSON.stringify(probe.innerHTML);
+  if (probe.innerHTML !== undefined) {
+    gadget.innerHTML = probe.innerHTML;
+  } else {
+    gadget.textContent = '(not polluted)';
+  }
+  document.getElementById('reset-banner').style.display = 'block';
+}
+
+// ─── Demo 4 ────────────────────────────────────────────────────────────────
+
+function demo4_merge() {
+  const v = document.getElementById('d4-val').value;
+  const out = document.getElementById('d4-out');
+  const gadget = document.getElementById('d4-gadget');
+
+  // Use constructor.prototype path — deepMergePartial blocks __proto__ but not this
+  const malicious = JSON.parse('{"constructor":{"prototype":{"innerHTML":' + JSON.stringify(v) + '}}}');
+  deepMergePartial({}, malicious);
+
+  const probe = {};
+  out.textContent = 'constructor.prototype path used.\nnew {}.innerHTML = ' + JSON.stringify(probe.innerHTML);
+  if (probe.innerHTML !== undefined) {
+    gadget.innerHTML = probe.innerHTML;
+  } else {
+    gadget.textContent = '(not polluted)';
+  }
+  document.getElementById('reset-banner').style.display = 'block';
+}
+
+// ─── Defense ───────────────────────────────────────────────────────────────
+
+function demo_defense() {
+  // Pollute Object.prototype first
+  Object.prototype._test_def = '<img src=x onerror=alert("defense-bypass")>';
+
+  const normalObj = {};
+  const nullObj = Object.create(null);
+
+  const out = document.getElementById('def-out');
+  out.textContent =
+    'Object.prototype._test_def = "' + Object.prototype._test_def + '"\n\n' +
+    'Normal {}._test_def = "' + normalObj._test_def + '"  ← inherited!\n' +
+    'Object.create(null)._test_def = ' + nullObj._test_def + '  ← undefined, no prototype chain';
+
+  // Clean up
+  delete Object.prototype._test_def;
+}
+</script>
+
+</body>
+</html>

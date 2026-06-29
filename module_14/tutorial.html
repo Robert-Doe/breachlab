@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Module 14 — Prototype Pollution → DOM XSS</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.7;padding:40px 32px;max-width:820px}
+  h1{font-size:26px;font-weight:800;color:var(--accent);margin-bottom:6px}
+  .mod-tag{font-size:12px;color:var(--muted);margin-bottom:36px;display:block}
+  h2{font-size:18px;font-weight:700;color:var(--warn);margin:36px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  h3{font-size:14px;font-weight:700;color:var(--accent);margin:22px 0 8px}
+  p{font-size:14px;color:var(--text);margin-bottom:12px}
+  ul,ol{font-size:14px;color:var(--text);margin-left:22px;margin-bottom:12px}
+  li{margin-bottom:5px}
+  code{font-family:'Courier New',monospace;font-size:12px;background:#060d1a;color:var(--accent);padding:2px 6px;border-radius:3px}
+  pre{background:#060d1a;border:1px solid var(--border);border-radius:6px;padding:14px 16px;overflow-x:auto;font-size:12px;line-height:1.7;color:var(--orange);margin:12px 0;white-space:pre-wrap}
+  .callout{border-left:3px solid var(--accent);background:var(--panel);padding:12px 16px;border-radius:0 6px 6px 0;margin:14px 0;font-size:13px;color:var(--muted)}
+  .callout strong{color:var(--text)}
+  .warn{border-left-color:var(--warn)}
+  .danger{border-left-color:var(--danger)}
+  .ok{border-left-color:var(--ok)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:14px 0}
+  th{padding:8px 12px;background:#060d1a;color:var(--accent);text-align:left;font-size:12px;font-weight:700}
+  td{padding:7px 12px;border-top:1px solid var(--border);color:var(--muted);vertical-align:top}
+  td strong{color:var(--text)}
+  .nav{display:flex;gap:12px;margin-top:48px;padding-top:20px;border-top:1px solid var(--border)}
+  .nav a{font-size:13px;color:var(--accent);padding:8px 18px;border:1px solid var(--accent);border-radius:4px}
+  a{color:var(--accent)}
+  .pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px;vertical-align:middle}
+  .pill-hard{background:#3b0000;color:var(--danger)}
+  .pill-new{background:#0d2b1a;color:var(--ok)}
+  .step{counter-increment:step;padding-left:36px;position:relative;margin-bottom:20px}
+  .step::before{content:counter(step);position:absolute;left:0;top:0;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#000;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;line-height:1}
+  ol.steps{counter-reset:step;list-style:none;margin-left:0}
+</style>
+</head>
+<body>
+
+<h1>Module 14 — Prototype Pollution → DOM XSS <span class="pill pill-hard">HARD</span></h1>
+<span class="mod-tag">XSS Mastery Course · Module 14 of 19</span>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>1. The Core Insight</h2>
+
+<p>Every JavaScript object you create — <code>{}</code>, <code>new Foo()</code>, an array — inherits from <code>Object.prototype</code>. When you access a property that doesn't exist on the object itself, the engine walks the prototype chain and finds it on <code>Object.prototype</code> instead.</p>
+
+<p><strong>Prototype pollution</strong> is the act of writing to <code>Object.prototype</code> (or another built-in prototype) via an application vulnerability, so that every subsequently created object in the runtime inherits the attacker's value.</p>
+
+<pre>// Normal object — no innerHTML
+const obj = {};
+console.log(obj.innerHTML); // undefined
+
+// After prototype pollution:
+Object.prototype.innerHTML = '&lt;img src=x onerror=alert(1)&gt;';
+const obj2 = {};
+console.log(obj2.innerHTML); // "&lt;img src=x onerror=alert(1)&gt;"  ← attacker value!</pre>
+
+<p>On its own, pollution is a denial-of-service or logic-corruption issue. It becomes XSS when application code reads the polluted property into a <strong>DOM sink</strong> like <code>innerHTML</code>, <code>eval</code>, or <code>document.write</code>.</p>
+
+<div class="callout danger"><strong>Why this is subtle:</strong> There is no direct path from user input to a DOM sink in the code. The sink reads from a config object that the developer assumes is always empty or typed. The attacker's value arrives via a completely different code path — the deep-merge utility.</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>2. JavaScript's Prototype Chain</h2>
+
+<p>When you write <code>obj.prop</code>, the engine performs this lookup:</p>
+
+<pre>obj.prop
+  → not found → obj.__proto__.prop       (the object's own prototype)
+  → not found → obj.__proto__.__proto__.prop  (Object.prototype)
+  → not found → undefined</pre>
+
+<p>Three ways to write to <code>Object.prototype</code>:</p>
+
+<table>
+  <tr><th>Method</th><th>Code</th><th>Notes</th></tr>
+  <tr><td><strong>Direct</strong></td><td><code>Object.prototype.x = v</code></td><td>Explicit — rarely in user-visible code</td></tr>
+  <tr><td><strong>Via __proto__</strong></td><td><code>obj.__proto__.x = v</code></td><td>Classic pollution vector</td></tr>
+  <tr><td><strong>Via constructor</strong></td><td><code>obj.constructor.prototype.x = v</code></td><td>Works when __proto__ is blocked</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>3. The Vulnerable Pattern: deepMerge</h2>
+
+<p>Prototype pollution almost always enters through a <strong>recursive object merge</strong> function — used everywhere in JavaScript for merging config objects, extending defaults, or parsing URL parameters into nested objects.</p>
+
+<h3>Vulnerable deepMerge</h3>
+<pre>function deepMerge(target, source) {
+  for (const key in source) {
+    if (typeof source[key] === 'object' &amp;&amp; source[key] !== null) {
+      target[key] = target[key] || {};
+      deepMerge(target[key], source[key]);   // ← recursion
+    } else {
+      target[key] = source[key];
+    }
+  }
+  return target;
+}
+
+// Attacker input:
+const malicious = JSON.parse('{"__proto__":{"innerHTML":"&lt;img src=x onerror=alert(1)&gt;"}}');
+deepMerge({}, malicious);
+// Now: Object.prototype.innerHTML === "&lt;img src=x onerror=alert(1)&gt;"</pre>
+
+<p>The bug: <code>for (const key in source)</code> iterates over inherited properties too (in older patterns) or the code explicitly assigns to <code>target["__proto__"]</code>, which in JavaScript writes to <code>Object.prototype</code>, not to the object's own <code>__proto__</code> key.</p>
+
+<h3>URL parameter vector</h3>
+<p>Many apps parse URL query strings into nested objects:</p>
+<pre>// URL: ?__proto__[innerHTML]=&lt;img src=x onerror=alert(1)&gt;
+// Parsed into:
+{ "__proto__": { "innerHTML": "&lt;img src=x onerror=alert(1)&gt;" } }
+// → deepMerge({}, parsed) → prototype polluted</pre>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>4. The Attack Chain: Source → Pollution → Sink</h2>
+
+<p>The full attack has two independent code paths that meet in the polluted prototype:</p>
+
+<pre>┌─────────────────────────────────────────────────────────┐
+│ SOURCE (user-controlled)                                │
+│   URL param → parseQuery() → deepMerge()               │
+│                         ↓                               │
+│              Object.prototype.innerHTML = PAYLOAD       │
+└─────────────────────────────────────────────────────────┘
+                           ↓  (prototype chain)
+┌─────────────────────────────────────────────────────────┐
+│ SINK (unrelated code path)                              │
+│   const config = {};                                    │
+│   if (config.innerHTML !== undefined) {                 │
+│     someElement.innerHTML = config.innerHTML;  ← XSS  │
+│   }                                                     │
+└─────────────────────────────────────────────────────────┘</pre>
+
+<div class="callout warn"><strong>Why static analysis misses this:</strong> No taint path connects the source to the sink in the same function or call chain. The connection is invisible — it runs through global state (Object.prototype).</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>5. Lab Exercises</h2>
+
+<p>The lab server at <code>http://localhost:5000</code> exposes four endpoints, each demonstrating a different prototype pollution gadget:</p>
+
+<table>
+  <tr><th>Endpoint</th><th>Gadget Type</th><th>Attack URL</th></tr>
+  <tr>
+    <td><code>/pp/merge</code></td>
+    <td><strong>Deep merge via URL params</strong></td>
+    <td><code>?__proto__[innerHTML]=&lt;img src=x onerror=alert(1)&gt;</code></td>
+  </tr>
+  <tr>
+    <td><code>/pp/config</code></td>
+    <td><strong>JSON config merge</strong></td>
+    <td><code>?settings={"__proto__":{"innerHTML":"&lt;img src=x onerror=alert(1)&gt;"}}</code></td>
+  </tr>
+  <tr>
+    <td><code>/pp/template</code></td>
+    <td><strong>Template engine gadget</strong></td>
+    <td><code>?__proto__[extraHtml]=&lt;img src=x onerror=alert(1)&gt;</code></td>
+  </tr>
+  <tr>
+    <td><code>/pp/gadget</code></td>
+    <td><strong>jQuery-like library gadget</strong></td>
+    <td><code>?__proto__[html]=&lt;img src=x onerror=alert(1)&gt;</code></td>
+  </tr>
+</table>
+
+<ol class="steps">
+  <li class="step">Start the server: <code>make py</code> or <code>make node</code></li>
+  <li class="step">Visit <code>/pp/merge</code> without any params. Observe the "proto-check" output — <code>new {}.innerHTML</code> is <code>undefined</code>.</li>
+  <li class="step">Add <code>?__proto__[innerHTML]=POLLUTED</code> to the URL. Observe proto-check now shows <code>"POLLUTED"</code> — every new object in the runtime inherits it.</li>
+  <li class="step">Add the XSS payload: <code>?__proto__[innerHTML]=&lt;img src=x onerror=alert(document.domain)&gt;</code>. The gadget fires.</li>
+  <li class="step">Repeat for <code>/pp/template</code> using <code>__proto__[extraHtml]</code> — this one fires inside the template renderer.</li>
+  <li class="step">Try <code>/pp/gadget</code> with <code>__proto__[html]</code> — the jQuery-like helper reads the polluted option.</li>
+</ol>
+
+<p>Also open <a href="public/attack_11_proto.html">attack_11_proto.html</a> for a standalone interactive demo that walks through each gadget without needing the server.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>6. Real Libraries That Were Vulnerable</h2>
+
+<table>
+  <tr><th>Library</th><th>CVE</th><th>Gadget / Sink</th></tr>
+  <tr><td><strong>lodash &lt; 4.17.5</strong></td><td>CVE-2018-3721, CVE-2019-10744</td><td><code>_.merge()</code>, <code>_.defaultsDeep()</code></td></tr>
+  <tr><td><strong>jQuery &lt; 3.4.0</strong></td><td>CVE-2019-11358</td><td><code>$.extend(true, …)</code></td></tr>
+  <tr><td><strong>hoek &lt; 4.2.1</strong></td><td>CVE-2018-3728</td><td><code>hoek.merge()</code></td></tr>
+  <tr><td><strong>mpath &lt; 0.8.4</strong></td><td>CVE-2021-23413</td><td>path-based property setter</td></tr>
+  <tr><td><strong>node-forge</strong></td><td>CVE-2022-0122</td><td>ASN.1 parser → merge</td></tr>
+</table>
+
+<p>In every case, the fix was to add a property key check before recursive merge:</p>
+<pre>// Safe deepMerge — reject prototype-polluting keys
+if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;</pre>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>7. Defenses</h2>
+
+<table>
+  <tr><th>Defense</th><th>How it helps</th><th>Limits</th></tr>
+  <tr>
+    <td><strong>Key deny-list in merge</strong></td>
+    <td>Skip <code>__proto__</code>, <code>constructor</code>, <code>prototype</code> during deep merge</td>
+    <td>Must catch all three; constructor.prototype is an alternate path</td>
+  </tr>
+  <tr>
+    <td><strong>Object.create(null)</strong></td>
+    <td>Creates an object with <em>no prototype</em> — pollution has no effect because there is no shared chain</td>
+    <td>Only for the object that holds untrusted data</td>
+  </tr>
+  <tr>
+    <td><strong>Object.freeze(Object.prototype)</strong></td>
+    <td>Makes Object.prototype immutable — no writes succeed</td>
+    <td>Can break libraries that legitimately extend prototypes</td>
+  </tr>
+  <tr>
+    <td><strong>hasOwnProperty checks</strong></td>
+    <td>Replace <code>obj.prop</code> with <code>Object.prototype.hasOwnProperty.call(obj,'prop')</code></td>
+    <td>Must be applied at every sink, not just the merge</td>
+  </tr>
+  <tr>
+    <td><strong>Trusted Types</strong></td>
+    <td>Blocks raw string assignment to innerHTML even if polluted</td>
+    <td>Coverage depends on enforcement scope</td>
+  </tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>8. Key Takeaways</h2>
+
+<ul>
+  <li>Prototype pollution is a <strong>second-order vulnerability</strong> — the injection and the execution are in different code paths. This makes it invisible to most auditing approaches.</li>
+  <li>The attack surface is <strong>every app that merges untrusted objects</strong> — URL params, JSON body, WebSocket messages.</li>
+  <li>Gadgets are <strong>everywhere</strong>: any code that reads a property from an object it doesn't fully control, and routes that value to a DOM sink, is a gadget.</li>
+  <li>As a defender, the root fix is the merge function. As an auditor, search for merge utilities + DOM sinks as independent findings that combine into a chain.</li>
+</ul>
+
+<div class="nav">
+  <a href="../module_13/tutorial.html">← Module 13: mXSS</a>
+  <a href="../module_15/tutorial.html">Module 15: Attack Chaining →</a>
+</div>
+
+</body>
+</html>
