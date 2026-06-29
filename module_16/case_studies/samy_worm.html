@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Case Study — Samy Worm (MySpace 2005)</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:36px 32px;max-width:860px}
+  h1{font-size:24px;font-weight:800;color:var(--accent);margin-bottom:6px}
+  .meta{font-size:12px;color:var(--muted);margin-bottom:28px}
+  h2{font-size:16px;font-weight:700;color:var(--warn);margin:28px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+  p{font-size:14px;line-height:1.7;color:var(--text);margin-bottom:12px}
+  code{font-family:'Courier New',monospace;font-size:12px;background:#060d1a;color:var(--orange);padding:2px 6px;border-radius:3px}
+  pre{background:#060d1a;border:1px solid var(--border);border-radius:6px;padding:16px;font-family:'Courier New',monospace;font-size:12px;color:var(--orange);overflow-x:auto;margin:12px 0;white-space:pre-wrap;word-break:break-all}
+  .timeline{border-left:2px solid var(--accent);padding-left:20px;margin:16px 0}
+  .timeline-item{margin-bottom:16px;position:relative}
+  .timeline-item::before{content:'';position:absolute;left:-25px;top:5px;width:8px;height:8px;background:var(--accent);border-radius:50%}
+  .t-time{font-size:11px;color:var(--muted);font-weight:700}
+  .t-event{font-size:13px;color:var(--text)}
+  .callout{background:var(--panel);border-left:3px solid var(--warn);padding:12px 16px;border-radius:0 6px 6px 0;margin:16px 0;font-size:13px}
+  .defense-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
+  .defense-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:14px}
+  .defense-card h3{font-size:12px;font-weight:700;margin-bottom:6px}
+  .d-missing{border-color:var(--danger);color:var(--danger)}
+  .d-fix{border-color:var(--ok);color:var(--ok)}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-block;margin-right:4px}
+  .t-worm{background:#001a0d;color:var(--ok)}
+  .t-bypass{background:#2a0000;color:var(--danger)}
+  nav{display:flex;gap:10px;margin-top:36px;padding-top:16px;border-top:1px solid var(--border)}
+  nav a{font-size:12px;color:var(--accent);padding:7px 16px;border:1px solid var(--accent);border-radius:4px;text-decoration:none}
+</style>
+</head>
+<body>
+
+<h1>Samy Worm — MySpace, October 2005</h1>
+<div class="meta">
+  <span class="tag t-worm">SELF-PROPAGATING</span>
+  <span class="tag t-bypass">FILTER BYPASS</span>
+  Author: Samy Kamkar &nbsp;|&nbsp; Impact: ~1,000,000 profiles in 20 hours &nbsp;|&nbsp; Module: M16
+</div>
+
+<h2>Background</h2>
+<p>In October 2005, Samy Kamkar injected a self-replicating XSS payload into his MySpace profile. MySpace allowed customisation of profile pages via HTML, but applied a filter to block JavaScript. Samy bypassed this filter and created the first large-scale XSS worm. Every user who visited his profile had their own profile infected with the same payload — which also added Samy as a friend and posted "but most of all, samy is my hero."</p>
+<p>Within 20 hours, approximately 1,000,000 MySpace accounts were infected. MySpace took the site offline to remove infected profiles. Samy pled guilty to a felony under the California Computer Crime Law and was sentenced to community service, probation, and banned from using computers for three years.</p>
+
+<h2>Timeline</h2>
+<div class="timeline">
+  <div class="timeline-item">
+    <div class="t-time">October 4, 2005 — 12:00 AM</div>
+    <div class="t-event">Samy publishes the infected profile. The payload begins silently infecting visitors.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="t-time">October 4, 2005 — Early morning</div>
+    <div class="t-event">Exponential spread: each infected profile infects all its visitors. Rate accelerates as infection depth grows.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="t-time">October 4, 2005 — ~08:00 AM</div>
+    <div class="t-event">MySpace detects anomalous profile update volume. Investigation begins.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="t-time">October 4, 2005 — ~10:00 AM</div>
+    <div class="t-event">MySpace takes the site offline. ~1,000,000 profiles infected at this point.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="t-time">October 4, 2005 — Afternoon</div>
+    <div class="t-event">MySpace purges infected profiles, patches the encoding bug, brings the site back up.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="t-time">2006 — Criminal charges</div>
+    <div class="t-event">Samy Kamkar indicted under 18 U.S.C. § 1030 (CFAA). Pled guilty. Sentenced to community service + 3-year computer ban.</div>
+  </div>
+</div>
+
+<h2>The Filter and How It Was Bypassed</h2>
+<p>MySpace's filter blocked obvious JavaScript patterns: the word "javascript", <code>&lt;script&gt;</code> tags, <code>onclick</code>, and other event handlers. It also blocked CSS <code>expression()</code> — but imperfectly.</p>
+
+<p>Samy discovered that Internet Explorer supported CSS expressions (<code>background: url('javascript:...')</code>) and that MySpace's filter checked for the exact string "javascript" — which could be split across a line boundary:</p>
+
+<pre>/* The key bypass — newline inside the keyword */
+background: url('java
+script:...')
+
+/* IE joined the split string and evaluated it */
+/* MySpace's filter saw "java" and "script" separately — no match */</pre>
+
+<p>The actual payload was injected via a CSS <code>style</code> attribute on a <code>&lt;div&gt;</code> inside the profile. The filter allowed <code>style=</code> attributes but didn't correctly handle the line-break bypass.</p>
+
+<div class="callout">
+<strong>Filter bypass lesson:</strong> Blocklist filters on string patterns are fundamentally fragile. Any filter that checks for "javascript" as a literal string can be bypassed by inserting whitespace, line breaks, null bytes, or encoding variants. The correct defense is an allowlist (permit only known-safe HTML elements and attributes), not a blocklist.
+</div>
+
+<h2>Worm Propagation Logic (Reconstructed)</h2>
+<p>The payload performed three actions on every victim's browser:</p>
+
+<pre>/* Step 1: Add Samy as a friend */
+/* XHR to /addFriend?id=11851658 */
+
+/* Step 2: Post "but most of all, samy is my hero" to the victim's hero section */
+/* XHR to /updateProfile with the text */
+
+/* Step 3: REPLICATE — copy the worm payload into the victim's own profile */
+/* XHR GET to /viewProfile to read CSRF token */
+/* XHR POST to /updateProfile with full worm payload */
+
+/* Every visitor → infected profile → infects next layer of visitors */
+</pre>
+
+<p>The CSRF bypass was possible because MySpace's AJAX calls included the CSRF token in the HTML — and the same-origin XHR could read it. MySpace did not have SameSite cookies or per-request nonces at the time.</p>
+
+<h2>Three Conditions for a Worm</h2>
+<p>The Samy worm illustrates that XSS worms require three specific conditions. Breaking any one of them stops propagation:</p>
+<ol style="padding-left:20px;font-size:14px;line-height:2">
+  <li><strong>Stored XSS sink</strong> — a field that stores user input and renders it to other users without encoding.</li>
+  <li><strong>Write-back capability</strong> — the payload can update the current user's profile/post (requires either no CSRF protection or CSRF token harvesting).</li>
+  <li><strong>Social visibility</strong> — the infected field is displayed to other users (profile visitors, followers, friends).</li>
+</ol>
+
+<h2>Missing Defenses</h2>
+<div class="defense-row">
+  <div class="defense-card d-missing">
+    <h3>Missing</h3>
+    <p style="font-size:12px;color:var(--text)">Output encoding on profile display — bio/hero fields inserted directly into HTML</p>
+  </div>
+  <div class="defense-card d-fix">
+    <h3>Fix</h3>
+    <p style="font-size:12px;color:var(--text)"><code>html.escape(bio)</code> before inserting into template — converts &lt; to &amp;lt;</p>
+  </div>
+  <div class="defense-card d-missing">
+    <h3>Missing</h3>
+    <p style="font-size:12px;color:var(--text)">Allowlist HTML filter — blocklist on "javascript" string bypassed by line break</p>
+  </div>
+  <div class="defense-card d-fix">
+    <h3>Fix</h3>
+    <p style="font-size:12px;color:var(--text)">Allowlist sanitizer (DOMPurify) — permit only known-safe tags, block all others by default</p>
+  </div>
+  <div class="defense-card d-missing">
+    <h3>Missing</h3>
+    <p style="font-size:12px;color:var(--text)">Rate limiting on profile updates — worm posted unlimited updates</p>
+  </div>
+  <div class="defense-card d-fix">
+    <h3>Fix</h3>
+    <p style="font-size:12px;color:var(--text)">Rate limit profile-update API per user per minute; CAPTCHA for high-frequency updates</p>
+  </div>
+  <div class="defense-card d-missing">
+    <h3>Missing</h3>
+    <p style="font-size:12px;color:var(--text)">CSP — no policy to block inline script or restrict XHR targets</p>
+  </div>
+  <div class="defense-card d-fix">
+    <h3>Fix</h3>
+    <p style="font-size:12px;color:var(--text)"><code>Content-Security-Policy: script-src 'nonce-…'; connect-src 'self'</code></p>
+  </div>
+</div>
+
+<h2>PhD-Level Observations</h2>
+<p>The Samy worm is the first empirical demonstration of XSS worm propagation at scale. Several observations remain relevant to research:</p>
+<ol style="padding-left:20px;font-size:14px;line-height:2">
+  <li>Exponential spread rate (each profile infects all its visitors) matches SIR epidemic models. The R₀ of the Samy worm was approximately (average friend count of an infected user) — estimated at 10–50 for MySpace circa 2005.</li>
+  <li>The worm bypassed CSRF protection via same-origin XHR — confirming that CSRF tokens provide no protection against XSS-driven requests.</li>
+  <li>Detection was by volume anomaly (unusual profile update rate), not by content inspection. This suggests monitoring API call rates per user as a detection layer complementary to input validation.</li>
+  <li>The patch required both encoding fix AND profile cleanup — the encoding fix alone would not remove already-infected content.</li>
+</ol>
+
+<nav>
+  <a href="twitter_worm.html">Next: Twitter Worm →</a>
+  <a href="../tutorial.html">← Module 16 Tutorial</a>
+</nav>
+
+</body>
+</html>

