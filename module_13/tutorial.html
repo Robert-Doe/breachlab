@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Module 13 — Mutation XSS (mXSS)</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.7;padding:40px 32px;max-width:820px}
+  h1{font-size:26px;font-weight:800;color:var(--accent);margin-bottom:6px}
+  .mod-tag{font-size:12px;color:var(--muted);margin-bottom:36px;display:block}
+  h2{font-size:18px;font-weight:700;color:var(--warn);margin:36px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  h3{font-size:14px;font-weight:700;color:var(--accent);margin:22px 0 8px}
+  p{font-size:14px;color:var(--text);margin-bottom:12px}
+  ul,ol{font-size:14px;color:var(--text);margin-left:22px;margin-bottom:12px}
+  li{margin-bottom:5px}
+  code{font-family:'Courier New',monospace;font-size:12px;background:#060d1a;color:var(--accent);padding:2px 6px;border-radius:3px}
+  pre{background:#060d1a;border:1px solid var(--border);border-radius:6px;padding:14px 16px;overflow-x:auto;font-size:12px;line-height:1.7;color:var(--orange);margin:12px 0;white-space:pre-wrap}
+  .callout{border-left:3px solid var(--accent);background:var(--panel);padding:12px 16px;border-radius:0 6px 6px 0;margin:14px 0;font-size:13px;color:var(--muted)}
+  .callout strong{color:var(--text)}
+  .warn{border-left-color:var(--warn)}
+  .danger{border-left-color:var(--danger)}
+  .ok{border-left-color:var(--ok)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:14px 0}
+  th{padding:8px 12px;background:#060d1a;color:var(--accent);text-align:left;font-size:12px;font-weight:700}
+  td{padding:7px 12px;border-top:1px solid var(--border);color:var(--muted);vertical-align:top}
+  td strong{color:var(--text)}
+  .nav{display:flex;gap:12px;margin-top:48px;padding-top:20px;border-top:1px solid var(--border)}
+  .nav a{font-size:13px;color:var(--accent);padding:8px 18px;border:1px solid var(--accent);border-radius:4px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>Module 13 — Mutation XSS (mXSS)</h1>
+<span class="mod-tag">XSS Mastery Course · PhD-Level Cybersecurity · Prerequisite: Modules 01–12</span>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>1. The mXSS problem: two parses, two results</h2>
+
+<p>Every sanitiser-based XSS defence is built on a shared assumption: <em>the sanitiser and the browser parse HTML the same way</em>. Mutation XSS (mXSS) is the class of attacks that breaks this assumption.</p>
+
+<p>mXSS was first formally documented by Mario Heiderich et al. in "mXSS Attacks: Attacking well-secured Web-Applications by using innerHTML Mutations" (CCS 2013). The core observation: the HTML5 parser is <strong>context-dependent</strong> — the same string produces different DOM trees depending on the parsing context (namespace, parent element, scripting state). A sanitiser that models one context and produces output that is re-parsed in a different context may produce a different — and dangerous — result.</p>
+
+<div class="callout warn">
+  <strong>Formal definition:</strong> Given a sanitiser S and an attacker-controlled string X, if S(X) = Y (sanitised, "safe"), but <code>innerHTML(Y) = Z</code> where Z contains executable content, then the system is vulnerable to mXSS. The attack exploits the gap between how S parses Y and how the browser's innerHTML re-parses Y.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>2. HTML5 parsing is not a pure function</h2>
+
+<p>The HTML5 parsing algorithm is defined in terms of a state machine that consumes a byte stream. Critically, the parser's behaviour depends on its current state, which is affected by:</p>
+
+<ul>
+  <li><strong>The current namespace:</strong> HTML, SVG, or MathML. Different elements are defined in each namespace. An element that is a text container in one namespace may be a structured element in another.</li>
+  <li><strong>The parent element:</strong> Table, select, textarea, and other elements have special child content models. Content not conforming to the model is handled by specific error-recovery rules.</li>
+  <li><strong>The scripting flag:</strong> Whether scripting is enabled or disabled changes how <code>&lt;noscript&gt;</code>, <code>&lt;template&gt;</code>, and some other elements are parsed.</li>
+  <li><strong>The insertion mode:</strong> "in table", "in row", "in cell", "in caption", "in foreign content" — each mode has different error recovery behaviours.</li>
+</ul>
+
+<p>A sanitiser that does not perfectly model all of these states and their interactions will produce output that the browser re-parses differently.</p>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>3. Foster parenting — the table mutation</h2>
+
+<p>The HTML5 specification defines "foster parenting" as the error-recovery rule for content that is not valid inside a <code>&lt;table&gt;</code> element. Valid table content is limited to <code>&lt;caption&gt;</code>, <code>&lt;colgroup&gt;</code>, <code>&lt;tbody&gt;</code>, <code>&lt;tfoot&gt;</code>, <code>&lt;thead&gt;</code>, and whitespace/comments. Anything else triggers foster parenting.</p>
+
+<p>When the parser encounters disallowed content inside a table, it does not reject it — it <em>moves</em> the content to just before the table in the current parent context. This is why it is called "foster parenting": the table's parent element adopts the misplaced content.</p>
+
+<pre>Input HTML:   &lt;table&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/table&gt;
+
+Parser insertion mode: "in table"
+Parser encounters &lt;img&gt; — not valid table content
+Foster parenting: img is inserted before the table in the parent
+
+Resulting DOM:
+  BODY
+  ├── IMG (onerror=alert(1)) ← moved here by foster parenting
+  └── TABLE (empty)</pre>
+
+<p>The sanitiser that accepted <code>&lt;table&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/table&gt;</code> as "contained" was modelling the HTML wrong. The img is not contained — it escapes the table and lands in the body.</p>
+
+<div class="callout">
+  <strong>Why sanitisers miss this:</strong> A regex-based or tree-based sanitiser that does not simulate the HTML5 table error-recovery rules will see <code>&lt;img&gt;</code> inside <code>&lt;table&gt;</code> and accept it because it does not model the parser moving it outside.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>4. Namespace boundary mutations</h2>
+
+<h3>4.1 SVG style as CDATA</h3>
+
+<p>In the SVG namespace, <code>&lt;style&gt;</code> and <code>&lt;script&gt;</code> elements are defined as containing raw text (CDATA). The parser does not look for child elements inside them — everything until the closing tag is treated as character data. In the HTML namespace, <code>&lt;style&gt;</code> also contains raw text, but the closing delimiter rules differ subtly across parsing states.</p>
+
+<p>The classic mXSS attack exploiting this:</p>
+
+<pre>Payload: &lt;svg&gt;&lt;style&gt;&lt;a id="&lt;/style&gt;&lt;img src=x onerror=alert(1)&gt;"&gt;
+
+SVG parser perspective:
+  &lt;style&gt; content = CDATA = everything until &lt;/style&gt;
+  Content: &lt;a id="&lt;/style&gt;&lt;img src=x onerror=alert(1)&gt;"&gt;
+  This is raw text. Nothing executes.
+
+Serialised (innerHTML readback):
+  &lt;svg&gt;&lt;style&gt;&lt;a id="&lt;/style&gt;&lt;img src=x onerror=alert(1)&gt;"&gt;&lt;/style&gt;&lt;/svg&gt;
+
+Re-inserted into HTML via innerHTML:
+  Parser sees &lt;style&gt;...&lt;/style&gt; — raw text until FIRST &lt;/style&gt;
+  Style content: &lt;a id="
+  Then: &lt;img src=x onerror=alert(1)&gt; — this is HTML markup!
+  onerror fires.</pre>
+
+<h3>4.2 MathML annotation-xml namespace switch</h3>
+
+<p>The MathML <code>&lt;annotation-xml&gt;</code> element with <code>encoding="text/html"</code> or <code>encoding="application/xhtml+xml"</code> triggers a namespace switch back to the HTML namespace. Content inside becomes HTML, not MathML. A sanitiser that does not model this transition may allow HTML content inside MathML that it believes is inert MathML text.</p>
+
+<pre>&lt;math&gt;
+  &lt;annotation-xml encoding="text/html"&gt;
+    &lt;img src=x onerror=alert(1)&gt;   ← HTML namespace here
+  &lt;/annotation-xml&gt;
+&lt;/math&gt;</pre>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>5. &lt;noscript&gt; — scripting state duality</h2>
+
+<p>The HTML5 specification defines two parsing modes for <code>&lt;noscript&gt;</code>:</p>
+
+<ul>
+  <li><strong>Scripting enabled:</strong> <code>&lt;noscript&gt;</code> content is treated as raw text — the parser does not look for HTML tags inside it. The content is a raw string until <code>&lt;/noscript&gt;</code>.</li>
+  <li><strong>Scripting disabled:</strong> <code>&lt;noscript&gt;</code> content is parsed as full HTML — tags inside are parsed and rendered normally (because noscript's fallback content needs to be rendered).</li>
+</ul>
+
+<p>A sanitiser library that is invoked with scripting disabled (as many server-side HTML parsers are, since they have no JS runtime) sees noscript content as HTML and sanitises it according to HTML rules. When the sanitised output is served to a browser with scripting enabled, the browser treats the noscript content as raw text — meaning the sanitiser's HTML-parse model was wrong for the target environment.</p>
+
+<pre>Payload: &lt;noscript&gt;&lt;p title="&lt;/noscript&gt;&lt;img src=x onerror=alert(1)&gt;"&gt;
+
+Sanitiser (scripting off — sees noscript as HTML):
+  Parses: &lt;p title="...&gt; — a p element with a title attribute
+  The attribute value contains characters the sanitiser may pass as safe text.
+  Output: &lt;noscript&gt;&lt;p title="&lt;/noscript&gt;&lt;img src=x onerror=alert(1)&gt;"&gt;&lt;/noscript&gt;
+
+Browser (scripting on — noscript = raw text):
+  Raw text content of noscript: &lt;p title="
+  &lt;/noscript&gt; terminates the raw text region.
+  Remaining: &lt;img src=x onerror=alert(1)&gt;" — parsed as HTML.
+  onerror fires.</pre>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>6. &lt;template&gt; — inert activation</h2>
+
+<p>The <code>&lt;template&gt;</code> element was introduced in HTML5 as a mechanism for holding inert, reusable HTML fragments. Its content is parsed into a separate <strong>document fragment</strong> — a subtree that is not part of the main document. Scripts, stylesheets, and event handlers in a template fragment do not execute and are not rendered.</p>
+
+<p>The mXSS risk arises when application code clones and activates a template that was populated with user-supplied content:</p>
+
+<pre>// Common pattern in web frameworks:
+const tmpl = document.querySelector('#user-template');
+tmpl.innerHTML = userContent;       // user content loaded into template
+// ... sanitiser may not run, or may see inert context ...
+document.body.appendChild(tmpl.content.cloneNode(true));  // activation!</pre>
+
+<p>If the sanitiser evaluated the template content while it was inert (no execution) and passed it, the cloneNode activation later makes the payload live.</p>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>7. DOMPurify's historical mXSS vulnerabilities</h2>
+
+<p>DOMPurify is the gold-standard client-side sanitiser, but it has been affected by multiple mXSS bypasses — each discovered as a new parser edge case was identified:</p>
+
+<table>
+  <tr><th>CVE / ID</th><th>Year</th><th>Mechanism</th><th>Fix</th></tr>
+  <tr><td>DOMPurify &lt; 1.0.11</td><td>2015</td><td>SVG style CDATA namespace confusion</td><td>Namespace-aware serialisation</td></tr>
+  <tr><td>DOMPurify &lt; 2.0.1</td><td>2019</td><td>MathML annotation-xml namespace switch</td><td>Allowlist annotation-xml encodings</td></tr>
+  <tr><td>DOMPurify &lt; 2.0.17</td><td>2020</td><td>noscript scripting-state confusion</td><td>Treat noscript as opaque in all states</td></tr>
+  <tr><td>DOMPurify &lt; 3.0.6</td><td>2023</td><td>Template element activation bypass</td><td>Sanitise template content explicitly</td></tr>
+  <tr><td>DOMPurify &lt; 3.1.3</td><td>2024</td><td>Foster parenting in new browser versions</td><td>Two-pass sanitisation validation</td></tr>
+</table>
+
+<div class="callout warn">
+  <strong>Lesson:</strong> Even the best-maintained sanitiser library has shipped mXSS vulnerabilities. This is not a criticism of DOMPurify — it is evidence that the HTML5 parsing specification is complex enough that no implementation has yet captured it perfectly. <strong>Always use the latest version of DOMPurify</strong> and treat any sanitiser as potentially bypassable until proven otherwise in your threat model.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>8. Implications for your intervention</h2>
+
+<p>mXSS directly constrains what your PhD intervention can claim to prevent:</p>
+
+<ul>
+  <li><strong>If your intervention operates at the sanitiser layer:</strong> it is subject to all mXSS bypass classes described here. Your threat model must acknowledge this and either (a) use a two-pass fixed-point sanitiser, or (b) add a layer above sanitisation (Trusted Types, CSP) that prevents innerHTML use entirely.</li>
+  <li><strong>If your intervention operates at the DOM sink layer (Trusted Types):</strong> mXSS is significantly reduced because the insertion point itself is gated — all innerHTML assignments must go through a trusted type policy that can apply context-aware sanitisation at the actual insertion context, not in a detached tree.</li>
+  <li><strong>If your intervention is a static analysis tool:</strong> it must model all mXSS-relevant parse contexts (table, namespace switches, noscript, template) to avoid false negatives.</li>
+</ul>
+
+<div class="callout ok">
+  <strong>The two-pass invariant:</strong> A sanitiser is mXSS-resistant if and only if applying it twice to the same input produces identical output: <code>S(S(X)) = S(X)</code> for all X. If a second pass changes the output, the sanitiser's parse model diverges from the browser's — the gap is exploitable.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>9. Exercises</h2>
+
+<ol>
+  <li>
+    <strong>Foster parenting confirmation:</strong> In the attack demo's live DOM readback tool (Step 1), input <code>&lt;table&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/table&gt;</code>. Observe that the innerHTML readback shows the img <em>before</em> the table. Then test the same payload on <code>/mxss/table</code>. Confirm the img fires in the document body.
+  </li>
+  <li>
+    <strong>SVG namespace mutation:</strong> Verify the SVG/style bypass: input <code>&lt;svg&gt;&lt;style&gt;&lt;/style&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/svg&gt;</code> into the live demo (Step 3). Observe the DOM readback. Then input the original DOMPurify bypass: <code>&lt;svg&gt;&lt;style&gt;&lt;a id="&lt;/style&gt;&lt;img src=x onerror=alert(1)&gt;"&gt;</code> and observe how the parser handles the attribute value containing markup.
+  </li>
+  <li>
+    <strong>Double-parse fixed-point test:</strong> Using the double-parse simulation (Step 6), input several payloads and check whether Pass 1 and Pass 2 produce identical output. If they differ, the first pass mutated the HTML — the gap is the mXSS window. Document three inputs where Pass 1 ≠ Pass 2.
+  </li>
+  <li>
+    <strong>Template activation:</strong> Using the template demo (Step 5), build a template with an onerror payload. Confirm the event does NOT fire when the template is built. Then click "Activate Template" and confirm it fires on activation. This is the inert→active transition.
+  </li>
+  <li>
+    <strong>Two-pass invariant check:</strong> Define the function <code>S(x) = naiveSanitise(innerHTML(x))</code> (strip scripts from DOM readback). Test <code>S(S(x)) == S(x)</code> for: (a) a table foster-parenting payload, (b) an SVG namespace payload, (c) a noscript payload. Document for each whether the two-pass invariant holds and what it implies for mXSS risk.
+  </li>
+</ol>
+
+<div class="nav">
+  <a href="public/attack_09_mxss.html">← Attack Demo 09</a>
+  <a href="../module_14/tutorial.html">Module 14 →</a>
+</div>
+
+</body>
+</html>
