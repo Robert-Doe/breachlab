@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>M18 — Gap Analysis &amp; Research Positioning</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:32px;max-width:960px}
+  h1{color:var(--accent);font-size:22px;margin-bottom:6px}
+  p{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:10px}
+  h2{font-size:15px;color:var(--warn);margin:28px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px}
+  label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px;margin-top:10px}
+  select,input,textarea{width:100%;padding:8px 10px;background:#060d1a;border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px}
+  textarea{min-height:80px;resize:vertical;font-family:'Courier New',monospace;font-size:12px;color:var(--orange)}
+  button{padding:8px 18px;background:var(--accent);color:#0b0f1a;font-weight:700;border:none;border-radius:4px;cursor:pointer;font-size:13px;margin-top:12px;margin-right:6px}
+  button.sec{background:var(--panel);color:var(--accent);border:1px solid var(--accent)}
+  .out{background:#060d1a;border:1px solid var(--border);border-radius:6px;padding:16px;font-size:13px;line-height:1.8;margin-top:12px;min-height:60px;white-space:pre-wrap;font-family:'Courier New',monospace;color:var(--orange)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .criteria-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+  .crit{background:#060d1a;border:1px solid var(--border);border-radius:5px;padding:12px}
+  .crit h4{font-size:11px;color:var(--accent);margin-bottom:6px}
+  .crit input{font-size:12px;padding:5px 8px}
+  .score-bar{height:6px;background:var(--border);border-radius:3px;margin-top:6px;overflow:hidden}
+  .score-fill{height:100%;background:var(--ok);border-radius:3px;transition:width 0.3s}
+  .tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;display:inline-block;margin-right:4px}
+  .t-open{background:#1a0000;color:var(--danger)}
+  .t-partial{background:#1a1500;color:var(--warn)}
+  .t-closed{background:#001a0d;color:var(--ok)}
+  code{font-family:'Courier New',monospace;font-size:11px;background:#060d1a;color:var(--orange);padding:1px 5px;border-radius:3px}
+</style>
+</head>
+<body>
+<h1>Gap Analysis &amp; Research Positioning Tool</h1>
+<p>Use this tool to identify a gap in the XSS defense coverage matrix and position your PhD contribution relative to it. Output is a draft research positioning statement.</p>
+
+<h2>Step 1 — Select a Gap</h2>
+<div class="card">
+  <div class="grid2">
+    <div>
+      <label>Attack class</label>
+      <select id="attack">
+        <option>DOM XSS</option>
+        <option>mXSS</option>
+        <option>Prototype Pollution</option>
+        <option>Supply Chain</option>
+        <option>URI Schemes</option>
+        <option>Filter Evasion</option>
+        <option>Reflected XSS</option>
+        <option>Stored XSS</option>
+      </select>
+    </div>
+    <div>
+      <label>Defense class</label>
+      <select id="defense">
+        <option>Output Encoding</option>
+        <option>CSP (nonce)</option>
+        <option>Trusted Types</option>
+        <option>DOMPurify</option>
+        <option>HttpOnly Cookie</option>
+        <option>SRI</option>
+      </select>
+    </div>
+    <div>
+      <label>Current coverage</label>
+      <select id="current">
+        <option value="OPEN">OPEN — no coverage</option>
+        <option value="PARTIAL">PARTIAL — incomplete</option>
+      </select>
+    </div>
+    <div>
+      <label>Target coverage after your work</label>
+      <select id="target">
+        <option value="CLOSED">CLOSED — fully addressed</option>
+        <option value="PARTIAL">PARTIAL — improved but not complete</option>
+      </select>
+    </div>
+  </div>
+  <label>Evidence of gap (CVE, paper, bypass technique)</label>
+  <textarea id="evidence" placeholder="e.g. CVE-2019-20374 — DOMPurify bypass via MathML mglyph foster parenting. Benchmarked against DOMPurify 2.0.0 and reproduced. No existing formal model covers this class of mutation."></textarea>
+</div>
+
+<h2>Step 2 — Describe Your Contribution</h2>
+<div class="card">
+  <label>Approach / method</label>
+  <input id="method" placeholder="e.g. Grammar-based fuzzer targeting HTML5 parsing spec, formal completeness proof in Coq">
+  <label>What you build</label>
+  <input id="artifact" placeholder="e.g. A sanitizer completeness checker; a taint analysis tool; a CSP policy generator">
+  <label>Prior work and what it misses</label>
+  <textarea id="prior" placeholder="e.g. Melicher et al. (2016) analyze CSP deployment but don't cover bypass systematisation. Bauer et al. (2013) model XSS in type theory but don't cover mXSS mutations."></textarea>
+</div>
+
+<h2>Step 3 — Evaluation Criteria</h2>
+<div class="card">
+  <div class="criteria-grid">
+    <div class="crit">
+      <h4>Coverage</h4>
+      <input id="cov" placeholder="≥ 95% of known variants" oninput="updateBar('cov-bar',this.value)">
+      <div class="score-bar"><div class="score-fill" id="cov-bar" style="width:0%"></div></div>
+    </div>
+    <div class="crit">
+      <h4>Soundness (false positives)</h4>
+      <input id="sound" placeholder="< 1% false positive rate" oninput="updateBar('sound-bar',this.value)">
+      <div class="score-bar"><div class="score-fill" id="sound-bar" style="width:0%"></div></div>
+    </div>
+    <div class="crit">
+      <h4>Performance</h4>
+      <input id="perf" placeholder="< 5ms p99 latency" oninput="updateBar('perf-bar',this.value)">
+      <div class="score-bar"><div class="score-fill" id="perf-bar" style="width:0%"></div></div>
+    </div>
+    <div class="crit">
+      <h4>Deployability</h4>
+      <input id="deploy" placeholder="< 50 LOC change to adopt">
+      <div class="score-bar"><div class="score-fill" id="deploy-bar" style="width:0%"></div></div>
+    </div>
+    <div class="crit">
+      <h4>Completeness</h4>
+      <input id="complete" placeholder="All HTML5 parsing contexts">
+      <div class="score-bar"><div class="score-fill" id="complete-bar" style="width:0%"></div></div>
+    </div>
+    <div class="crit">
+      <h4>Composability</h4>
+      <input id="compose" placeholder="Works alongside existing CSP/TT">
+      <div class="score-bar"><div class="score-fill" id="compose-bar" style="width:0%"></div></div>
+    </div>
+  </div>
+</div>
+
+<button onclick="generate()">Generate positioning statement</button>
+<button class="sec" onclick="clearOutput()">Clear</button>
+
+<h2>Generated Positioning Statement</h2>
+<div id="output" class="out">Fill in the fields above and click "Generate"…</div>
+
+<script>
+function updateBar(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.style.width = val.length ? '80%' : '0%';
+}
+
+function generate() {
+  const attack = document.getElementById('attack').value;
+  const defense = document.getElementById('defense').value;
+  const current = document.getElementById('current').value;
+  const target = document.getElementById('target').value;
+  const evidence = document.getElementById('evidence').value || '[no evidence provided]';
+  const method = document.getElementById('method').value || '[method not specified]';
+  const artifact = document.getElementById('artifact').value || '[artifact not specified]';
+  const prior = document.getElementById('prior').value || '[prior work not specified]';
+  const cov = document.getElementById('cov').value;
+  const sound = document.getElementById('sound').value;
+  const perf = document.getElementById('perf').value;
+
+  const stmt = `=== XSS RESEARCH POSITIONING STATEMENT ===
+
+GAP:
+  Attack class:  ${attack}
+  Defense class: ${defense}
+  Current:       ${current}
+  Target:        ${target}
+
+EVIDENCE OF GAP:
+  ${evidence}
+
+CONTRIBUTION:
+  We propose ${artifact}.
+  Method: ${method}.
+
+  This addresses the coverage gap between ${defense} and ${attack} by
+  transitioning the cell from ${current} to ${target}.
+
+PRIOR WORK AND NOVELTY:
+  ${prior}
+
+EVALUATION TARGETS:
+  Coverage:     ${cov || 'TBD'}
+  Soundness:    ${sound || 'TBD'}
+  Performance:  ${perf || 'TBD'}
+
+ABSTRACT TEMPLATE:
+  "${defense} defenses against ${attack} are currently incomplete (${current}).
+  Evidence: ${evidence.slice(0,100)}…
+  We propose ${artifact} using ${method}.
+  Our approach achieves ${cov ? 'coverage of ' + cov : 'improved coverage'},
+  making the ${defense} × ${attack} cell ${target}."
+
+=== END ===`;
+
+  document.getElementById('output').textContent = stmt;
+}
+
+function clearOutput() {
+  document.getElementById('output').textContent = 'Fill in the fields above and click "Generate"…';
+}
+</script>
+</body>
+</html>

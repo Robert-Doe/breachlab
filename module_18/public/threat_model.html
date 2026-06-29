@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>M18 — XSS Threat Model</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:32px;max-width:1060px}
+  h1{color:var(--accent);font-size:22px;margin-bottom:6px}
+  p{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:12px}
+  h2{font-size:14px;color:var(--warn);margin:28px 0 10px}
+  .matrix-wrap{overflow-x:auto;margin-bottom:28px}
+  table{border-collapse:collapse;font-size:11px;min-width:700px}
+  th{padding:9px 10px;text-align:center;color:var(--muted);font-weight:700;background:var(--panel);border:1px solid var(--border)}
+  th.row-header{text-align:left;min-width:130px}
+  td{padding:8px 10px;text-align:center;border:1px solid var(--border);cursor:pointer;transition:opacity 0.1s}
+  td:hover{opacity:0.8}
+  .CLOSED{background:#001a0d;color:var(--ok);font-weight:700}
+  .PARTIAL{background:#1a1500;color:var(--warn);font-weight:700}
+  .OPEN{background:#1a0000;color:var(--danger);font-weight:700}
+  .legend{display:flex;gap:16px;margin-bottom:16px;font-size:12px}
+  .leg{display:flex;align-items:center;gap:6px}
+  .swatch{width:12px;height:12px;border-radius:2px}
+  .s-closed{background:var(--ok)}
+  .s-partial{background:var(--warn)}
+  .s-open{background:var(--danger)}
+  .gap-list{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .gap-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:14px}
+  .gap-card h3{font-size:12px;color:var(--accent);margin-bottom:6px}
+  .gap-card p{font-size:12px;color:var(--text);margin-bottom:4px}
+  .gap-card .tags{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+  .tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px}
+  .t-open{background:#1a0000;color:var(--danger)}
+  .t-research{background:#0d1a30;color:var(--accent)}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+  .stat{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:14px;text-align:center}
+  .stat-num{font-size:28px;font-weight:800;color:var(--accent)}
+  .stat-label{font-size:11px;color:var(--muted);margin-top:4px}
+  a{color:var(--accent);text-decoration:none}
+  button{padding:7px 14px;background:var(--panel);color:var(--accent);border:1px solid var(--accent);border-radius:4px;cursor:pointer;font-size:12px;margin-right:6px}
+</style>
+</head>
+<body>
+<h1>XSS Threat Model — Coverage Matrix</h1>
+<p>Each cell shows whether a defense CLOSES, PARTIALLY covers, or leaves OPEN a given attack class. Click any cell to toggle. Uses live data from the server when running <code>make py</code>.</p>
+
+<div class="stats" id="stats"></div>
+
+<div class="legend">
+  <div class="leg"><div class="swatch s-closed"></div> CLOSED — defense fully addresses this attack class</div>
+  <div class="leg"><div class="swatch s-partial"></div> PARTIAL — defense reduces risk but doesn't eliminate it</div>
+  <div class="leg"><div class="swatch s-open"></div> OPEN — defense does not address this attack class</div>
+</div>
+
+<div style="margin-bottom:12px">
+  <button onclick="loadFromServer()">Load from server</button>
+  <button onclick="exportCSV()">Export CSV</button>
+  <button onclick="filterOpen()">Show gaps only</button>
+  <button onclick="resetFilter()">Show all</button>
+</div>
+
+<div class="matrix-wrap">
+  <table id="matrix"></table>
+</div>
+
+<h2>Open Research Gaps</h2>
+<div class="gap-list" id="gaps"></div>
+
+<script>
+const DEFENSES = ['Output Encoding','CSP (nonce)','Trusted Types','DOMPurify','HttpOnly Cookie','SRI'];
+const ATTACKS  = ['Reflected XSS','Stored XSS','DOM XSS','mXSS','Prototype Pollution','URI Schemes','Filter Evasion','Supply Chain'];
+
+const COVERAGE = {
+  'Output Encoding': {'Reflected XSS':'CLOSED','Stored XSS':'CLOSED','DOM XSS':'OPEN','mXSS':'PARTIAL','Prototype Pollution':'OPEN','URI Schemes':'CLOSED','Filter Evasion':'CLOSED','Supply Chain':'OPEN'},
+  'CSP (nonce)':     {'Reflected XSS':'CLOSED','Stored XSS':'CLOSED','DOM XSS':'PARTIAL','mXSS':'PARTIAL','Prototype Pollution':'PARTIAL','URI Schemes':'PARTIAL','Filter Evasion':'CLOSED','Supply Chain':'PARTIAL'},
+  'Trusted Types':   {'Reflected XSS':'CLOSED','Stored XSS':'CLOSED','DOM XSS':'CLOSED','mXSS':'PARTIAL','Prototype Pollution':'PARTIAL','URI Schemes':'PARTIAL','Filter Evasion':'CLOSED','Supply Chain':'OPEN'},
+  'DOMPurify':       {'Reflected XSS':'CLOSED','Stored XSS':'CLOSED','DOM XSS':'OPEN','mXSS':'PARTIAL','Prototype Pollution':'OPEN','URI Schemes':'PARTIAL','Filter Evasion':'CLOSED','Supply Chain':'OPEN'},
+  'HttpOnly Cookie': {'Reflected XSS':'PARTIAL','Stored XSS':'PARTIAL','DOM XSS':'PARTIAL','mXSS':'PARTIAL','Prototype Pollution':'PARTIAL','URI Schemes':'PARTIAL','Filter Evasion':'PARTIAL','Supply Chain':'PARTIAL'},
+  'SRI':             {'Reflected XSS':'OPEN','Stored XSS':'OPEN','DOM XSS':'OPEN','mXSS':'OPEN','Prototype Pollution':'OPEN','URI Schemes':'OPEN','Filter Evasion':'OPEN','Supply Chain':'CLOSED'},
+};
+
+const CYCLE = ['CLOSED','PARTIAL','OPEN'];
+let showOnlyOpen = false;
+
+function buildMatrix() {
+  const table = document.getElementById('matrix');
+  let html = '<tr><th class="row-header">Defense \\ Attack</th>';
+  ATTACKS.forEach(a => html += `<th>${a}</th>`);
+  html += '</tr>';
+
+  DEFENSES.forEach(d => {
+    if (showOnlyOpen) {
+      const hasOpen = ATTACKS.some(a => COVERAGE[d][a] !== 'CLOSED');
+      if (!hasOpen) return;
+    }
+    html += `<tr><th class="row-header">${d}</th>`;
+    ATTACKS.forEach(a => {
+      const v = COVERAGE[d][a];
+      html += `<td class="${v}" onclick="toggle('${d}','${a}')" title="${d} vs ${a}: ${v}">${v}</td>`;
+    });
+    html += '</tr>';
+  });
+  table.innerHTML = html;
+  updateStats();
+  updateGaps();
+}
+
+function toggle(defense, attack) {
+  const cur = COVERAGE[defense][attack];
+  const next = CYCLE[(CYCLE.indexOf(cur) + 1) % 3];
+  COVERAGE[defense][attack] = next;
+  buildMatrix();
+}
+
+function updateStats() {
+  let closed=0, partial=0, open=0;
+  DEFENSES.forEach(d => ATTACKS.forEach(a => {
+    const v = COVERAGE[d][a];
+    if (v==='CLOSED') closed++;
+    else if (v==='PARTIAL') partial++;
+    else open++;
+  }));
+  const total = closed+partial+open;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="stat-num" style="color:var(--ok)">${closed}</div><div class="stat-label">CLOSED cells</div></div>
+    <div class="stat"><div class="stat-num" style="color:var(--warn)">${partial}</div><div class="stat-label">PARTIAL cells</div></div>
+    <div class="stat"><div class="stat-num" style="color:var(--danger)">${open}</div><div class="stat-label">OPEN gaps</div></div>
+    <div class="stat"><div class="stat-num" style="color:var(--muted)">${Math.round(closed/total*100)}%</div><div class="stat-label">Coverage rate</div></div>`;
+}
+
+const GAP_NOTES = {
+  'DOM XSS': { gap: 'DOM XSS sources in SPAs are not tracked by output encoding or DOMPurify (both operate on strings, not data flows).', research: 'Taint analysis tools, Trusted Types enforcement' },
+  'mXSS': { gap: 'No formal completeness proof for any sanitizer under all browser re-parsing scenarios.', research: 'Formal grammar model; fuzzing harness for mXSS variants' },
+  'Prototype Pollution': { gap: 'No runtime defense fully blocks PP → DOM XSS chains. Gadget discovery is unsolved.', research: 'Static gadget finder; Object.prototype immutability enforcement' },
+  'Supply Chain': { gap: 'SRI is the only direct defense; most sites don\'t deploy it. Continuous monitoring is not standardised.', research: 'Automated SRI tooling; CDN integrity monitoring frameworks' },
+};
+
+function updateGaps() {
+  const open_gaps = [];
+  DEFENSES.forEach(d => ATTACKS.forEach(a => {
+    if (COVERAGE[d][a] === 'OPEN') open_gaps.push({d, a});
+  }));
+
+  // Deduplicate by attack class
+  const byAttack = {};
+  open_gaps.forEach(({d, a}) => {
+    if (!byAttack[a]) byAttack[a] = [];
+    byAttack[a].push(d);
+  });
+
+  const container = document.getElementById('gaps');
+  container.innerHTML = '';
+  Object.entries(byAttack).forEach(([attack, defenses]) => {
+    const note = GAP_NOTES[attack] || {};
+    const card = document.createElement('div');
+    card.className = 'gap-card';
+    card.innerHTML = `
+      <h3>${attack}</h3>
+      <p><strong style="color:var(--danger)">Not covered by:</strong> ${defenses.join(', ')}</p>
+      ${note.gap ? `<p>${note.gap}</p>` : ''}
+      ${note.research ? `<p style="color:var(--accent)">Research directions: ${note.research}</p>` : ''}
+      <div class="tags"><span class="tag t-open">OPEN</span><span class="tag t-research">RESEARCH GAP</span></div>`;
+    container.appendChild(card);
+  });
+}
+
+async function loadFromServer() {
+  try {
+    const r = await fetch('/api/coverage');
+    if (r.ok) {
+      const data = await r.json();
+      Object.assign(COVERAGE, data);
+      buildMatrix();
+    }
+  } catch(e) {
+    console.log('Server not running — using local data');
+  }
+}
+
+function exportCSV() {
+  let csv = ',' + ATTACKS.join(',') + '\n';
+  DEFENSES.forEach(d => {
+    csv += d + ',' + ATTACKS.map(a => COVERAGE[d][a]).join(',') + '\n';
+  });
+  const blob = new Blob([csv], {type: 'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'xss_threat_model.csv';
+  a.click();
+}
+
+function filterOpen() { showOnlyOpen = true; buildMatrix(); }
+function resetFilter() { showOnlyOpen = false; buildMatrix(); }
+
+buildMatrix();
+</script>
+</body>
+</html>

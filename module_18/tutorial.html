@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Module 18 — Threat Model, Defense Gaps &amp; Your Intervention</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.7;padding:40px 32px;max-width:820px}
+  h1{font-size:26px;font-weight:800;color:var(--accent);margin-bottom:6px}
+  .mod-tag{font-size:12px;color:var(--muted);margin-bottom:36px;display:block}
+  h2{font-size:18px;font-weight:700;color:var(--warn);margin:36px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  h3{font-size:14px;font-weight:700;color:var(--accent);margin:22px 0 8px}
+  p{font-size:14px;color:var(--text);margin-bottom:12px}
+  ul,ol{font-size:14px;color:var(--text);margin-left:22px;margin-bottom:12px}
+  li{margin-bottom:6px}
+  code{font-family:'Courier New',monospace;font-size:12px;background:#060d1a;color:var(--accent);padding:2px 6px;border-radius:3px}
+  pre{background:#060d1a;border:1px solid var(--border);border-radius:6px;padding:14px 16px;overflow-x:auto;font-size:12px;line-height:1.7;color:var(--orange);margin:12px 0;white-space:pre-wrap}
+  .callout{border-left:3px solid var(--accent);background:var(--panel);padding:12px 16px;border-radius:0 6px 6px 0;margin:14px 0;font-size:13px;color:var(--muted)}
+  .callout strong{color:var(--text)}
+  .warn{border-left-color:var(--warn)}
+  .danger{border-left-color:var(--danger)}
+  .ok{border-left-color:var(--ok)}
+  .purple{border-left-color:var(--purple)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:14px 0}
+  th{padding:8px 12px;background:#060d1a;color:var(--accent);text-align:left;font-size:12px;font-weight:700}
+  td{padding:7px 12px;border-top:1px solid var(--border);color:var(--muted);vertical-align:top}
+  td strong{color:var(--text)}
+  .nav{display:flex;gap:12px;margin-top:48px;padding-top:20px;border-top:1px solid var(--border)}
+  .nav a{font-size:13px;color:var(--accent);padding:8px 18px;border:1px solid var(--accent);border-radius:4px}
+  a{color:var(--accent)}
+  .gap-row-open{background:#1a0000}
+  .gap-row-partial{background:#1a1400}
+  .gap-row-closed{background:#001a00}
+  .research-box{background:var(--panel);border:2px solid var(--purple);border-radius:8px;padding:20px;margin:20px 0}
+  .research-box h3{color:var(--purple);margin-top:0}
+</style>
+</head>
+<body>
+
+<h1>Module 18 — Threat Model, Defense Gaps &amp; Your PhD Intervention</h1>
+<span class="mod-tag">XSS Mastery Course · Module 18 of 19</span>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>1. What a Threat Model Is (and Isn't)</h2>
+
+<p>A threat model is a structured enumeration of: <strong>what can go wrong, for whom, and what can be done about it</strong>. In XSS research, your threat model maps the attack taxonomy (M03–M14) against the existing defenses (M17) and explicitly names the gaps your research addresses.</p>
+
+<p>A threat model that says "XSS is bad, defenses exist" is not a threat model — it is a summary. A PhD-level threat model is falsifiable: it makes specific claims about which attacks bypass which defenses under which conditions, and those claims are testable.</p>
+
+<div class="callout purple"><strong>Framing for your PhD:</strong> Your intervention (novel defense, detection method, or analysis technique) should be positioned in the gap table below. The gap table is the "why this matters" for your committee. If your technique closes a row that is currently OPEN, you have a contribution.</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>2. The Full Gap Table</h2>
+
+<p>Each row is an attack class. Each column is a defense layer. The cell value is whether the defense closes the attack: CLOSED (reliably stops it), PARTIAL (stops some cases, not all), or OPEN (defense does not apply).</p>
+
+<table>
+  <tr>
+    <th>Attack Class</th>
+    <th>Output Encoding</th>
+    <th>CSP</th>
+    <th>Trusted Types</th>
+    <th>HTML Sanitizer</th>
+    <th>SRI</th>
+  </tr>
+  <tr class="gap-row-closed">
+    <td><strong>M04 Script tag injection</strong></td>
+    <td>CLOSED</td><td>CLOSED</td><td>n/a</td><td>CLOSED</td><td>n/a</td>
+  </tr>
+  <tr class="gap-row-closed">
+    <td><strong>M05 Event handler injection</strong></td>
+    <td>CLOSED</td><td>CLOSED*</td><td>n/a</td><td>CLOSED</td><td>n/a</td>
+  </tr>
+  <tr class="gap-row-closed">
+    <td><strong>M06 javascript: URI</strong></td>
+    <td>CLOSED</td><td>CLOSED</td><td>n/a</td><td>CLOSED</td><td>n/a</td>
+  </tr>
+  <tr class="gap-row-partial">
+    <td><strong>M07 SVG/namespace injection</strong></td>
+    <td>CLOSED</td><td>CLOSED*</td><td>n/a</td><td>PARTIAL</td><td>n/a</td>
+  </tr>
+  <tr class="gap-row-closed">
+    <td><strong>M08 Attribute injection</strong></td>
+    <td>CLOSED</td><td>CLOSED</td><td>n/a</td><td>CLOSED</td><td>n/a</td>
+  </tr>
+  <tr class="gap-row-open">
+    <td><strong>M09 DOM-based XSS</strong></td>
+    <td>OPEN</td><td>PARTIAL</td><td>CLOSED</td><td>PARTIAL</td><td>n/a</td>
+  </tr>
+  <tr class="gap-row-closed">
+    <td><strong>M10 Stored XSS</strong></td>
+    <td>CLOSED</td><td>CLOSED</td><td>n/a</td><td>CLOSED</td><td>n/a</td>
+  </tr>
+  <tr class="gap-row-open">
+    <td><strong>M11 Blind XSS</strong></td>
+    <td>CLOSED (if applied)</td><td>PARTIAL</td><td>n/a</td><td>CLOSED (if applied)</td><td>n/a</td>
+  </tr>
+  <tr class="gap-row-open">
+    <td><strong>M12 Filter evasion</strong></td>
+    <td>CLOSED</td><td>CLOSED</td><td>CLOSED</td><td>OPEN (for naive sanitizers)</td><td>n/a</td>
+  </tr>
+  <tr class="gap-row-open">
+    <td><strong>M13 Mutation XSS (mXSS)</strong></td>
+    <td>OPEN</td><td>CLOSED</td><td>PARTIAL</td><td>OPEN</td><td>n/a</td>
+  </tr>
+  <tr class="gap-row-open">
+    <td><strong>M14 Prototype pollution → DOM XSS</strong></td>
+    <td>OPEN</td><td>PARTIAL</td><td>PARTIAL</td><td>OPEN</td><td>n/a</td>
+  </tr>
+  <tr class="gap-row-open">
+    <td><strong>M16 Supply chain XSS</strong></td>
+    <td>OPEN</td><td>PARTIAL</td><td>PARTIAL</td><td>OPEN</td><td>CLOSED</td>
+  </tr>
+  <tr class="gap-row-open">
+    <td><strong>XSS chaining (M15)</strong></td>
+    <td colspan="5" style="color:var(--danger)">No defense stops chaining once XSS executes — only preventing initial XSS applies</td>
+  </tr>
+</table>
+
+<p>* CSP closes event handler injection only when <code>unsafe-inline</code> is absent from <code>script-src</code>. Many production CSP deployments include it.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>3. Open Research Gaps (as of 2024–2025)</h2>
+
+<h3>Gap 1 — mXSS: No Formal Model of Safe Round-Tripping</h3>
+<p>Mutation XSS arises because sanitizers and browsers model the HTML grammar differently. There is no formal, complete characterisation of the set of strings that are safe through all browser parsers. DOMPurify is empirically good but not provably complete. A formal grammar-theoretic model could enable provably safe sanitization.</p>
+
+<h3>Gap 2 — Prototype Pollution: Automated Gadget Discovery</h3>
+<p>Given a source (deepMerge) and a set of DOM sinks, no existing tool reliably finds all prototype pollution → DOM XSS chains in a real JavaScript codebase. The connection is through Object.prototype — invisible to taint analysis tools that track variables.</p>
+
+<h3>Gap 3 — DOM XSS in SPAs: Source Coverage</h3>
+<p>Existing DOM XSS detection tools (DOM Invader, etc.) work through dynamic analysis — they must exercise code paths to find taint flows. SPAs with route-dependent rendering have massive source coverage gaps. Techniques for complete static source enumeration in TypeScript/React SPAs are underdeveloped.</p>
+
+<h3>Gap 4 — Supply Chain: Runtime Integrity Enforcement</h3>
+<p>SRI is a build-time control. It doesn't handle dynamically loaded scripts, scripts loaded by third-party scripts, or runtime script mutation. A runtime integrity mechanism (analogous to memory integrity in OS security) for the browser script environment would address supply chain XSS at a different layer.</p>
+
+<h3>Gap 5 — CSP Bypass Landscape: Systematisation</h3>
+<p>Known CSP bypass techniques (JSONP gadgets, open redirectors in allowlisted hosts, base-uri manipulation) are catalogued ad hoc in blog posts and CTF writeups. A systematic study — given a CSP header, enumerate all remaining executable attack paths — is absent from the academic literature.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>4. Positioning Your Intervention</h2>
+
+<p>Use this frame for your PhD contribution claim:</p>
+
+<div class="research-box">
+  <h3>Contribution Positioning Template</h3>
+  <p><strong>Attack class addressed:</strong> [Pick from M04–M16, or a sub-class]<br>
+  <strong>Existing defenses:</strong> [Name what currently exists and why it's insufficient]<br>
+  <strong>My intervention:</strong> [Technique / tool / formal model / empirical study]<br>
+  <strong>What I close in the gap table:</strong> [Which OPEN / PARTIAL row becomes CLOSED / PARTIAL]<br>
+  <strong>Falsifiable claim:</strong> [A specific, testable assertion your evaluation will verify or refute]<br>
+  <strong>Evaluation methodology:</strong> [Lab corpus / CVE dataset / user study / formal proof / browser conformance tests]</p>
+</div>
+
+<h3>Example Positionings</h3>
+
+<table>
+  <tr><th>Research direction</th><th>Gap addressed</th><th>Contribution type</th></tr>
+  <tr><td>Provably safe HTML sanitization via grammar intersection</td><td>mXSS (Gap 1)</td><td>Formal method + tool</td></tr>
+  <tr><td>Static gadget discovery for prototype pollution → DOM XSS</td><td>Gap 2</td><td>Static analysis + tool</td></tr>
+  <tr><td>Complete DOM XSS source enumeration for React SPAs</td><td>Gap 3</td><td>Analysis technique + study</td></tr>
+  <tr><td>Runtime script integrity via service worker interception</td><td>Gap 4 (supply chain)</td><td>Browser API mechanism</td></tr>
+  <tr><td>Systematic CSP bypass enumeration algorithm</td><td>Gap 5</td><td>Algorithm + empirical study</td></tr>
+  <tr><td>Longitudinal study of XSS in production CSP deployments</td><td>All</td><td>Measurement study</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>5. Evaluation Criteria for a Novel Defense</h2>
+
+<p>If your contribution is a defense, it must be evaluated along these axes:</p>
+
+<ol>
+  <li><strong>Coverage:</strong> Which attacks from the taxonomy does it stop? Test against M04–M14 plus your open gaps.</li>
+  <li><strong>Soundness:</strong> Does it produce false positives (blocking legitimate content)? Measured against a corpus of real-world rich HTML.</li>
+  <li><strong>Completeness:</strong> Does it miss attacks? Measured against a curated payload set (Module 19 is your starting corpus).</li>
+  <li><strong>Performance:</strong> What is the overhead? Sanitizers and TT policies add parse time. Acceptable thresholds depend on context.</li>
+  <li><strong>Deployability:</strong> Can it be adopted without breaking existing sites? Backward compatibility is the dominant reason defenses aren't adopted.</li>
+  <li><strong>Composability:</strong> Does it compose correctly with other defenses in the stack, or does it create gaps at the seams?</li>
+</ol>
+
+<div class="callout ok"><strong>The deployability axis is underappreciated in academic defense papers.</strong> CSP adoption is low not because developers don't know about it, but because retrofitting it to existing codebases is expensive. A defense that is 95% as effective but requires zero migration effort will have 100× the real-world impact.</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>6. Interactive Tools</h2>
+
+<ul>
+  <li><a href="public/threat_model.html">threat_model.html</a> — Interactive threat model builder: fill in your attack scope, existing defenses, and gap claims</li>
+  <li><a href="public/gap_analysis.html">gap_analysis.html</a> — Visual gap matrix: color-code the full table for your specific research context</li>
+  <li><a href="intervention_template.md">intervention_template.md</a> — Markdown template for writing your contribution claim</li>
+</ul>
+
+<div class="nav">
+  <a href="../module_17/tutorial.html">← Module 17: Defenses</a>
+  <a href="../module_19/payload_bank.html">Module 19: Payload Bank →</a>
+</div>
+
+</body>
+</html>
