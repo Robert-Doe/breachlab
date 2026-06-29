@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Module 12 — Filter Evasion & Obfuscation</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.7;padding:40px 32px;max-width:820px}
+  h1{font-size:26px;font-weight:800;color:var(--accent);margin-bottom:6px}
+  .mod-tag{font-size:12px;color:var(--muted);margin-bottom:36px;display:block}
+  h2{font-size:18px;font-weight:700;color:var(--warn);margin:36px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  h3{font-size:14px;font-weight:700;color:var(--accent);margin:22px 0 8px}
+  p{font-size:14px;color:var(--text);margin-bottom:12px}
+  ul,ol{font-size:14px;color:var(--text);margin-left:22px;margin-bottom:12px}
+  li{margin-bottom:5px}
+  code{font-family:'Courier New',monospace;font-size:12px;background:#060d1a;color:var(--accent);padding:2px 6px;border-radius:3px}
+  pre{background:#060d1a;border:1px solid var(--border);border-radius:6px;padding:14px 16px;overflow-x:auto;font-size:12px;line-height:1.7;color:var(--orange);margin:12px 0;white-space:pre-wrap}
+  .callout{border-left:3px solid var(--accent);background:var(--panel);padding:12px 16px;border-radius:0 6px 6px 0;margin:14px 0;font-size:13px;color:var(--muted)}
+  .callout strong{color:var(--text)}
+  .warn{border-left-color:var(--warn)}
+  .danger{border-left-color:var(--danger)}
+  .ok{border-left-color:var(--ok)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:14px 0}
+  th{padding:8px 12px;background:#060d1a;color:var(--accent);text-align:left;font-size:12px;font-weight:700}
+  td{padding:7px 12px;border-top:1px solid var(--border);color:var(--muted);vertical-align:top}
+  td strong{color:var(--text)}
+  .nav{display:flex;gap:12px;margin-top:48px;padding-top:20px;border-top:1px solid var(--border)}
+  .nav a{font-size:13px;color:var(--accent);padding:8px 18px;border:1px solid var(--accent);border-radius:4px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>Module 12 — Filter Evasion & Obfuscation</h1>
+<span class="mod-tag">XSS Mastery Course · PhD-Level Cybersecurity · Prerequisite: Modules 01–11</span>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>1. Why filters fail: the fundamental problem</h2>
+
+<p>Server-side input filters that attempt to block XSS operate on text — they inspect the raw string value and look for patterns that resemble attack payloads. This is structurally inadequate for three reasons:</p>
+
+<ol>
+  <li><strong>The context is not known at filter time.</strong> A filter cannot know whether the value will end up in an HTML attribute, a script string, a CSS property, or a JavaScript event handler — each requires different encoding and has different attack surface.</li>
+  <li><strong>The parser runs after the filter.</strong> Browsers decode HTML entities, URL-encoding, and Unicode escapes <em>after</em> the server sends the response. A filter that blocks <code>&lt;</code> but not <code>&amp;lt;</code> has a bypass built in.</li>
+  <li><strong>The attack surface is too large to enumerate.</strong> HTML5 defines 170+ event handler attributes. JavaScript provides hundreds of ways to invoke a function. No blocklist can enumerate them all.</li>
+</ol>
+
+<div class="callout warn">
+  <strong>The core insight:</strong> The only correct defence against injection is <strong>context-aware output encoding</strong> or <strong>allowlist-based sanitisation</strong> — not blocklists, stripping, or content inspection. Filters are a false defence. Understanding how they fail is essential for threat modelling: any filter-based defence in a system under review should be treated as no defence.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>2. Blocklist bypass taxonomy</h2>
+
+<h3>2.1 Synonym substitution</h3>
+
+<p>A filter blocking <code>alert</code> is bypassed with <code>confirm()</code>, <code>prompt()</code>, <code>console.log()</code>, or — for execution proof without a dialog — any side-effecting JS expression.</p>
+
+<p>A filter blocking specific event handlers (<code>onerror</code>, <code>onload</code>) is bypassed with the 160+ other handlers. Key handlers not on typical blocklists:</p>
+
+<table>
+  <tr><th>Handler</th><th>Trigger</th><th>Zero-interaction?</th></tr>
+  <tr><td><code>ontoggle</code></td><td>&lt;details open&gt; toggle on parse</td><td>Yes</td></tr>
+  <tr><td><code>onpageshow</code></td><td>Page shown event</td><td>Yes</td></tr>
+  <tr><td><code>onanimationstart</code></td><td>CSS animation starts</td><td>Yes (with CSS)</td></tr>
+  <tr><td><code>oncut</code> / <code>oncopy</code></td><td>Clipboard interaction</td><td>No (user action)</td></tr>
+  <tr><td><code>onscroll</code></td><td>Page scroll</td><td>Near-zero (common action)</td></tr>
+  <tr><td><code>onmouseover</code></td><td>Hover</td><td>Near-zero</td></tr>
+  <tr><td><code>onfocus</code> + autofocus</td><td>Auto-focus on parse</td><td>Yes</td></tr>
+</table>
+
+<h3>2.2 Case variation</h3>
+
+<p>HTML attribute names are case-insensitive in the HTML parser. <code>onerror</code>, <code>ONERROR</code>, <code>oNeRrOr</code>, <code>OnErRoR</code> are all equivalent. A case-sensitive blocklist fails immediately.</p>
+
+<pre>&lt;img src=x OnErRoR=alert(1)&gt;</pre>
+
+<h3>2.3 Whitespace and delimiter variation</h3>
+
+<p>HTML parsers accept a wide range of whitespace between tag components. These are all valid:</p>
+
+<pre>&lt;img src=x onerror=alert(1)&gt;          &lt;!-- standard --&gt;
+&lt;img src=x	onerror=alert(1)&gt;         &lt;!-- tab --&gt;
+&lt;img/src=x/onerror=alert(1)&gt;         &lt;!-- slash separator --&gt;
+&lt;img src=x
+onerror=alert(1)&gt;                     &lt;!-- newline --&gt;</pre>
+
+<h3>2.4 Non-script vectors</h3>
+
+<p>Filters targeting <code>&lt;script&gt;</code> tags miss every other XSS vector. As demonstrated throughout this course, SVG, MathML, <code>&lt;img&gt;</code>, <code>&lt;details&gt;</code>, <code>&lt;input&gt;</code>, <code>&lt;video&gt;</code>, <code>&lt;audio&gt;</code>, and <code>&lt;body&gt;</code> all carry event handlers.</p>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>3. Tag stripping failure modes</h2>
+
+<h3>3.1 Single-pass non-recursive stripping</h3>
+
+<p>A regex that strips <code>&lt;script&gt;…&lt;/script&gt;</code> in one pass is defeated by nested tags that reconstruct the target after stripping:</p>
+
+<pre>Input:   &lt;scr&lt;script&gt;ipt&gt;alert(1)&lt;/scr&lt;/script&gt;ipt&gt;
+Regex removes &lt;script&gt; and &lt;/script&gt;:
+Output:  &lt;script&gt;alert(1)&lt;/script&gt;</pre>
+
+<p>The attacker wraps the forbidden tag inside itself. When the regex removes the inner occurrence, the outer halves join to form the original forbidden tag.</p>
+
+<h3>3.2 Greedy vs. non-greedy matching</h3>
+
+<p>A greedy regex that matches from the first <code>&lt;script</code> to the <em>last</em> <code>&lt;/script&gt;</code> collapses all script blocks into one removal. A non-greedy regex that matches each pair individually can be defeated by the nested technique. Neither is correct — the HTML parser is not a regex machine.</p>
+
+<h3>3.3 MIME-type confusion</h3>
+
+<p>Some filters strip tags from JSON, XML, or plain-text responses but forget that the browser parses based on Content-Type, not URL extension. A response served as <code>text/html</code> is always parsed as HTML regardless of what the developer intended.</p>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>4. Encoding bypass mechanics</h2>
+
+<p>The HTML parser decodes character references before handing content to downstream processors. This creates a two-stage pipeline that filters operating in only one stage cannot fully observe:</p>
+
+<pre>Network (filter sees this) → HTML parser → DOM (browser executes this)
+
+Filter sees:  &amp;lt;img src=x onerror=alert(1)&amp;gt;
+HTML parser decodes: &lt;img src=x onerror=alert(1)&gt;
+Browser executes the onerror event</pre>
+
+<h3>4.1 HTML entity forms</h3>
+
+<table>
+  <tr><th>Character</th><th>Named entity</th><th>Decimal ref</th><th>Hex ref</th></tr>
+  <tr><td>&lt;</td><td><code>&amp;lt;</code></td><td><code>&amp;#60;</code></td><td><code>&amp;#x3C;</code></td></tr>
+  <tr><td>&gt;</td><td><code>&amp;gt;</code></td><td><code>&amp;#62;</code></td><td><code>&amp;#x3E;</code></td></tr>
+  <tr><td>"</td><td><code>&amp;quot;</code></td><td><code>&amp;#34;</code></td><td><code>&amp;#x22;</code></td></tr>
+  <tr><td>'</td><td><code>&amp;apos;</code></td><td><code>&amp;#39;</code></td><td><code>&amp;#x27;</code></td></tr>
+  <tr><td>&amp;</td><td><code>&amp;amp;</code></td><td><code>&amp;#38;</code></td><td><code>&amp;#x26;</code></td></tr>
+</table>
+
+<h3>4.2 JavaScript-level encoding</h3>
+
+<p>Inside a JavaScript execution context (event handler attribute, script block), additional encoding layers are decoded by the JS engine:</p>
+
+<table>
+  <tr><th>Encoding</th><th>Example</th><th>Decoded by</th></tr>
+  <tr><td>Unicode escape</td><td><code>alert(1)</code> → <code>alert(1)</code></td><td>JS engine identifier parser</td></tr>
+  <tr><td>Hex escape</td><td><code>\x61lert(1)</code> → <code>alert(1)</code></td><td>JS engine string/identifier parser</td></tr>
+  <tr><td>Base64 + eval</td><td><code>eval(atob('YWxlcnQoMSk='))</code></td><td>JS engine at runtime</td></tr>
+  <tr><td>String concat</td><td><code>window['al'+'ert'](1)</code></td><td>JS engine property access</td></tr>
+  <tr><td>fromCharCode</td><td><code>eval(String.fromCharCode(97,108,101,114,116,40,49,41))</code></td><td>JS engine at runtime</td></tr>
+</table>
+
+<h3>4.3 URL encoding</h3>
+
+<p>URL-encoded input (<code>%3Cscript%3E</code>) is decoded by the server's URL parser before the filter runs — unless the filter operates on the raw encoded bytes. Filters on decoded values miss double-encoded inputs (<code>%253C</code> → URL-decoded to <code>%3C</code> → if decoded again, <code>&lt;</code>).</p>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>5. WAF bypass methodology</h2>
+
+<p>A systematic WAF bypass approach mirrors fuzzing methodology:</p>
+
+<ol>
+  <li><strong>Probe the WAF's rules individually.</strong> Send inputs that test one rule at a time: raw script tag, encoded script tag, event handler, javascript: URI. Observe which are blocked and which pass.</li>
+  <li><strong>Map rule interactions.</strong> Test combinations: does the WAF's encoding normalisation happen before or after keyword matching? Does stripping happen before or after length checks?</li>
+  <li><strong>Find the bypass class.</strong> Is the WAF blocking by keyword, by regex, by tag whitelist/blacklist, or by heuristic score? Each has a different bypass class.</li>
+  <li><strong>Minimise the bypass payload.</strong> Once a bypass is found, reduce it to the shortest form that passes all rules. Shorter payloads also improve length-limit bypass.</li>
+</ol>
+
+<div class="callout">
+  <strong>Burp Suite workflow:</strong> Send the target input to Burp Intruder. Use the XSS payload list from Burp's built-in library (or a custom wordlist) as the payload set. Filter for responses that differ from the "blocked" template — these are your bypass candidates.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>6. JavaScript obfuscation — the full taxonomy</h2>
+
+<p>Once a payload reaches JavaScript execution context, the attacker can obfuscate the JavaScript itself. These techniques are relevant when the application or WAF inspects JavaScript content (e.g., scanning event handler values).</p>
+
+<h3>6.1 Function call obfuscation</h3>
+
+<pre>alert(1)                              // standard
+window.alert(1)                       // property access
+window['alert'](1)                    // bracket notation
+window['al'+'ert'](1)                 // concatenated property name
+this['alert'](1)                      // 'this' in global scope is window
+self['alert'](1)                      // same
+top['alert'](1)                       // same
+alert`1`                              // tagged template literal — no parens
+(alert)(1)                            // extra parens — parsed identically</pre>
+
+<h3>6.2 eval-based obfuscation</h3>
+
+<pre>eval('alert(1)')
+eval(atob('YWxlcnQoMSk='))           // base64
+eval('alert(1)')                 // unicode escape inside string
+eval(String.fromCharCode(97,108,101,114,116,40,49,41))
+Function('alert(1)')()               // Function constructor
+setTimeout('alert(1)',0)             // string-form setTimeout
+setInterval('alert(1)',1e9)          // string-form setInterval</pre>
+
+<h3>6.3 Constructor chain (no eval keyword)</h3>
+
+<pre>[]['constructor']['constructor']('alert(1)')()
+// [].constructor === Array
+// Array.constructor === Function
+// Function('alert(1)')() executes alert(1)</pre>
+
+<h3>6.4 JSFuck — 6-character alphabet</h3>
+
+<p>JSFuck encodes any JavaScript using only <code>[ ] ( ) ! +</code>. The output is valid JavaScript that evaluates to any desired expression via coercions and array/function manipulations. It is impractical in length-limited contexts but theoretically proves that no JS content filter can be complete.</p>
+
+<pre>// alert(1) in JSFuck (abbreviated):
+[][(![]+[])[+[]]+([![]]+[][[]])[+!+[]+[+[]]]+ ...</pre>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>7. Implications for your intervention (PhD context)</h2>
+
+<p>This module defines what your intervention must <em>not</em> rely on:</p>
+
+<ul>
+  <li><strong>No blocklists.</strong> Any blocklist-based pre-processing step in your intervention has the bypass properties described above. If your intervention includes a filter, it must be an allowlist sanitiser (DOMPurify-style), not a blocklist.</li>
+  <li><strong>No regex-based tag detection.</strong> The HTML context is not regular. Use an HTML parser (DOMParser, parse5, html5lib) to analyse structure, not string patterns.</li>
+  <li><strong>Encoding must be context-aware.</strong> If your intervention outputs user data into a page, the encoding function must know the output context (HTML content, HTML attribute, JavaScript string, CSS value) and apply the correct escape sequence for that context.</li>
+  <li><strong>WAF bypass means attacker-controlled.</strong> If your threat model assumes a WAF as a layer in the defence, model the WAF as bypassable. Your intervention should not depend on WAF-level filtering as a security guarantee.</li>
+</ul>
+
+<div class="callout ok">
+  <strong>What works:</strong> The only robust client-side XSS defences are (1) DOMPurify allowlist sanitisation applied at every rendering sink, (2) Content Security Policy configured to block inline execution, and (3) Trusted Types to enforce (1) at the platform level. Modules 17–18 cover these in depth.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>8. Exercises</h2>
+
+<ol>
+  <li>
+    <strong>Exhaust the blocklist:</strong> Against <code>/filter/blocklist</code>, find five distinct payloads that execute JavaScript without using any of the blocked keywords. Document the event handler or function used for each.
+  </li>
+  <li>
+    <strong>Nested tag bypass:</strong> Confirm the nested tag bypass against <code>/filter/stripping</code>. Then explain why applying the strip operation recursively (loop until no change) would prevent this bypass but not prevent a non-script vector.
+  </li>
+  <li>
+    <strong>Entity bypass:</strong> Against <code>/filter/encoding</code>, send an <code>&lt;img onerror&gt;</code> payload encoded as decimal character references for every character. Observe that the filter is bypassed. Then explain the condition that makes this work: the output must be rendered as HTML without re-encoding.
+  </li>
+  <li>
+    <strong>Minimum-length payload:</strong> Find the shortest payload (fewest characters) that achieves JavaScript execution against <code>/filter/length</code> (30-char limit). Target: under 25 characters.
+  </li>
+  <li>
+    <strong>WAF simulation bypass:</strong> Against <code>/waf-sim</code>, craft a payload that bypasses all three rules and achieves JavaScript execution. Document which property of each rule you exploited.
+  </li>
+</ol>
+
+<div class="nav">
+  <a href="public/attack_08_evasion.html">← Attack Demo 08</a>
+  <a href="../module_13/tutorial.html">Module 13 →</a>
+</div>
+
+</body>
+</html>

