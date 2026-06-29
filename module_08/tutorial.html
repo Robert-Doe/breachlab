@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Module 08 — Attribute Injection | XSS Mastery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Lato:wght@300;400;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0b0f1a;--bg2:#111827;--bg3:#1a2235;--card:#141c2e;--border:#1e3a5f;
+          --gold:#f5c842;--cyan:#38bdf8;--purple:#a78bfa;--red:#f87171;--green:#4ade80;
+          --teal:#0d9488;--orange:#fb923c;--text:#e2e8f0;--muted:#7a9bbf;--code-bg:#060d1a}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:'Lato',sans-serif;font-size:16px;line-height:1.75}
+    .page-wrap{max-width:860px;margin:0 auto;padding:48px 24px 96px}
+    .mod-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.14em;
+               text-transform:uppercase;color:var(--muted);border:1px solid var(--border);
+               border-radius:4px;padding:4px 10px;margin-bottom:20px}
+    h1{font-family:'Playfair Display',serif;font-size:42px;color:var(--gold);line-height:1.2;margin-bottom:12px}
+    h2{font-family:'Playfair Display',serif;font-size:26px;color:var(--cyan);margin:52px 0 16px;padding-top:8px;border-top:1px solid var(--border)}
+    h3{font-size:18px;font-weight:700;color:var(--purple);margin:32px 0 10px}
+    h4{font-size:14px;font-weight:700;color:var(--orange);margin:20px 0 6px;text-transform:uppercase;letter-spacing:.06em}
+    .subtitle{font-size:17px;color:var(--muted);margin-bottom:40px;line-height:1.5}
+    p{margin-bottom:18px}
+    strong{color:var(--text);font-weight:700}
+    em{color:var(--orange);font-style:normal;font-weight:600}
+    a{color:var(--cyan)}
+    ul,ol{padding-left:22px;margin-bottom:18px}
+    li{margin-bottom:6px;font-size:15px}
+    .prereq-bar{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--teal);border-radius:6px;padding:16px 20px;margin-bottom:32px}
+    .prereq-bar strong{color:var(--teal);font-size:12px;text-transform:uppercase;letter-spacing:.1em;display:block;margin-bottom:6px}
+    .prereq-bar p{font-size:14px;color:var(--muted);margin:0}
+    .deliverables{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:20px 24px;margin-bottom:36px}
+    .deliverables strong{color:var(--gold);font-size:13px;text-transform:uppercase;letter-spacing:.1em;display:block;margin-bottom:12px}
+    .deliverables ul{list-style:none;padding:0}
+    .deliverables li{font-size:14px;padding:4px 0 4px 20px;position:relative}
+    .deliverables li::before{content:"→";position:absolute;left:0;color:var(--green);font-weight:700}
+    .callout{border-radius:6px;padding:16px 20px;margin:28px 0;font-size:14.5px;line-height:1.65}
+    .callout .callout-label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px;display:block}
+    .callout.warning{background:#1f0f0f;border-left:4px solid var(--red)}
+    .callout.warning .callout-label{color:var(--red)}
+    .callout.tip{background:#0a1f13;border-left:4px solid var(--green)}
+    .callout.tip .callout-label{color:var(--green)}
+    .callout.insight{background:#0f1240;border-left:4px solid var(--purple)}
+    .callout.insight .callout-label{color:var(--purple)}
+    pre{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:20px;overflow-x:auto;margin:20px 0;font-family:'Source Code Pro',monospace;font-size:13.5px;line-height:1.7}
+    code{font-family:'Source Code Pro',monospace;font-size:13px}
+    p code,li code{background:var(--code-bg);color:var(--cyan);padding:2px 6px;border-radius:3px;border:1px solid var(--border)}
+    .cm{color:#4b5563}.kw{color:#89dceb}.fn{color:#a78bfa}.st{color:#a6e3a1}
+    .at{color:#f5c842}.op{color:#f87171}.hl{color:#f5c842;font-weight:700}.del{color:var(--red);font-weight:700}
+    .steps{list-style:none;counter-reset:step;margin:20px 0;padding:0}
+    .steps li{counter-increment:step;padding:14px 16px 14px 56px;position:relative;background:var(--card);border:1px solid var(--border);border-radius:6px;margin-bottom:10px;font-size:14.5px}
+    .steps li::before{content:counter(step);position:absolute;left:16px;top:14px;width:24px;height:24px;border-radius:50%;background:var(--border);color:var(--cyan);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center}
+    .exercise{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:20px 24px;margin-bottom:14px}
+    .exercise .ex-badge{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:2px 8px;border-radius:3px;margin-bottom:10px;display:inline-block}
+    .ex-warm .ex-badge{background:#1a2f1a;color:var(--green)}
+    .ex-core .ex-badge{background:#1a1a2f;color:var(--cyan)}
+    .ex-stretch .ex-badge{background:#2f1a2f;color:var(--purple)}
+    .exercise h4{margin-top:0}
+    .exercise p,.exercise li{font-size:14.5px}
+    .next-box{background:var(--bg3);border:1px solid var(--border);border-left:4px solid var(--gold);border-radius:6px;padding:22px 24px;margin-top:48px}
+    .next-box strong{color:var(--gold);display:block;font-size:12px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+    .top-nav{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--muted)}
+    .top-nav a{color:var(--cyan);text-decoration:none}
+    table{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px}
+    th{background:var(--card);color:var(--cyan);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border)}
+    td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+    tr:last-child td{border-bottom:none}
+    .breakout-diagram{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:16px 20px;margin:20px 0;font-family:'Source Code Pro',monospace;font-size:13px;line-height:2}
+    .bd-static{color:var(--muted)}
+    .bd-break{color:var(--red);font-weight:700}
+    .bd-payload{color:var(--green)}
+    .bd-repair{color:var(--cyan)}
+    .bd-label{font-family:'Lato',sans-serif;font-size:11px;color:var(--muted);display:block;margin-top:-4px;margin-bottom:8px;padding-left:4px}
+  </style>
+</head>
+<body>
+
+<nav class="top-nav">
+  <a href="/">← Lab Home</a>
+  <span>XSS Mastery Course</span>
+  <span>Module 08 of 19</span>
+</nav>
+
+<div class="page-wrap">
+
+  <div class="mod-badge">Module 08 of 19</div>
+  <h1>Attribute Injection<br>& Context Breaking</h1>
+  <p class="subtitle">
+    When user input lands inside an HTML attribute value — rather than in
+    the document body — a different class of technique is needed. The attacker
+    must first escape the attribute context before injecting executable content.
+    The break-out character depends on the quoting style of the surrounding template.
+  </p>
+
+  <div class="prereq-bar">
+    <strong>Prerequisites</strong>
+    <p>Modules 01–07 complete. You have fired body-context, event-handler, URI,
+       namespace, and server-side injection. Module 04 introduced attribute context
+       briefly; this module covers it fully.</p>
+  </div>
+
+  <div class="deliverables">
+    <strong>What you will build in this module</strong>
+    <ul>
+      <li>Four endpoints: double-quoted, single-quoted, unquoted, and data-attribute injection</li>
+      <li>A 7-step demo covering all breakout patterns including zero-interaction variants</li>
+      <li>A data-attribute → DOM sink chain demonstrating server-safe / client-vulnerable split</li>
+      <li>A complete breakout payload reference table</li>
+    </ul>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 1 — The Attribute Context</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    When server-side code interpolates user input into an HTML attribute value,
+    the resulting injection context is fundamentally different from body-context
+    injection. In body context, the attacker can inject a complete tag immediately.
+    In attribute context, the injected string is <em>inside</em> an attribute value —
+    the parser treats it as attribute data, not markup.
+  </p>
+
+  <p>
+    To inject executable content, the attacker must first terminate the attribute
+    value. This is called a <em>context breakout</em>. The required character
+    depends on what delimiter was used in the template:
+  </p>
+
+  <table>
+    <thead><tr><th>Template pattern</th><th>Breakout character</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td><code>value="..."</code></td><td><code>"</code> (double-quote)</td><td><code>" onmouseover="alert(1)"</code></td></tr>
+      <tr><td><code>value='...'</code></td><td><code>'</code> (single-quote)</td><td><code>' onmouseover='alert(1)'</code></td></tr>
+      <tr><td><code>value=...</code></td><td>any whitespace</td><td><code>x onmouseover=alert(1)</code></td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    After the breakout, the attacker is in tag context — they can inject new
+    attributes on the same element (preferred for minimal markup disruption)
+    or close the tag entirely with <code>&gt;</code> and inject a new element.
+  </p>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 2 — The Anatomy of an Attribute Breakout Payload</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    A well-crafted attribute breakout payload has three parts:
+  </p>
+
+  <div class="breakout-diagram">
+    <span class="bd-static">value="</span><span class="bd-break">"</span> <span class="bd-payload">autofocus onfocus="alert(document.cookie)"</span> <span class="bd-repair">x="</span><span class="bd-static">"</span>
+    <span class="bd-label">
+      ① static template prefix &nbsp;|&nbsp; ② breakout char &nbsp;|&nbsp; ③ payload attributes &nbsp;|&nbsp; ④ repair suffix absorbs template's closing quote
+    </span>
+  </div>
+
+  <ul>
+    <li><strong>Break-out character:</strong> closes the current attribute value, returning the parser to tag context</li>
+    <li><strong>Payload:</strong> one or more new attributes injected on the element; the most useful are event handlers</li>
+    <li><strong>Repair suffix:</strong> opens a dummy attribute (<code>x="</code>) that absorbs the trailing quote from the original template, keeping the surrounding HTML syntactically valid</li>
+  </ul>
+
+  <p>
+    The repair suffix prevents the trailing template quote from appearing as
+    stray markup that might break the DOM or alert a developer reviewing the
+    page source. A clean, valid-looking DOM is less likely to trigger detection.
+  </p>
+
+  <div class="callout insight">
+    <span class="callout-label">PhD Insight — Context-Aware Output Encoding</span>
+    The correct defence for attribute injection is <em>context-aware HTML attribute encoding</em>:
+    encoding the characters <code>"</code>, <code>'</code>, <code>&lt;</code>,
+    <code>&gt;</code>, and <code>&amp;</code> as HTML entities before interpolating
+    into any attribute value. This prevents break-out regardless of the quoting style.
+    The OWASP XSS Prevention Cheat Sheet Rule #2 specifies this explicitly.
+    A developer who encodes only <code>&lt;</code> and <code>&gt;</code> (to prevent
+    tag injection in body context) and applies that same function to attribute values
+    has a partial fix that still allows attribute-context breakout via <code>"</code>.
+    The encoding function must be context-specific.
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 3 — Why "HTML Encoding" Is Not One Thing</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    Developers often speak of "HTML encoding" as if it were a single universal
+    operation. It is not. The correct encoding depends on the injection context:
+  </p>
+
+  <table>
+    <thead><tr><th>Context</th><th>Encoding required</th><th>Characters to encode</th></tr></thead>
+    <tbody>
+      <tr><td>HTML body</td><td>HTML entity encoding</td><td><code>&amp; &lt; &gt; " '</code></td></tr>
+      <tr><td>HTML attribute (quoted)</td><td>HTML attribute encoding</td><td><code>&amp; " '</code> (and the quote char used)</td></tr>
+      <tr><td>HTML attribute (unquoted)</td><td>Must quote the attribute first</td><td>Quote the attribute, then attribute encoding</td></tr>
+      <tr><td>JavaScript string inside HTML</td><td>JS string encoding first, then HTML encoding</td><td>JS escapes for <code>' " \ /</code>, then HTML for <code>&lt; &gt;</code></td></tr>
+      <tr><td>URL attribute (href, src)</td><td>URL percent-encoding + scheme validation</td><td>Non-URL chars + block unsafe schemes</td></tr>
+      <tr><td>CSS value</td><td>CSS encoding</td><td>Backslash-escape non-alphanumeric chars</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    A template engine that provides one "escape" function and applies it to all
+    contexts is either over-encoding (breaking functionality) or under-encoding
+    (leaving vulnerabilities). Context-aware output encoding requires knowing
+    exactly which context each output point falls into.
+  </p>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 4 — The data-Attribute and DOM Sink Split</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    HTML5 <code>data-*</code> attributes store arbitrary data associated with
+    an element. When user input is placed in a data attribute, the server-side
+    template is technically safe — the value is attribute data, not rendered
+    HTML. No tag injection can occur at the server-template level.
+  </p>
+
+  <p>
+    However, when JavaScript reads that attribute via <code>element.dataset</code>
+    and passes the value to an unsafe DOM sink like <code>innerHTML</code>,
+    <code>document.write()</code>, or <code>eval()</code>, the vulnerability
+    reappears on the client side. This is the pattern that produces DOM XSS
+    in applications that use server-rendered data attributes to pass values
+    to client-side code.
+  </p>
+
+  <pre><span class="cm">// Server template — looks safe:</span>
+<span class="op">&lt;</span>div <span class="at">id</span>=<span class="st">"widget"</span> <span class="at">data-query</span>=<span class="st">"{{user_query}}"</span><span class="op">&gt;&lt;/</span>div<span class="op">&gt;</span>
+
+<span class="cm">// Client JavaScript — vulnerable DOM sink:</span>
+<span class="kw">const</span> widget = document.<span class="fn">getElementById</span>(<span class="st">'widget'</span>);
+<span class="kw">const</span> query  = widget.dataset.query;   <span class="cm">// reads attacker-controlled value</span>
+widget.innerHTML = <span class="st">'Results for: '</span> + query;  <span class="cm">// DOM XSS — sink</span>
+
+<span class="cm">// Payload:  ?query=&lt;img src=x onerror=alert(document.cookie)&gt;
+// The onerror fires when innerHTML parses the injected img tag.</span></pre>
+
+  <p>
+    The server-side security review of this code would mark the template as
+    safe. The client-side review would need to trace the data flow from
+    <code>dataset.query</code> → <code>innerHTML</code> to find the vulnerability.
+    This is why DOM XSS requires taint-tracking static analysis tools (covered
+    in Module 09), not just server-side code review.
+  </p>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Build &amp; Run</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <ol class="steps">
+    <li>Start the server: <code>python lab_server.py</code> or <code>node lab_server.js</code></li>
+    <li>Open <a href="http://localhost:5000/attack_05_attr.html" target="_blank">attack_05_attr.html</a> with DevTools → Elements panel open</li>
+    <li>For Steps 1–3: after firing, inspect the input element in DevTools. Confirm that the injected attributes appear as real DOM attributes, not as text</li>
+    <li>For Step 4: click "Demo" button first, observe the partial-fix scenario, then fire the server link</li>
+    <li>For Step 5: note that no quote character appears in the payload — whitespace alone terminates the unquoted attribute</li>
+    <li>For Step 6: in DevTools → Elements, find the <code>data-query</code> attribute and confirm its value before and after the JS sink runs</li>
+  </ol>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Exercises</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 1 — Identify the Context in Burp</h4>
+    <p>
+      Configure Burp Suite to intercept the response from <code>/attr-double</code>.
+      In the response body, find the line containing the input element.
+      Identify: (1) the attribute name, (2) the delimiter character, (3) exactly
+      where the injected value appears. Then, without sending a payload yet,
+      write down the minimum string needed to break out of the attribute context
+      and inject <code>autofocus onfocus=alert(1)</code>.
+    </p>
+    <p>
+      Verify your prediction by sending the payload and observing the result.
+    </p>
+  </div>
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 2 — Map All Three Quote Styles</h4>
+    <p>
+      Write three payloads — one for each quoting style — that produce the
+      same effect: firing <code>alert(document.domain)</code> with zero user
+      interaction. Use the following endpoints:
+    </p>
+    <ul>
+      <li><code>/attr-double</code> — double-quoted, autofocus onfocus</li>
+      <li><code>/attr-single</code> — single-quoted, autofocus onfocus</li>
+      <li><code>/attr-unquoted</code> — unquoted, autofocus onfocus</li>
+    </ul>
+    <p>
+      For each payload, write down: the break-out char, the payload attributes,
+      and the repair suffix (if needed). Then explain: which of the three
+      quoting styles is hardest to exploit and why?
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 3 — Fix All Four Endpoints</h4>
+    <p>
+      Add safe variants <code>/attr-double-safe</code>, <code>/attr-single-safe</code>,
+      <code>/attr-unquoted-safe</code>, and <code>/attr-data-safe</code> to both
+      servers. Each must correctly neutralise the injection. Guidelines:
+    </p>
+    <ul>
+      <li>For <code>/attr-double-safe</code>: use Python's <code>html.escape(q)</code> — verify it encodes <code>"</code> as <code>&amp;quot;</code></li>
+      <li>For <code>/attr-single-safe</code>: use <code>html.escape(q, quote=True)</code> — verify <code>'</code> is encoded as <code>&amp;#x27;</code></li>
+      <li>For <code>/attr-unquoted-safe</code>: add double-quotes to the template AND apply html.escape — unquoted attributes must be quoted before they can be encoded safely</li>
+      <li>For <code>/attr-data-safe</code>: the server template is already safe; fix the client-side JavaScript to use <code>textContent</code> instead of <code>innerHTML</code></li>
+    </ul>
+    <p>
+      Test each safe endpoint with the same payloads from Exercises 1–2. Verify no execution occurs.
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 4 — Attribute Injection via POST Body</h4>
+    <p>
+      All current endpoints use GET with query parameters. Add a new endpoint
+      <code>/comment</code> (POST, both servers) that accepts a JSON body
+      <code>{"author": "...", "text": "..."}</code> and reflects both fields
+      into HTML:
+    </p>
+    <pre><span class="op">&lt;</span>div <span class="at">class</span>=<span class="st">"comment"</span> <span class="at">data-author</span>=<span class="st">"{author}"</span><span class="op">&gt;</span>
+  <span class="op">&lt;</span>span <span class="at">class</span>=<span class="st">"name"</span><span class="op">&gt;</span>{author}<span class="op">&lt;/</span>span<span class="op">&gt;</span>: {text}
+<span class="op">&lt;/</span>div<span class="op">&gt;</span></pre>
+    <p>
+      Use Burp Repeater to send a POST with a payload in <code>author</code>
+      that breaks out of the <code>data-author</code> attribute context.
+      Note: this is an attribute context even though the field name is
+      <code>data-author</code> (a data attribute is still an attribute value).
+    </p>
+  </div>
+
+  <div class="exercise ex-stretch">
+    <span class="ex-badge">Stretch</span>
+    <h4>Exercise 5 — style= Attribute Injection</h4>
+    <p>
+      Add an endpoint <code>/style-inject?color=</code> that places
+      <code>color=</code> into an element's <code>style</code> attribute:
+    </p>
+    <pre><span class="op">&lt;</span>div <span class="at">style</span>=<span class="st">"color: {color}"</span><span class="op">&gt;</span>Hello<span class="op">&lt;/</span>div<span class="op">&gt;</span></pre>
+    <p>
+      Build a payload that:
+    </p>
+    <ul>
+      <li>Breaks out of the style attribute value</li>
+      <li>Injects an event handler on the same element</li>
+      <li>Fires with zero interaction using <code>onanimationstart</code> and an inline <code>&lt;style&gt;</code> keyframe</li>
+    </ul>
+    <p>
+      This is a real attack pattern — style attributes accepting user-controlled
+      color/theme values appear in dashboard and UI customisation features.
+      Document which characters in a CSS value context need to be escaped to
+      prevent attribute breakout.
+    </p>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>What's Next</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <div class="next-box">
+    <strong>Module 09 — DOM-Based XSS & Client-Side Sinks</strong>
+    <p>
+      Module 08 introduced the data-attribute → DOM sink pattern as a preview.
+      Module 09 gives DOM XSS its full treatment: the complete taxonomy of DOM
+      sinks (<code>innerHTML</code>, <code>eval</code>, <code>location</code>,
+      <code>document.write</code>, <code>setTimeout(string)</code>,
+      <code>insertAdjacentHTML</code>), the sources that feed them
+      (<code>location.search</code>, <code>location.hash</code>,
+      <code>document.referrer</code>, <code>postMessage</code>),
+      and why DOM XSS requires different detection and defence techniques
+      than reflected or stored XSS. A dedicated client-side lab page will
+      contain intentionally vulnerable JS for the student to exploit without
+      any server involvement.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>
