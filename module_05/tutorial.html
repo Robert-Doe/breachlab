@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Module 05 — Event Handler Injection | XSS Mastery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Lato:wght@300;400;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0b0f1a;--bg2:#111827;--bg3:#1a2235;--card:#141c2e;--border:#1e3a5f;
+          --gold:#f5c842;--cyan:#38bdf8;--purple:#a78bfa;--red:#f87171;--green:#4ade80;
+          --teal:#0d9488;--orange:#fb923c;--text:#e2e8f0;--muted:#7a9bbf;--code-bg:#060d1a}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:'Lato',sans-serif;font-size:16px;line-height:1.75}
+    .page-wrap{max-width:860px;margin:0 auto;padding:48px 24px 96px}
+    .mod-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.14em;
+               text-transform:uppercase;color:var(--muted);border:1px solid var(--border);
+               border-radius:4px;padding:4px 10px;margin-bottom:20px}
+    h1{font-family:'Playfair Display',serif;font-size:42px;color:var(--gold);line-height:1.2;margin-bottom:12px}
+    h2{font-family:'Playfair Display',serif;font-size:26px;color:var(--cyan);
+       margin:52px 0 16px;padding-top:8px;border-top:1px solid var(--border)}
+    h3{font-family:'Lato',sans-serif;font-size:18px;font-weight:700;color:var(--purple);margin:32px 0 10px}
+    h4{font-size:14px;font-weight:700;color:var(--orange);margin:20px 0 6px;
+       text-transform:uppercase;letter-spacing:.06em}
+    .subtitle{font-size:17px;color:var(--muted);margin-bottom:40px;line-height:1.5}
+    p{margin-bottom:18px}
+    strong{color:var(--text);font-weight:700}
+    em{color:var(--orange);font-style:normal;font-weight:600}
+    a{color:var(--cyan)}
+    ul,ol{padding-left:22px;margin-bottom:18px}
+    li{margin-bottom:6px;font-size:15px}
+    .prereq-bar{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--teal);
+                border-radius:6px;padding:16px 20px;margin-bottom:32px}
+    .prereq-bar strong{color:var(--teal);font-size:12px;text-transform:uppercase;
+                       letter-spacing:.1em;display:block;margin-bottom:6px}
+    .prereq-bar p{font-size:14px;color:var(--muted);margin:0}
+    .deliverables{background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+                  padding:20px 24px;margin-bottom:36px}
+    .deliverables strong{color:var(--gold);font-size:13px;text-transform:uppercase;
+                         letter-spacing:.1em;display:block;margin-bottom:12px}
+    .deliverables ul{list-style:none;padding:0}
+    .deliverables li{font-size:14px;padding:4px 0 4px 20px;position:relative}
+    .deliverables li::before{content:"→";position:absolute;left:0;color:var(--green);font-weight:700}
+    .callout{border-radius:6px;padding:16px 20px;margin:28px 0;font-size:14.5px;line-height:1.65}
+    .callout .callout-label{font-size:11px;font-weight:700;letter-spacing:.12em;
+                             text-transform:uppercase;margin-bottom:8px;display:block}
+    .callout.warning{background:#1f0f0f;border-left:4px solid var(--red)}
+    .callout.warning .callout-label{color:var(--red)}
+    .callout.tip{background:#0a1f13;border-left:4px solid var(--green)}
+    .callout.tip .callout-label{color:var(--green)}
+    .callout.insight{background:#0f1240;border-left:4px solid var(--purple)}
+    .callout.insight .callout-label{color:var(--purple)}
+    .callout.info{background:#061826;border-left:4px solid var(--cyan)}
+    .callout.info .callout-label{color:var(--cyan)}
+    pre{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;
+        padding:20px;overflow-x:auto;margin:20px 0;
+        font-family:'Source Code Pro',monospace;font-size:13.5px;line-height:1.7}
+    code{font-family:'Source Code Pro',monospace;font-size:13px}
+    p code,li code{background:var(--code-bg);color:var(--cyan);padding:2px 6px;
+                   border-radius:3px;border:1px solid var(--border)}
+    .cm{color:#4b5563}.kw{color:#89dceb}.fn{color:#a78bfa}
+    .st{color:#a6e3a1}.nu{color:#fab387}.at{color:#f5c842}.op{color:#f87171}
+    .hl{color:#f5c842;font-weight:700}
+    .steps{list-style:none;counter-reset:step;margin:20px 0;padding:0}
+    .steps li{counter-increment:step;padding:14px 16px 14px 56px;position:relative;
+              background:var(--card);border:1px solid var(--border);border-radius:6px;
+              margin-bottom:10px;font-size:14.5px}
+    .steps li::before{content:counter(step);position:absolute;left:16px;top:14px;
+                      width:24px;height:24px;border-radius:50%;background:var(--border);
+                      color:var(--cyan);font-weight:700;font-size:12px;
+                      display:flex;align-items:center;justify-content:center}
+    .exercise{background:var(--card);border:1px solid var(--border);
+              border-radius:6px;padding:20px 24px;margin-bottom:14px}
+    .exercise .ex-badge{font-size:10px;font-weight:700;letter-spacing:.1em;
+                        text-transform:uppercase;padding:2px 8px;border-radius:3px;
+                        margin-bottom:10px;display:inline-block}
+    .ex-warm .ex-badge{background:#1a2f1a;color:var(--green)}
+    .ex-core .ex-badge{background:#1a1a2f;color:var(--cyan)}
+    .ex-stretch .ex-badge{background:#2f1a2f;color:var(--purple)}
+    .exercise h4{margin-top:0}
+    .exercise p{font-size:14.5px;margin-bottom:8px}
+    .exercise ul{padding-left:20px;font-size:14px}
+    .exercise li{margin-bottom:4px}
+    .next-box{background:var(--bg3);border:1px solid var(--border);
+              border-left:4px solid var(--gold);border-radius:6px;
+              padding:22px 24px;margin-top:48px}
+    .next-box strong{color:var(--gold);display:block;font-size:12px;text-transform:uppercase;
+                     letter-spacing:.1em;margin-bottom:10px}
+    .file-block{background:var(--bg2);border:1px solid var(--border);
+                border-radius:6px;margin:24px 0;overflow:hidden}
+    .file-block-header{background:var(--card);padding:10px 16px;
+                       font-family:'Source Code Pro',monospace;font-size:13px;
+                       color:var(--gold);border-bottom:1px solid var(--border)}
+    .file-block pre{margin:0;border:none;border-radius:0}
+    .event-row{display:grid;grid-template-columns:160px 1fr;gap:10px;
+               padding:10px 0;border-bottom:1px solid var(--border);font-size:14px}
+    .event-row:last-child{border-bottom:none}
+    .event-name{font-family:'Source Code Pro',monospace;color:var(--green);font-weight:700}
+    .event-desc{color:var(--muted)}
+    .top-nav{background:var(--bg2);border-bottom:1px solid var(--border);
+             padding:12px 24px;display:flex;align-items:center;
+             justify-content:space-between;font-size:13px;color:var(--muted)}
+    .top-nav a{color:var(--cyan);text-decoration:none}
+    hr{border:none;border-top:1px solid var(--border);margin:40px 0}
+    table{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px}
+    th{background:var(--card);color:var(--cyan);padding:10px 14px;
+       text-align:left;border-bottom:1px solid var(--border)}
+    td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+    tr:last-child td{border-bottom:none}
+  </style>
+</head>
+<body>
+
+<nav class="top-nav">
+  <a href="/">← Lab Home</a>
+  <span>XSS Mastery Course</span>
+  <span>Module 05 of 19</span>
+</nav>
+
+<div class="page-wrap">
+
+  <div class="mod-badge">Module 05 of 19</div>
+  <h1>Event Handler Injection:<br>Mechanism 2 in Depth</h1>
+  <p class="subtitle">
+    Blocking <code>&lt;script&gt;</code> tags is the single most common
+    "fix" applied to XSS reports in legacy codebases. This module
+    systematically demonstrates why it fails — and introduces the 40+
+    event handlers that make Mechanism 2 the most versatile and durable
+    XSS execution path available to attackers.
+  </p>
+
+  <div class="prereq-bar">
+    <strong>Prerequisites</strong>
+    <p>Modules 01–04 complete. You have fired reflected XSS in body, attribute,
+       and script contexts. You understand the innerHTML/script-tag asymmetry
+       introduced in Module 04.</p>
+  </div>
+
+  <div class="deliverables">
+    <strong>What you will build in this module</strong>
+    <ul>
+      <li>A server endpoint that simulates a naive script-tag filter (<code>/vuln-display</code>)</li>
+      <li>A five-rule blocklist filter (<code>/filter-demo</code>) that the student systematically bypasses</li>
+      <li>An interactive attack demo (<code>attack_02_events.html</code>) with 7 steps</li>
+      <li>A searchable event-handler reference (<code>event_catalog.html</code>) with 40+ vectors</li>
+      <li>The ability to fire zero-interaction XSS on a server that blocks script tags</li>
+    </ul>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 1 — Why Event Handlers Are the Primary XSS Vector</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    When security researchers report XSS vulnerabilities, developers typically
+    patch the most obvious vector first — the <code>&lt;script&gt;</code> tag.
+    A filter is added: strip <code>&lt;script&gt;...&lt;/script&gt;</code>,
+    close the ticket. The application remains vulnerable to every other
+    execution mechanism because the developer conflated "XSS" with
+    "script tag injection."
+  </p>
+
+  <p>
+    The HTML5 specification defines over 150 event handler attributes. Every
+    single one of them executes JavaScript. They work on <em>any</em> HTML
+    element — not just the "dangerous" ones. A <code>&lt;div&gt;</code>,
+    a <code>&lt;p&gt;</code>, a <code>&lt;span&gt;</code> — all can carry
+    event handlers. An allowlist-based sanitiser that permits "safe" tags
+    but does not carefully filter their attributes is equally broken.
+  </p>
+
+  <p>
+    More critically: event handlers injected via <code>innerHTML</code>
+    <em>do execute</em>, unlike <code>&lt;script&gt;</code> tags. This is
+    the critical asymmetry that makes Mechanism 2 the dominant vector in
+    DOM-based XSS. Every DOM XSS payload you will encounter from Module 09
+    onward uses event handlers rather than script tags, precisely because
+    of the HTML5 innerHTML restriction.
+  </p>
+
+  <div class="callout warning">
+    <span class="callout-label">Warning — innerHTML Is Not "Safe" Without Event-Handler Filtering</span>
+    The HTML5 spec says <code>innerHTML</code> does not execute
+    <code>&lt;script&gt;</code> tags. This is not a security feature — it is a
+    rendering optimisation. Event handlers on any element injected via
+    <code>innerHTML</code> fire normally. <code>textContent</code> is the only
+    DOM property that truly treats its argument as inert text. Use
+    <code>textContent</code> for user-supplied strings that should appear as
+    visible text. Use <code>innerHTML</code> only for trusted, sanitised HTML.
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 2 — The Zero-Interaction Events</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    The most dangerous event handlers are those that fire without any user
+    action. They make XSS completely silent — the victim opens the page and
+    the payload executes before they read a single word. The five most
+    important zero-interaction events for XSS are:
+  </p>
+
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;
+              padding:4px 20px;margin:20px 0">
+    <div class="event-row">
+      <div class="event-name">onerror</div>
+      <div class="event-desc">Fires when a resource fails to load. <code>src=x</code> deliberately fails. Works on <code>img</code>, <code>video</code>, <code>audio</code>, <code>object</code>, <code>input[type=image]</code>. The single most reliable zero-interaction vector.</div>
+    </div>
+    <div class="event-row">
+      <div class="event-name">onload</div>
+      <div class="event-desc">Fires when an element finishes loading. <code>&lt;svg onload=...&gt;</code> fires immediately when the SVG is parsed, even inline. <code>&lt;body onload=...&gt;</code> fires when the full page loads.</div>
+    </div>
+    <div class="event-row">
+      <div class="event-name">ontoggle</div>
+      <div class="event-desc">Fires on <code>&lt;details&gt;</code> when its open state changes. The <code>open</code> attribute causes an immediate toggle at parse time — before any user interaction. Works via <code>innerHTML</code>.</div>
+    </div>
+    <div class="event-row">
+      <div class="event-name">onfocus</div>
+      <div class="event-desc">Fires when an element receives focus. Combined with <code>autofocus</code>, the browser focuses the element immediately on page load — zero user action required.</div>
+    </div>
+    <div class="event-row">
+      <div class="event-name">onanimationstart</div>
+      <div class="event-desc">Fires when a CSS animation begins. If a keyframe animation is applied to an element via an inline <code>style</code> attribute, it starts immediately. No user action, no external stylesheet needed.</div>
+    </div>
+  </div>
+
+  <div class="callout insight">
+    <span class="callout-label">PhD Insight — Zero-Interaction Events and Threat Severity</span>
+    The distinction between zero-interaction and interaction-required events is
+    critical for threat model severity ratings. A zero-interaction XSS payload
+    requires only that the victim's browser loads the page — the exploit is
+    automatic. No phishing, no social engineering, no clicks. This maps to the
+    highest severity ratings (CVSS 9.0+) for stored XSS vulnerabilities.
+    An interaction-required payload (onmouseover, onclick) requires some level
+    of social engineering — lower severity, but still exploitable in targeted
+    attacks. When writing your threat model, the interaction requirement should
+    be an explicit parameter of your attacker capability assumptions.
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 3 — Why Blocklists Always Fail</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    The fundamental problem with blocklist-based XSS filters is enumeration:
+    the attacker only needs one vector the filter doesn't cover; the filter
+    must cover all of them. This asymmetry is structurally unwinnable for
+    the defender operating at the string/keyword level.
+  </p>
+
+  <p>
+    Consider the progression of a typical legacy application's XSS filter history:
+  </p>
+
+  <table>
+    <thead><tr><th>Bug report #</th><th>Payload used</th><th>Fix applied</th><th>Still bypassed by</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><code>&lt;script&gt;alert(1)&lt;/script&gt;</code></td><td>Strip <code>&lt;script&gt;</code></td><td><code>&lt;img src=x onerror=...&gt;</code></td></tr>
+      <tr><td>2</td><td><code>&lt;img onerror=...&gt;</code></td><td>Strip <code>onerror</code></td><td><code>&lt;svg onload=...&gt;</code></td></tr>
+      <tr><td>3</td><td><code>&lt;svg onload=...&gt;</code></td><td>Strip <code>onload</code></td><td><code>&lt;details ontoggle=...&gt;</code></td></tr>
+      <tr><td>4</td><td><code>&lt;details ontoggle=...&gt;</code></td><td>Strip <code>ontoggle</code></td><td><code>&lt;input autofocus onfocus=...&gt;</code></td></tr>
+      <tr><td>5</td><td><code>&lt;input onfocus=...&gt;</code></td><td>Strip <code>onfocus</code></td><td><code>onanimationstart</code>, <code>onpointerover</code>, …</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    Each fix patches one vector and leaves 145+ others intact. The correct
+    fix — applied after report #1 — is to replace the blocklist with an
+    <em>allowlist sanitiser</em> that permits only specific known-safe tags
+    and attributes. We study allowlist sanitisers in Module 17 and their
+    bypass (mXSS) in Module 13.
+  </p>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 4 — The Event Handler on Any Element</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    HTML5 global event attributes can be applied to <em>any</em> HTML element.
+    This means that even a sanitiser which correctly allowlists only "safe"
+    tags like <code>&lt;div&gt;</code>, <code>&lt;p&gt;</code>,
+    <code>&lt;span&gt;</code>, <code>&lt;em&gt;</code>, and <code>&lt;strong&gt;</code>
+    is still vulnerable if it permits any event handler attributes on those tags.
+  </p>
+
+  <pre><span class="cm">// "Safe" tag with dangerous attribute — both would pass a tag-only allowlist</span>
+<span class="op">&lt;</span>p <span class="at">onmouseover</span>=<span class="st">"alert(document.domain)"</span><span class="op">&gt;</span>hover me<span class="op">&lt;/</span>p<span class="op">&gt;</span>
+<span class="op">&lt;</span>em <span class="at">onclick</span>=<span class="st">"alert(1)"</span><span class="op">&gt;</span>click me<span class="op">&lt;/</span>em<span class="op">&gt;</span>
+<span class="op">&lt;</span>strong <span class="at">onfocus</span>=<span class="st">"alert(1)"</span> <span class="at">tabindex</span>=<span class="st">"1"</span><span class="op">&gt;</span>focus me<span class="op">&lt;/</span>strong<span class="op">&gt;</span></pre>
+
+  <p>
+    An allowlist sanitiser must therefore maintain two separate allowlists:
+    permitted tags AND permitted attributes (per tag or globally). DOMPurify's
+    default configuration allowlists approximately 85 tags and 80 attributes —
+    none of which are event handler attributes. This is the correct approach.
+    Any configuration that permits <code>on*</code> attributes is insecure.
+  </p>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Code Walkthrough — /vuln-display (Flask)</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div class="file-block">
+    <div class="file-block-header">lab_server.py — /vuln-display</div>
+    <pre><span class="kw">import</span> re
+
+<span class="at">@app.route</span>(<span class="st">"/vuln-display"</span>)
+<span class="kw">def</span> <span class="fn">vuln_display</span>():
+    content = request.args.<span class="fn">get</span>(<span class="st">"content"</span>, <span class="st">""</span>)
+
+    <span class="cm"># THE "SANITISER": one regex, strips &lt;script&gt; blocks only.
+    # re.IGNORECASE handles &lt;SCRIPT&gt;, &lt;Script&gt;, &lt;ScRiPt&gt;.
+    # [\s\S]*? is a non-greedy match for any content including newlines.
+    #
+    # What it misses (everything else):
+    #   - Event handler attributes on ANY element
+    #   - javascript: URIs in href/src/action
+    #   - SVG/MathML with embedded event handlers
+    #   - data: URIs in iframe/object/embed
+    #   - CSS expression() (legacy IE)
+    #   - All 150+ HTML event attributes</span>
+    filtered = re.<span class="fn">sub</span>(
+        <span class="st">r'&lt;script[\s\S]*?&lt;/script&gt;'</span>,
+        <span class="st">''</span>,
+        content,
+        flags=re.IGNORECASE
+    )
+
+    <span class="cm"># Both 'content' and 'filtered' are reflected into the page.
+    # 'filtered' is placed inside a div that renders it as HTML.
+    # Event handlers in 'filtered' will execute when their events fire.</span>
+    body = <span class="st">f"""
+  &lt;div class="box"&gt;
+    &lt;label&gt;After removing &lt;script&gt; tags:&lt;/label&gt;
+    &lt;pre&gt;{filtered}&lt;/pre&gt;
+  &lt;/div&gt;
+  &lt;div class="box"&gt;
+    &lt;label&gt;Rendered (event handlers still active):&lt;/label&gt;
+    &lt;div id="rendered"&gt;<span class="hl">{filtered}</span>&lt;/div&gt;   &lt;!-- still vulnerable --&gt;
+  &lt;/div&gt;"""</span>
+    <span class="kw">return</span> <span class="fn">make_response</span>(<span class="fn">page</span>(<span class="st">"Vuln Display"</span>, body),
+                          <span class="nu">200</span>, {<span class="st">"Content-Type"</span>: <span class="st">"text/html; charset=utf-8"</span>})</pre>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Build &amp; Run</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <ol class="steps">
+    <li>Start the server: <code>python lab_server.py</code> or <code>node lab_server.js</code></li>
+    <li>Open <a href="http://localhost:5000/attack_02_events.html" target="_blank">http://localhost:5000/attack_02_events.html</a> with DevTools Console open</li>
+    <li>Open the <a href="http://localhost:5000/event_catalog.html" target="_blank">Event Catalog</a> in a second tab — reference it throughout</li>
+    <li>Work Steps 1–7 in order. For each step: confirm the filter state first, then fire the bypass</li>
+    <li>For Step 7: open <code>/filter-demo</code> directly in the URL bar, not via a button — this way you can see exactly what the server returns in Burp</li>
+    <li>After all steps: return to the Event Catalog and identify 3 additional zero-interaction events not used in the demo</li>
+  </ol>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Exercises</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 1 — Count What the Filter Misses</h4>
+    <p>
+      Open <a href="/event_catalog.html" target="_blank">event_catalog.html</a>.
+      The <code>/filter-demo</code> endpoint blocks:
+      <code>onerror</code>, <code>onload</code>, <code>onclick</code>.
+      Use the search box to find how many entries in the catalog are
+      <em>not</em> blocked by these three rules. Write down the count.
+      Then pick the three you would use first if targeting a real application
+      and explain why (consider: interaction required? works via innerHTML?
+      likely to be in other blocklists?).
+    </p>
+  </div>
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 2 — Confirm the innerHTML Asymmetry</h4>
+    <p>
+      Open the browser Console on any page. Run these two snippets and observe:
+    </p>
+    <pre><span class="cm">// Snippet A — script tag via innerHTML</span>
+<span class="kw">const</span> a = document.<span class="fn">createElement</span>(<span class="st">'div'</span>);
+a.innerHTML = <span class="st">'&lt;script&gt;console.log("script via innerHTML")&lt;\/script&gt;'</span>;
+document.body.<span class="fn">appendChild</span>(a);
+<span class="cm">// Check Console — did "script via innerHTML" appear?</span>
+
+<span class="cm">// Snippet B — event handler via innerHTML</span>
+<span class="kw">const</span> b = document.<span class="fn">createElement</span>(<span class="st">'div'</span>);
+b.innerHTML = <span class="st">'&lt;img src=x onerror="console.log(\'onerror via innerHTML\')"&gt;'</span>;
+document.body.<span class="fn">appendChild</span>(b);
+<span class="cm">// Check Console — did "onerror via innerHTML" appear?</span></pre>
+    <p>
+      Document: which fired, which didn't, and cite the specific HTML5 spec
+      section that explains the difference (hint: search "already started"
+      in the WHATWG HTML Living Standard).
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 3 — Extend the Blocklist (and Break It)</h4>
+    <p>
+      Open <code>lab_server.py</code> (or <code>lab_server.js</code>).
+      In the <code>/filter-demo</code> route, add five more rules to the
+      blocklist that would stop the bypasses from Step 7:
+    </p>
+    <pre><span class="cm"># Add these to blocked_patterns:</span>
+(r<span class="st">'ontoggle'</span>,   <span class="st">'stripped ontoggle'</span>),
+(r<span class="st">'onfocus'</span>,    <span class="st">'stripped onfocus'</span>),
+(r<span class="st">'onmouse'</span>,    <span class="st">'stripped onmouse*'</span>),
+(r<span class="st">'onanimation'</span>,<span class="st">'stripped onanimation*'</span>),
+(r<span class="st">'onpaste'</span>,    <span class="st">'stripped onpaste'</span>),</pre>
+    <p>
+      Reload the server. Now find a payload in the Event Catalog that bypasses
+      the expanded 10-rule blocklist. Write it down and test it on
+      <code>/filter-demo</code>. How many rules would you need to add to
+      stop all 40 catalog entries? (Rhetorical — the answer is "you cannot
+      enumerate a complete list.")
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 4 — Build a Correct Sanitiser</h4>
+    <p>
+      Add a new endpoint <code>/display-safe</code> to both servers. This endpoint
+      should accept a <code>content</code> parameter and render it safely.
+      The correct approach for Python is to use <code>html.escape()</code> before
+      inserting into the rendered HTML. The correct approach for Node is the same
+      escaping function from Module 04. Apply it and verify:
+    </p>
+    <ul>
+      <li><code>/display-safe?content=&lt;img src=x onerror=alert(1)&gt;</code> → displays the tag as visible text, does not execute</li>
+      <li><code>/display-safe?content=hello &lt;b&gt;world&lt;/b&gt;</code> → displays the literal string including the angle brackets</li>
+      <li><code>/display-safe?content=safe text</code> → displays normally</li>
+    </ul>
+    <p>
+      This is the correct fix for a context where user input should be displayed
+      as text. In Module 17 we study when HTML rendering of user content is
+      legitimate (rich-text fields) and how to handle that safely with DOMPurify.
+    </p>
+  </div>
+
+  <div class="exercise ex-stretch">
+    <span class="ex-badge">Stretch</span>
+    <h4>Exercise 5 — Build a Zero-Interaction Proof-of-Concept</h4>
+    <p>
+      Using <em>only</em> the Event Catalog as a reference (no searching online),
+      build a payload that meets all of the following constraints simultaneously:
+    </p>
+    <ul>
+      <li>Zero user interaction required</li>
+      <li>Works when injected via <code>innerHTML</code> (not just server-side)</li>
+      <li>Does not use <code>onerror</code>, <code>onload</code>, or <code>ontoggle</code></li>
+      <li>Does not use a <code>&lt;script&gt;</code> tag</li>
+      <li>Does not use <code>javascript:</code> URI scheme</li>
+      <li>Exfiltrates <code>document.cookie</code> as a query parameter to <code>/ping</code></li>
+    </ul>
+    <p>
+      Test your payload on <code>/vuln-display</code>. Verify in the Network
+      panel that a request to <code>/ping?c=...</code> is made.
+      Document which event handler you used and why it satisfies all six constraints.
+    </p>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>What's Next</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div class="next-box">
+    <strong>Module 06 — URI Scheme Injection (Mechanism 3 in Depth)</strong>
+    <p>
+      Modules 04 and 05 covered execution via tag parsing and event handlers.
+      Module 06 turns to the third mechanism: URI scheme evaluation.
+      The new file is <code>vuln_redirect.py</code> / <code>vuln_redirect.js</code>
+      — an open redirect endpoint that forwards users to attacker-supplied URLs.
+      When the URL scheme is <code>javascript:</code>, the browser executes it
+      instead of navigating. You will study every attribute that accepts a URL
+      (<code>href</code>, <code>src</code>, <code>action</code>,
+      <code>formaction</code>, <code>data</code>, <code>xlink:href</code>)
+      and why a sanitiser that handles tag bodies and event handlers correctly
+      can still be bypassed if it does not validate URL values.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

