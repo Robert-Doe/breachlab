@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Module 06 — URI Scheme Injection | XSS Mastery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Lato:wght@300;400;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0b0f1a;--bg2:#111827;--bg3:#1a2235;--card:#141c2e;--border:#1e3a5f;
+          --gold:#f5c842;--cyan:#38bdf8;--purple:#a78bfa;--red:#f87171;--green:#4ade80;
+          --teal:#0d9488;--orange:#fb923c;--text:#e2e8f0;--muted:#7a9bbf;--code-bg:#060d1a}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:'Lato',sans-serif;font-size:16px;line-height:1.75}
+    .page-wrap{max-width:860px;margin:0 auto;padding:48px 24px 96px}
+    .mod-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.14em;
+               text-transform:uppercase;color:var(--muted);border:1px solid var(--border);
+               border-radius:4px;padding:4px 10px;margin-bottom:20px}
+    h1{font-family:'Playfair Display',serif;font-size:42px;color:var(--gold);line-height:1.2;margin-bottom:12px}
+    h2{font-family:'Playfair Display',serif;font-size:26px;color:var(--cyan);
+       margin:52px 0 16px;padding-top:8px;border-top:1px solid var(--border)}
+    h3{font-size:18px;font-weight:700;color:var(--purple);margin:32px 0 10px}
+    h4{font-size:14px;font-weight:700;color:var(--orange);margin:20px 0 6px;
+       text-transform:uppercase;letter-spacing:.06em}
+    .subtitle{font-size:17px;color:var(--muted);margin-bottom:40px;line-height:1.5}
+    p{margin-bottom:18px}
+    strong{color:var(--text);font-weight:700}
+    em{color:var(--orange);font-style:normal;font-weight:600}
+    a{color:var(--cyan)}
+    ul,ol{padding-left:22px;margin-bottom:18px}
+    li{margin-bottom:6px;font-size:15px}
+    .prereq-bar{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--teal);
+                border-radius:6px;padding:16px 20px;margin-bottom:32px}
+    .prereq-bar strong{color:var(--teal);font-size:12px;text-transform:uppercase;
+                       letter-spacing:.1em;display:block;margin-bottom:6px}
+    .prereq-bar p{font-size:14px;color:var(--muted);margin:0}
+    .deliverables{background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+                  padding:20px 24px;margin-bottom:36px}
+    .deliverables strong{color:var(--gold);font-size:13px;text-transform:uppercase;
+                         letter-spacing:.1em;display:block;margin-bottom:12px}
+    .deliverables ul{list-style:none;padding:0}
+    .deliverables li{font-size:14px;padding:4px 0 4px 20px;position:relative}
+    .deliverables li::before{content:"→";position:absolute;left:0;color:var(--green);font-weight:700}
+    .callout{border-radius:6px;padding:16px 20px;margin:28px 0;font-size:14.5px;line-height:1.65}
+    .callout .callout-label{font-size:11px;font-weight:700;letter-spacing:.12em;
+                             text-transform:uppercase;margin-bottom:8px;display:block}
+    .callout.warning{background:#1f0f0f;border-left:4px solid var(--red)}
+    .callout.warning .callout-label{color:var(--red)}
+    .callout.tip{background:#0a1f13;border-left:4px solid var(--green)}
+    .callout.tip .callout-label{color:var(--green)}
+    .callout.insight{background:#0f1240;border-left:4px solid var(--purple)}
+    .callout.insight .callout-label{color:var(--purple)}
+    .callout.info{background:#061826;border-left:4px solid var(--cyan)}
+    .callout.info .callout-label{color:var(--cyan)}
+    pre{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;
+        padding:20px;overflow-x:auto;margin:20px 0;
+        font-family:'Source Code Pro',monospace;font-size:13.5px;line-height:1.7}
+    code{font-family:'Source Code Pro',monospace;font-size:13px}
+    p code,li code{background:var(--code-bg);color:var(--cyan);padding:2px 6px;
+                   border-radius:3px;border:1px solid var(--border)}
+    .cm{color:#4b5563}.kw{color:#89dceb}.fn{color:#a78bfa}
+    .st{color:#a6e3a1}.nu{color:#fab387}.at{color:#f5c842}.op{color:#f87171}.hl{color:#f5c842;font-weight:700}
+    .steps{list-style:none;counter-reset:step;margin:20px 0;padding:0}
+    .steps li{counter-increment:step;padding:14px 16px 14px 56px;position:relative;
+              background:var(--card);border:1px solid var(--border);border-radius:6px;margin-bottom:10px;font-size:14.5px}
+    .steps li::before{content:counter(step);position:absolute;left:16px;top:14px;
+                      width:24px;height:24px;border-radius:50%;background:var(--border);
+                      color:var(--cyan);font-weight:700;font-size:12px;
+                      display:flex;align-items:center;justify-content:center}
+    .exercise{background:var(--card);border:1px solid var(--border);
+              border-radius:6px;padding:20px 24px;margin-bottom:14px}
+    .exercise .ex-badge{font-size:10px;font-weight:700;letter-spacing:.1em;
+                        text-transform:uppercase;padding:2px 8px;border-radius:3px;
+                        margin-bottom:10px;display:inline-block}
+    .ex-warm .ex-badge{background:#1a2f1a;color:var(--green)}
+    .ex-core .ex-badge{background:#1a1a2f;color:var(--cyan)}
+    .ex-stretch .ex-badge{background:#2f1a2f;color:var(--purple)}
+    .exercise h4{margin-top:0}
+    .exercise p,.exercise li{font-size:14.5px}
+    .next-box{background:var(--bg3);border:1px solid var(--border);
+              border-left:4px solid var(--gold);border-radius:6px;padding:22px 24px;margin-top:48px}
+    .next-box strong{color:var(--gold);display:block;font-size:12px;text-transform:uppercase;
+                     letter-spacing:.1em;margin-bottom:10px}
+    .file-block{background:var(--bg2);border:1px solid var(--border);
+                border-radius:6px;margin:24px 0;overflow:hidden}
+    .file-block-header{background:var(--card);padding:10px 16px;font-family:'Source Code Pro',monospace;
+                       font-size:13px;color:var(--gold);border-bottom:1px solid var(--border)}
+    .file-block pre{margin:0;border:none;border-radius:0}
+    .top-nav{background:var(--bg2);border-bottom:1px solid var(--border);
+             padding:12px 24px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--muted)}
+    .top-nav a{color:var(--cyan);text-decoration:none}
+    table{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px}
+    th{background:var(--card);color:var(--cyan);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border)}
+    td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+    td:first-child{font-family:'Source Code Pro',monospace;font-size:12.5px;color:var(--orange)}
+    tr:last-child td{border-bottom:none}
+  </style>
+</head>
+<body>
+
+<nav class="top-nav">
+  <a href="/">← Lab Home</a>
+  <span>XSS Mastery Course</span>
+  <span>Module 06 of 19</span>
+</nav>
+
+<div class="page-wrap">
+
+  <div class="mod-badge">Module 06 of 19</div>
+  <h1>URI Scheme Injection:<br>Mechanism 3 in Depth</h1>
+  <p class="subtitle">
+    The third execution mechanism requires no HTML tag injection at all.
+    When a URL value is attacker-controlled and flows into a navigation
+    context — an <code>href</code>, an <code>action</code>, a redirect
+    header, or a DOM location assignment — the <code>javascript:</code>
+    scheme turns that URL into a JavaScript executor running in the victim's origin.
+  </p>
+
+  <div class="prereq-bar">
+    <strong>Prerequisites</strong>
+    <p>Modules 01–05 complete. You have fired tag injection and event-handler
+       payloads. You understand the browser's HTML parsing pipeline and the
+       five execution mechanisms framework.</p>
+  </div>
+
+  <div class="deliverables">
+    <strong>What you will build in this module</strong>
+    <ul>
+      <li>An open redirect endpoint (<code>/redirect</code>) with no scheme validation</li>
+      <li>A link-preview endpoint (<code>/link-preview</code>) that injects user URLs into <code>href</code></li>
+      <li>A profile page (<code>/profile</code>) with three simultaneous URL injection points</li>
+      <li>An interactive attack demo with 7 steps including obfuscation bypasses</li>
+      <li>A searchable URI scheme reference covering all dangerous schemes and attributes</li>
+    </ul>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 1 — The URL as an Execution Context</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    HTML has two fundamentally different ways of embedding executable content.
+    The first is the <em>element/attribute model</em> — a tag exists in the DOM
+    and an event fires on it. Modules 04 and 05 covered this model.
+    The second is the <em>navigation model</em> — the browser is asked to
+    navigate to a resource identified by a URL.
+  </p>
+
+  <p>
+    When the URL scheme is <code>http:</code> or <code>https:</code>, the
+    browser fetches a remote resource. When the scheme is <code>javascript:</code>,
+    the browser evaluates the expression that follows and uses the result as
+    the new document content. When the scheme is <code>data:</code>, the
+    browser renders the inline document specified.
+  </p>
+
+  <p>
+    These URI schemes are not XSS quirks — they are defined behaviour in the
+    HTML and URL specifications. The vulnerability arises when an application
+    places attacker-controlled data into a URL-accepting context without
+    validating the scheme. The attacker doesn't inject a tag; they inject a URL.
+  </p>
+
+  <div class="callout insight">
+    <span class="callout-label">PhD Insight — URI Injection Crosses Injection Class Boundaries</span>
+    URI scheme injection is unique in that it can manifest as reflected, stored, or DOM-based XSS
+    depending on where the URL value originates. A stored profile website field that gets rendered
+    into an <code>href</code> is stored XSS via URI mechanism. An open redirect that reflects
+    <code>?url=</code> into a Location header is reflected XSS via URI mechanism. A client-side
+    router that reads <code>location.hash</code> and assigns it to <code>location.href</code>
+    is DOM-based XSS via URI mechanism. The mechanism taxonomy (Module 03) captures this;
+    the origin taxonomy (reflected/stored/DOM) does not. Both are needed for a complete threat model.
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 2 — The javascript: Scheme</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    The <code>javascript:</code> URI scheme evaluates a JavaScript expression
+    in the context of the current document. The expression runs with the same
+    privileges as any other script on the page — access to <code>document.cookie</code>,
+    <code>localStorage</code>, the DOM, and the ability to make credentialed
+    HTTP requests to the same origin.
+  </p>
+
+  <p>
+    The scheme is triggered by any browser navigation to a URL with that scheme.
+    Navigation occurs via:
+  </p>
+
+  <ul>
+    <li>User clicking an <code>&lt;a href="javascript:..."&gt;</code> link</li>
+    <li>Form submission to <code>&lt;form action="javascript:..."&gt;</code></li>
+    <li>HTTP 3xx redirect with <code>Location: javascript:...</code> header</li>
+    <li>JavaScript assignment: <code>location.href = "javascript:..."</code></li>
+    <li>JavaScript call: <code>window.open("javascript:...")</code></li>
+    <li><code>&lt;iframe src="javascript:..."&gt;</code> (browser-dependent)</li>
+    <li><code>&lt;meta http-equiv="refresh" content="0;url=javascript:..."&gt;</code></li>
+  </ul>
+
+  <div class="callout warning">
+    <span class="callout-label">Critical — href Injection Requires No HTML Injection</span>
+    An application that correctly HTML-encodes all output — preventing tag injection and
+    event-handler injection — can still be vulnerable to URI injection if it places
+    user-supplied values into <code>href</code>, <code>action</code>, or <code>src</code>
+    attributes without scheme validation. The angle brackets in
+    <code>&lt;a href="javascript:alert(1)"&gt;</code> are part of the surrounding
+    static HTML; the only attacker-supplied string is <code>javascript:alert(1)</code>,
+    which contains no characters that HTML encoding would affect.
+    Context-aware output encoding alone is insufficient — URL context requires
+    URL scheme validation in addition to HTML encoding.
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 3 — The Browser URL Parser and Obfuscation</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    The browser normalises URLs before evaluating them. This normalisation
+    happens <em>after</em> HTML parsing — meaning HTML entities are decoded
+    first. The URL is then parsed according to the WHATWG URL Standard.
+    The scheme component is extracted and lowercased before comparison.
+    Leading C0 controls (tab, newline, carriage return) are stripped from
+    the URL before parsing.
+  </p>
+
+  <p>
+    This multi-stage processing pipeline means that a filter operating at
+    the HTML string level sees a different value than the browser URL
+    parser eventually evaluates. The bypass chain is:
+  </p>
+
+  <pre><span class="cm">Step 1 — HTTP request arrives:</span>
+  GET /?url=<span class="hl">&#106;</span>avascript:alert(1)
+
+<span class="cm">Step 2 — HTML encoding decode (by browser HTML parser):</span>
+  href value = <span class="hl">j</span>avascript:alert(1)       <span class="cm">// &#106; → j</span>
+
+<span class="cm">Step 3 — URL normalisation (by browser URL parser):</span>
+  scheme = javascript                       <span class="cm">// lowercased, entity decoded</span>
+  path   = alert(1)
+
+<span class="cm">Step 4 — Execution:</span>
+  eval("alert(1)")                          <span class="cm">// in current page origin</span>
+
+<span class="cm">A filter that checks for the string "javascript:" at Step 1 sees "&#106;avascript:"
+and does not match. The browser evaluates it anyway at Step 4.</span></pre>
+
+  <div class="callout tip">
+    <span class="callout-label">Correct Defence</span>
+    A URL validation function must operate on the fully normalised URL value —
+    after HTML entity decoding and whitespace stripping. The correct check is:
+    parse the URL, extract the scheme, compare against an allowlist of safe schemes
+    (<code>http</code>, <code>https</code>, <code>mailto</code>, <code>/</code> for relative).
+    DOMPurify does this correctly by default. A custom filter that does a string search
+    for "javascript:" on the raw input does not.
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Concept 4 — The data: URI Scheme</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <p>
+    <code>data:</code> URIs embed resource content directly in the URL.
+    The format is <code>data:[mediatype][;base64],&lt;data&gt;</code>.
+    When the media type is <code>text/html</code>, the browser renders
+    a full HTML document — including script execution.
+  </p>
+
+  <p>
+    <code>data:</code> URIs that render HTML are subject to a different
+    restriction than <code>javascript:</code>: they execute in a
+    <em>null origin</em> rather than the origin of the current page.
+    This means scripts inside a <code>data:</code> document cannot
+    directly read <code>document.cookie</code> or <code>localStorage</code>
+    from the parent origin via the DOM.
+  </p>
+
+  <p>
+    However, null-origin documents can:
+  </p>
+
+  <ul>
+    <li>Make credentialed HTTP requests to same-origin endpoints (with CORS or cookies), exfiltrating data indirectly</li>
+    <li>Render convincing phishing overlays that visually replace the parent page</li>
+    <li>Use <code>postMessage</code> to communicate with parent frames if the parent has an overly permissive <code>message</code> event listener</li>
+    <li>In some browser configurations, access the parent window via <code>window.opener</code></li>
+  </ul>
+
+  <div class="callout insight">
+    <span class="callout-label">PhD Insight — data: and Same-Origin Policy</span>
+    The null-origin restriction for data: URIs is a deliberate hardening added
+    to modern browsers after years of abuse. Pre-2012 browsers treated data:
+    documents as inheriting the opener's origin — giving them full same-origin access.
+    This was a catastrophic design flaw exploited widely before the fix.
+    The current null-origin model is safer but not harmless: the phishing and
+    indirect-exfil vectors remain. When writing your threat model, the data: scheme
+    requires a separate threat entry from javascript: because the impact model differs.
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Code Walkthrough — /link-preview</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <div class="file-block">
+    <div class="file-block-header">lab_server.py — /link-preview</div>
+    <pre><span class="at">@app.route</span>(<span class="st">"/link-preview"</span>)
+<span class="kw">def</span> <span class="fn">link_preview</span>():
+    url   = request.args.<span class="fn">get</span>(<span class="st">"url"</span>, <span class="st">""</span>)
+    label = request.args.<span class="fn">get</span>(<span class="st">"label"</span>, <span class="st">"Visit link"</span>)
+
+    <span class="cm"># url= goes directly into href — no scheme validation.
+    # HTML special chars in url ARE preserved here — the angle brackets
+    # in the surrounding HTML are static. The only injected data is the
+    # url value itself, which contains no HTML-special chars in a
+    # javascript: payload. HTML encoding would not help here.
+    #
+    # Vulnerable: places arbitrary scheme in href
+    # Fix: assert url.startswith(("http://","https://","/")) before using</span>
+    body = <span class="st">f"""&lt;a href="<span class="hl">{url}</span>"&gt;{label}&lt;/a&gt;"""</span>
+
+    resp = <span class="fn">make_response</span>(<span class="fn">page</span>(<span class="st">"Link Preview"</span>, body))
+    resp.headers[<span class="st">"Content-Type"</span>] = <span class="st">"text/html; charset=utf-8"</span>
+    <span class="kw">return</span> resp</pre>
+  </div>
+
+  <p>
+    Note the important distinction from Modules 04 and 05: in a body-context
+    injection, a payload like <code>&lt;script&gt;alert(1)&lt;/script&gt;</code>
+    contains angle brackets that HTML encoding <em>would</em> neutralise.
+    In an href-context injection, the payload <code>javascript:alert(1)</code>
+    contains <em>no characters that require HTML encoding</em>. The colon,
+    letters, and parentheses are all valid unencoded characters. HTML encoding
+    as a universal defence fails here entirely.
+  </p>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Build &amp; Run</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <ol class="steps">
+    <li>Start the server: <code>python lab_server.py</code> or <code>node lab_server.js</code></li>
+    <li>Open <a href="http://localhost:5000/attack_03_uri.html" target="_blank">http://localhost:5000/attack_03_uri.html</a> with DevTools open on both Network and Console tabs</li>
+    <li>Also open the <a href="http://localhost:5000/uri_reference.html" target="_blank">URI Scheme Reference</a> as a persistent reference tab</li>
+    <li>Step 1: Click "Analyze in Network panel" first, then observe the 302 Location header in DevTools before clicking "Fire"</li>
+    <li>Steps 2–4: work each step noting which interaction (if any) is required</li>
+    <li>Step 6: after injecting the obfuscated link, right-click it and Copy Link Address — verify the raw href contains the tab character</li>
+    <li>Step 7: be prepared to use the browser Back button after the location sink fires</li>
+  </ol>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>Exercises</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 1 — Why HTML Encoding Fails for href</h4>
+    <p>
+      Open the Console on the <code>/link-preview</code> page after firing a
+      <code>javascript:</code> payload. Now try the same endpoint with
+      <code>?url=&lt;img src=x onerror=alert(1)&gt;</code>. What happens?
+      Does the tag injection fire or does HTML encoding stop it?
+    </p>
+    <p>
+      Then explain in writing: for the <code>javascript:alert(1)</code> payload,
+      which characters in the payload would be affected by HTML encoding
+      (<code>&amp;</code>, <code>&lt;</code>, <code>&gt;</code>, <code>"</code>, <code>'</code>)?
+      Why does HTML encoding not protect href against this specific payload?
+    </p>
+  </div>
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 2 — The Open Redirect in Burp</h4>
+    <p>
+      Configure your browser to proxy through Burp Suite. Navigate to:
+    </p>
+    <pre>/redirect?url=javascript:alert(document.domain)</pre>
+    <p>
+      In Burp Proxy → HTTP history, find the request. Examine the response:
+    </p>
+    <ul>
+      <li>What HTTP status code is returned?</li>
+      <li>What is the exact value of the Location response header?</li>
+      <li>Forward the request. What happens in the browser?</li>
+    </ul>
+    <p>
+      Now try the same with a legitimate redirect: <code>?url=/</code>.
+      Compare the two Location headers. What is the minimum validation
+      that would block the javascript: case without breaking the
+      legitimate relative-URL case?
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 3 — Add Scheme Validation to /link-preview</h4>
+    <p>
+      Add a fixed version of <code>/link-preview</code> as a new route
+      <code>/link-preview-safe</code> in both servers. The endpoint should:
+    </p>
+    <ul>
+      <li>Accept only URLs that start with <code>http://</code> or <code>https://</code> or <code>/</code></li>
+      <li>For any other scheme, replace the URL with the string <code>#blocked</code> and log the rejected value</li>
+      <li>Still correctly render <code>http://example.com</code> as a clickable link</li>
+    </ul>
+    <p>
+      Test all of these inputs and document which pass and which are blocked:
+      <code>javascript:alert(1)</code>, <code>JAVASCRIPT:alert(1)</code>,
+      <code>&#106;avascript:alert(1)</code>, <code>https://example.com</code>,
+      <code>/relative/path</code>, <code>data:text/html,&lt;h1&gt;hi&lt;/h1&gt;</code>.
+    </p>
+    <p>
+      <em>Hint:</em> Parse the URL first using Python's <code>urllib.parse.urlparse()</code>
+      or JavaScript's <code>new URL(url, location.href)</code> — do not do string comparison
+      on the raw input directly.
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 4 — Exfiltration via javascript: href</h4>
+    <p>
+      Build a realistic exfiltration payload for the <code>/link-preview</code>
+      endpoint. The payload should:
+    </p>
+    <ul>
+      <li>Execute when the victim clicks the rendered link</li>
+      <li>Send <code>document.cookie</code> as a query parameter to <code>/ping</code></li>
+      <li>Return the victim to the original page (no visible navigation away)</li>
+    </ul>
+    <p>
+      The <code>void()</code> operator is your friend for the last requirement.
+      Test it: verify in DevTools → Network that the <code>/ping?c=...</code>
+      request fires when you click the link.
+    </p>
+  </div>
+
+  <div class="exercise ex-stretch">
+    <span class="ex-badge">Stretch</span>
+    <h4>Exercise 5 — Stored URI Injection via Profile</h4>
+    <p>
+      This exercise simulates a stored URI injection scenario. The
+      <code>/profile</code> page accepts a <code>site=</code> parameter
+      that is placed in an <code>href</code>. In a real application, this
+      value would be stored in a database when the user saves their profile.
+    </p>
+    <p>
+      Build a stored-style attack chain:
+    </p>
+    <ul>
+      <li>Construct a profile URL with <code>site=javascript:fetch('/ping?stolen='+btoa(document.cookie))</code></li>
+      <li>Verify the fetch fires when the Website link is clicked</li>
+      <li>Check <code>/ping</code> response confirms receipt</li>
+      <li>Then explain: how does this attack model differ in terms of attacker effort from the reflected version in Step 2?
+          When would the stored version be the preferred attack vector?</li>
+    </ul>
+    <p>
+      As a bonus: research whether <code>btoa()</code> will correctly encode all possible
+      cookie values. What characters in a cookie could break the base64 encoding,
+      and what is the correct alternative?
+    </p>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <h2>What's Next</h2>
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <div class="next-box">
+    <strong>Module 07 — Tag & Namespace Confusion (SVG, MathML, iframe)</strong>
+    <p>
+      Modules 04–06 covered the three most common execution mechanisms in
+      HTML body, event handlers, and URI contexts. Module 07 goes deeper into
+      the parser itself: the HTML5 spec defines three parsing namespaces —
+      HTML, SVG, and MathML — and the transitions between them are exploitable.
+      Injecting a payload inside an SVG context gives it different parsing rules
+      than the same payload in HTML context. A sanitiser that handles HTML
+      correctly may mis-handle an SVG fragment. This is the foundation for
+      understanding Mutation XSS (Module 13), which exploits the differential
+      between what a sanitiser parses and what the browser re-parses after
+      sanitisation.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

