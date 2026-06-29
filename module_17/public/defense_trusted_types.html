@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>M17 — Trusted Types Interactive Demo</title>
+<meta http-equiv="Content-Security-Policy" content="require-trusted-types-for 'script'">
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:32px;max-width:900px}
+  h1{color:var(--accent);font-size:22px;margin-bottom:8px}
+  p{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:12px}
+  h2{font-size:14px;color:var(--warn);margin:24px 0 8px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px}
+  textarea{width:100%;height:70px;background:#060d1a;border:1px solid var(--border);border-radius:4px;color:var(--orange);font-family:'Courier New',monospace;font-size:12px;padding:10px;resize:vertical}
+  button{padding:8px 16px;background:var(--accent);color:#0b0f1a;font-weight:700;border:none;border-radius:4px;cursor:pointer;font-size:12px;margin-right:6px;margin-bottom:4px}
+  button.secondary{background:var(--panel);color:var(--accent);border:1px solid var(--accent)}
+  .out{margin-top:8px;padding:10px;background:#060d1a;border-radius:4px;font-size:12px;font-family:'Courier New',monospace;min-height:28px;word-break:break-all}
+  .ok-text{color:var(--ok)}
+  .err-text{color:var(--danger)}
+  .warn-text{color:var(--warn)}
+  code{font-family:'Courier New',monospace;font-size:11px;background:#060d1a;color:var(--orange);padding:1px 5px;border-radius:3px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .cell{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:16px}
+  .cell h3{font-size:12px;font-weight:700;margin-bottom:8px}
+  .cell.danger{border-color:var(--danger)} .cell.danger h3{color:var(--danger)}
+  .cell.ok{border-color:var(--ok)} .cell.ok h3{color:var(--ok)}
+  .cell.warn{border-color:var(--warn)} .cell.warn h3{color:var(--warn)}
+</style>
+</head>
+<body>
+<h1>Trusted Types Interactive Demo</h1>
+<p>This page has <code>Content-Security-Policy: require-trusted-types-for 'script'</code> enforced via meta tag. Every <code>innerHTML</code> assignment must go through a Trusted Types policy. Open DevTools Console to see TypeError messages.</p>
+
+<div class="card">
+  <h2>Sinks blocked by Trusted Types</h2>
+  <div class="grid">
+    <div class="cell danger"><h3>innerHTML / outerHTML</h3><p style="font-size:11px;color:var(--muted)">Requires TrustedHTML. Most common DOM XSS sink.</p></div>
+    <div class="cell danger"><h3>document.write()</h3><p style="font-size:11px;color:var(--muted)">Requires TrustedHTML.</p></div>
+    <div class="cell danger"><h3>eval() / setTimeout(string)</h3><p style="font-size:11px;color:var(--muted)">Requires TrustedScript.</p></div>
+    <div class="cell danger"><h3>script.src / worker.src</h3><p style="font-size:11px;color:var(--muted)">Requires TrustedScriptURL.</p></div>
+    <div class="cell ok"><h3>textContent (not blocked)</h3><p style="font-size:11px;color:var(--muted)">Always safe. Use instead of innerHTML for text.</p></div>
+    <div class="cell ok"><h3>setAttribute('class', …)</h3><p style="font-size:11px;color:var(--muted)">Non-URL, non-script attributes are not restricted.</p></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Live Experiment</h2>
+  <textarea id="payload">&lt;img src=x onerror=alert('XSS!')&gt;</textarea>
+  <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
+    <button onclick="tryDirect()">1. Direct innerHTML (should throw)</button>
+    <button onclick="tryPassthrough()">2. Pass-through policy (bad pattern)</button>
+    <button onclick="tryDOMPurify()">3. DOMPurify policy (correct)</button>
+    <button onclick="tryTextContent()">4. textContent (always safe)</button>
+  </div>
+
+  <div class="grid" style="margin-top:12px">
+    <div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:4px">Output:</p>
+      <div id="out" class="out" style="min-height:50px"></div>
+    </div>
+    <div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:4px">Result:</p>
+      <div id="result" class="out"></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Policy Playground</h2>
+  <p>Define a custom Trusted Types policy and test it against the payload above.</p>
+  <textarea id="policy-code">// Define createHTML behavior
+// s = the string being assigned to innerHTML
+// Return a safe version, or throw to block
+return s.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '')
+        .replace(/\s+on\w+=[^\s>]*/gi, '')
+        .replace(/javascript:/gi, '');</textarea>
+  <button onclick="testCustomPolicy()" style="margin-top:8px">Test custom policy</button>
+  <div id="custom-result" class="out" style="margin-top:8px"></div>
+</div>
+
+<div class="card">
+  <h2>Key Insight: TT enforces, doesn't sanitize</h2>
+  <p>Trusted Types forces all innerHTML assignments through a named <code>createPolicy()</code> function. The policy author decides what's safe. A <code>createHTML: s => s</code> pass-through policy defeats the entire purpose — TT just enforces that <em>someone</em> made an intentional decision.</p>
+  <p>The correct pattern: <code>createHTML: s => DOMPurify.sanitize(s)</code>. TT is the enforcement mechanism; DOMPurify is the actual defense.</p>
+</div>
+
+<script>
+const payload = () => document.getElementById('payload').value;
+const setResult = (msg, cls) => {
+  document.getElementById('result').innerHTML = `<span class="${cls}-text">${msg}</span>`;
+};
+const clearOut = () => {
+  document.getElementById('out').innerHTML = '';
+  document.getElementById('result').innerHTML = '';
+};
+
+function tryDirect() {
+  clearOut();
+  try {
+    document.getElementById('out').innerHTML = payload();
+    setResult('No TT enforced — innerHTML executed', 'warn');
+  } catch(e) {
+    setResult('Blocked: ' + e.message.slice(0, 120), 'ok');
+  }
+}
+
+function tryPassthrough() {
+  clearOut();
+  try {
+    const policy = trustedTypes.createPolicy('passthrough-' + Date.now(), {
+      createHTML: s => s  // intentionally bad — passes everything through
+    });
+    document.getElementById('out').innerHTML = policy.createHTML(payload());
+    setResult('Pass-through policy — TT "satisfied" but no actual sanitization. XSS payload executed.', 'err');
+  } catch(e) {
+    if (e.name === 'TypeError' && e.message.includes('trustedTypes')) {
+      setResult('TT not supported in this browser.', 'warn');
+    } else {
+      setResult('Error: ' + e.message.slice(0, 120), 'warn');
+    }
+  }
+}
+
+function tryDOMPurify() {
+  clearOut();
+  if (typeof DOMPurify === 'undefined') {
+    setResult('DOMPurify not loaded. In production: npm install dompurify and import it.', 'warn');
+    document.getElementById('out').textContent = '(DOMPurify not available in this static demo)';
+    return;
+  }
+  try {
+    const policy = trustedTypes.createPolicy('dompurify-policy', {
+      createHTML: s => DOMPurify.sanitize(s)
+    });
+    document.getElementById('out').innerHTML = policy.createHTML(payload());
+    setResult('DOMPurify policy applied — event handlers and scripts stripped', 'ok');
+  } catch(e) {
+    setResult('Error: ' + e.message.slice(0, 120), 'warn');
+  }
+}
+
+function tryTextContent() {
+  clearOut();
+  document.getElementById('out').textContent = payload();
+  setResult('textContent — payload treated as literal text. Always safe. No TT needed.', 'ok');
+}
+
+function testCustomPolicy() {
+  const code = document.getElementById('policy-code').value;
+  const resultEl = document.getElementById('custom-result');
+  try {
+    const fn = new Function('s', code);
+    const policy = trustedTypes.createPolicy('custom-' + Date.now(), {
+      createHTML: s => fn(s)
+    });
+    const sanitised = policy.createHTML(payload());
+    resultEl.innerHTML = '<span class="ok-text">Policy returned: </span>' +
+      document.createTextNode(sanitised).nodeValue;
+  } catch(e) {
+    resultEl.innerHTML = '<span class="err-text">Error: ' + e.message.slice(0, 200) + '</span>';
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "xss-lab-m17",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": { "start": "node lab_server.js" },
+  "dependencies": {
+    "express": "^4.18.0"
+  }
+}

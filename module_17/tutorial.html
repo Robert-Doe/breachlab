@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Module 17 — Defenses: Encoding, CSP, Trusted Types, Sanitizers</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.7;padding:40px 32px;max-width:820px}
+  h1{font-size:26px;font-weight:800;color:var(--accent);margin-bottom:6px}
+  .mod-tag{font-size:12px;color:var(--muted);margin-bottom:36px;display:block}
+  h2{font-size:18px;font-weight:700;color:var(--warn);margin:36px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  h3{font-size:14px;font-weight:700;color:var(--accent);margin:22px 0 8px}
+  p{font-size:14px;color:var(--text);margin-bottom:12px}
+  ul,ol{font-size:14px;color:var(--text);margin-left:22px;margin-bottom:12px}
+  li{margin-bottom:6px}
+  code{font-family:'Courier New',monospace;font-size:12px;background:#060d1a;color:var(--accent);padding:2px 6px;border-radius:3px}
+  pre{background:#060d1a;border:1px solid var(--border);border-radius:6px;padding:14px 16px;overflow-x:auto;font-size:12px;line-height:1.7;color:var(--orange);margin:12px 0;white-space:pre-wrap}
+  .callout{border-left:3px solid var(--accent);background:var(--panel);padding:12px 16px;border-radius:0 6px 6px 0;margin:14px 0;font-size:13px;color:var(--muted)}
+  .callout strong{color:var(--text)}
+  .warn{border-left-color:var(--warn)}
+  .danger{border-left-color:var(--danger)}
+  .ok{border-left-color:var(--ok)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:14px 0}
+  th{padding:8px 12px;background:#060d1a;color:var(--accent);text-align:left;font-size:12px;font-weight:700}
+  td{padding:7px 12px;border-top:1px solid var(--border);color:var(--muted);vertical-align:top}
+  td strong{color:var(--text)}
+  .nav{display:flex;gap:12px;margin-top:48px;padding-top:20px;border-top:1px solid var(--border)}
+  .nav a{font-size:13px;color:var(--accent);padding:8px 18px;border:1px solid var(--accent);border-radius:4px}
+  a{color:var(--accent)}
+  .defense-tier{background:var(--panel);border-left:4px solid var(--ok);padding:14px 18px;border-radius:0 6px 6px 0;margin:14px 0}
+  .defense-tier h3{margin-top:0}
+  .bypass-box{background:#1a0000;border-left:4px solid var(--danger);padding:12px 16px;border-radius:0 6px 6px 0;margin:10px 0;font-size:13px;color:var(--muted)}
+  .bypass-box strong{color:var(--danger)}
+</style>
+</head>
+<body>
+
+<h1>Module 17 — Defenses: Encoding, CSP, Trusted Types, Sanitizers</h1>
+<span class="mod-tag">XSS Mastery Course · Module 17 of 19</span>
+
+<p>This module maps every defense to the specific execution mechanisms it stops — and explicitly states what it does <em>not</em> stop. A defense you don't understand at the gap level is a defense that will fail you.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>1. Defense Layer Model</h2>
+
+<p>No single defense stops all XSS. The industry approach is defense-in-depth: multiple layers that each stop a different class of attack, so an attacker who defeats one layer still hits the next.</p>
+
+<table>
+  <tr><th>Layer</th><th>Defense</th><th>Stops</th><th>Doesn't stop</th></tr>
+  <tr><td><strong>1</strong></td><td>Output encoding</td><td>Reflected + stored XSS in HTML context</td><td>DOM-based XSS, template injection</td></tr>
+  <tr><td><strong>2</strong></td><td>Parameterized templates</td><td>Server-side template injection → XSS</td><td>Client-side DOM sinks</td></tr>
+  <tr><td><strong>3</strong></td><td>HTML sanitization</td><td>Rich-text/HTML input in display contexts</td><td>mXSS, parser divergence, context mistakes</td></tr>
+  <tr><td><strong>4</strong></td><td>Content Security Policy</td><td>Inline script execution, external script loads</td><td>DOM sinks fed by allowed scripts; data: / blob: misconfig</td></tr>
+  <tr><td><strong>5</strong></td><td>Trusted Types</td><td>DOM sink injection (innerHTML, eval, etc.)</td><td>Server-side reflection; XSS in non-sink positions</td></tr>
+  <tr><td><strong>6</strong></td><td>HttpOnly cookies</td><td>Cookie theft via document.cookie</td><td>Forged requests using cookie (cookie still sent by browser)</td></tr>
+  <tr><td><strong>7</strong></td><td>SRI on scripts</td><td>Supply-chain script tampering</td><td>XSS in first-party code</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>2. Output Encoding — The Foundation</h2>
+
+<p>Output encoding converts characters that have meaning in the target context into their harmless escaped equivalents. The key word is <em>context</em> — the encoding rules differ by where the data lands.</p>
+
+<table>
+  <tr><th>Context</th><th>Dangerous chars</th><th>Correct encoding</th><th>Function (Python / JS)</th></tr>
+  <tr><td><strong>HTML body</strong></td><td><code>&lt; &gt; &amp; " '</code></td><td><code>&amp;lt; &amp;gt; &amp;amp; &amp;quot; &amp;#39;</code></td><td><code>html.escape()</code> / <code>textContent</code></td></tr>
+  <tr><td><strong>HTML attribute</strong></td><td><code>&lt; &gt; &amp; " '</code></td><td>Same + must be in quoted attribute</td><td><code>html.escape()</code></td></tr>
+  <tr><td><strong>JavaScript string</strong></td><td><code>\ ' " &lt;/script&gt; \n</code></td><td>JSON-encode or <code>\x</code> / <code>\u</code> escape</td><td><code>json.dumps()</code></td></tr>
+  <tr><td><strong>CSS value</strong></td><td><code>; { } expression(</code></td><td>CSS-encode or whitelist values</td><td>Whitelist only</td></tr>
+  <tr><td><strong>URL parameter</strong></td><td>Everything except unreserved chars</td><td>Percent-encode</td><td><code>urllib.parse.quote()</code> / <code>encodeURIComponent()</code></td></tr>
+</table>
+
+<h3>The Context Mistake</h3>
+<pre># WRONG — HTML encoding applied in JS context
+&lt;script&gt;
+  var name = "{{ html_escape(user_name) }}";
+//              ^ &amp;lt; becomes &amp;lt; in the string — wrong encoding
+&lt;/script&gt;
+
+# CORRECT — JSON encode for JS string context
+&lt;script&gt;
+  var name = {{ json.dumps(user_name) }};
+//              ^ produces "Alice<script>..." — safe
+&lt;/script&gt;</pre>
+
+<div class="callout danger"><strong>Most encoding bugs are context mistakes, not missing encoding.</strong> The developer encoded, but used the wrong encoding for the context. HTML-escaping a value that lands in a JavaScript string context is still vulnerable.</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>3. Content Security Policy (CSP)</h2>
+
+<p>CSP is an HTTP response header that tells the browser which sources of content are legitimate. Inline scripts are forbidden by default when CSP is active.</p>
+
+<h3>Minimal effective CSP</h3>
+<pre>Content-Security-Policy:
+  default-src 'self';
+  script-src 'self' https://cdn.example.com;
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: https:;
+  connect-src 'self';
+  object-src 'none';
+  base-uri 'self';
+  form-action 'self'</pre>
+
+<h3>What CSP stops</h3>
+<ul>
+  <li>Inline <code>&lt;script&gt;</code> tags (including <code>&lt;script&gt;alert(1)&lt;/script&gt;</code>)</li>
+  <li>Inline event handlers (<code>onerror=alert(1)</code>) — blocked by disallowing unsafe-inline</li>
+  <li><code>javascript:</code> URIs in navigation</li>
+  <li>Loading scripts from unauthorized external domains</li>
+</ul>
+
+<div class="bypass-box">
+<strong>CSP Bypasses:</strong>
+<ul style="margin-top:6px;margin-bottom:0">
+  <li><code>'unsafe-inline'</code> in script-src defeats the entire point</li>
+  <li>Trusted CDN hosts (<code>*.googleapis.com</code>) often contain JSONP endpoints usable as script gadgets</li>
+  <li>Dangling markup injection still works to exfiltrate data even without JS execution</li>
+  <li>DOM-based XSS via allowed scripts (CSP can't see what an allowed script does with DOM)</li>
+  <li><code>base-uri</code> not set → <code>&lt;base href=//evil&gt;</code> hijacks all relative URLs</li>
+  <li>Missing <code>object-src 'none'</code> → Flash / plugins bypass CSP</li>
+</ul>
+</div>
+
+<h3>Nonce-based CSP (best practice)</h3>
+<pre>&lt;!-- Server generates a new nonce each request --&gt;
+Content-Security-Policy: script-src 'nonce-{RANDOM_BASE64}'
+
+&lt;!-- Only scripts with the matching nonce execute --&gt;
+&lt;script nonce="{RANDOM_BASE64}"&gt;
+  // legitimate script
+&lt;/script&gt;
+
+&lt;!-- Injected scripts have no nonce — blocked --&gt;
+&lt;script&gt;alert(1)&lt;/script&gt;  ← blocked</pre>
+
+<p>See <a href="public/defense_csp.html">defense_csp.html</a> for an interactive CSP policy tester against the lab's attacks.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>4. Trusted Types</h2>
+
+<p>Trusted Types is a browser API that locks DOM sinks so they only accept values produced by a registered, auditable policy — not raw strings. It targets DOM-based XSS (Module 09) specifically.</p>
+
+<h3>What it locks</h3>
+<ul>
+  <li><code>element.innerHTML</code>, <code>element.outerHTML</code></li>
+  <li><code>document.write()</code>, <code>document.writeln()</code></li>
+  <li><code>eval()</code>, <code>new Function()</code>, <code>setTimeout(string)</code>, <code>setInterval(string)</code></li>
+  <li><code>script.src</code>, <code>script.text</code></li>
+</ul>
+
+<h3>Enabling Trusted Types</h3>
+<pre>Content-Security-Policy: require-trusted-types-for 'script'; trusted-types default</pre>
+
+<h3>Writing a Trusted Types policy</h3>
+<pre>// Register a policy — this is the ONLY place raw strings can enter innerHTML
+const policy = trustedTypes.createPolicy('default', {
+  createHTML: (input) =&gt; {
+    // Run through a real sanitizer here (DOMPurify, etc.)
+    return DOMPurify.sanitize(input);
+  },
+  createScriptURL: (input) =&gt; {
+    if (input.startsWith('https://cdn.example.com/')) return input;
+    throw new Error('Untrusted script URL: ' + input);
+  }
+});
+
+// Usage — now safe because policy validates
+element.innerHTML = policy.createHTML(userInput);
+
+// This now throws TypeError — raw strings rejected by the browser
+element.innerHTML = userInput;  // ← TypeError: assignment to innerHTML</pre>
+
+<div class="callout ok"><strong>Why Trusted Types is powerful:</strong> It converts XSS from a runtime vulnerability into a compile-time constraint. You can enumerate every call to <code>createHTML</code> in your codebase and audit them — the set is small and bounded. Without TT, the sink surface is every string assigned to innerHTML anywhere in your code or your dependencies.</div>
+
+<div class="bypass-box">
+<strong>Trusted Types Bypasses:</strong>
+<ul style="margin-top:6px;margin-bottom:0">
+  <li>Overly permissive <code>createHTML</code> policy that doesn't sanitize properly</li>
+  <li><code>'unsafe-eval'</code> in CSP defeats TT protection on eval sinks</li>
+  <li>Server-side XSS (reflected/stored) is not a DOM sink — TT doesn't apply</li>
+  <li>Browser support: Chromium only as of 2024. Firefox and Safari behind flags</li>
+</ul>
+</div>
+
+<p>See <a href="public/defense_trusted_types.html">defense_trusted_types.html</a> for a live Trusted Types demo.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>5. HTML Sanitizers</h2>
+
+<p>When you need to accept and display rich HTML from users (a blog editor, comment markdown, etc.), output encoding destroys the formatting. Sanitizers are the answer — parse the HTML, remove dangerous elements and attributes, re-serialize.</p>
+
+<h3>The Right Sanitizer: DOMPurify</h3>
+<pre>import DOMPurify from 'dompurify';
+
+// Basic usage
+const clean = DOMPurify.sanitize(dirtyHTML);
+element.innerHTML = clean;
+
+// Restrictive config — strips everything except a whitelist
+const clean = DOMPurify.sanitize(dirtyHTML, {
+  ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br'],
+  ALLOWED_ATTR: ['href', 'title']
+});</pre>
+
+<h3>Why String-Based Sanitizers Fail (Module 13 recap)</h3>
+<p>Sanitizers that operate on strings (regex replace, keyword strip) fail because they model a different parser than the browser uses. The examples from M13 all apply: foster parenting, namespace boundaries, noscript context, template inert context — the sanitizer's model of "is this safe?" diverges from what the browser actually does.</p>
+
+<div class="bypass-box">
+<strong>Sanitizer Pitfalls:</strong>
+<ul style="margin-top:6px;margin-bottom:0">
+  <li>Mutation XSS (mXSS) — see M13: a safe string becomes dangerous after innerHTML round-trip</li>
+  <li>Sanitizer configuration gaps (e.g. allowing <code>style</code> attributes enables CSS injection)</li>
+  <li>Sanitizing server-side then trusting the result client-side through additional DOM manipulation</li>
+  <li>Outdated sanitizer version — DOMPurify has had mXSS bypasses; keep it updated</li>
+</ul>
+</div>
+
+<p>See <a href="public/defense_sanitizer_compare.html">defense_sanitizer_compare.html</a> for a side-by-side comparison of sanitizer approaches against 20 payloads.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>6. Subresource Integrity (SRI)</h2>
+
+<p>SRI adds a cryptographic hash to script/link tags. The browser refuses to execute any file whose content doesn't match the hash — defeating supply chain XSS (Module 16's Magecart scenario).</p>
+
+<pre>&lt;!-- Hash generated at build time from the known-good file --&gt;
+&lt;script src="https://cdn.example.com/lib.js"
+        integrity="sha256-abc123…base64hash…"
+        crossorigin="anonymous"&gt;&lt;/script&gt;
+
+&lt;!-- If the CDN serves a tampered file: browser refuses to execute it --&gt;</pre>
+
+<p>SRI only works if the script content is fixed (not dynamic). For CDN-hosted libraries it is effective. For APIs that return user-specific JS it is not applicable.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>7. Defense Coverage Matrix</h2>
+
+<table>
+  <tr><th>Attack (from M04–M14)</th><th>Output Encoding</th><th>CSP</th><th>Trusted Types</th><th>Sanitizer</th></tr>
+  <tr><td>Script tag injection (M04)</td><td style="color:var(--ok)">✓ stops</td><td style="color:var(--ok)">✓ blocks inline</td><td style="color:var(--muted)">n/a (server)</td><td style="color:var(--ok)">✓ strips script</td></tr>
+  <tr><td>Event handler injection (M05)</td><td style="color:var(--ok)">✓ stops</td><td style="color:var(--warn)">⚠ unsafe-inline?</td><td style="color:var(--muted)">n/a</td><td style="color:var(--ok)">✓ strips handlers</td></tr>
+  <tr><td>javascript: URI (M06)</td><td style="color:var(--ok)">✓ stops</td><td style="color:var(--ok)">✓ blocks js: nav</td><td style="color:var(--muted)">n/a</td><td style="color:var(--ok)">✓ strips js: href</td></tr>
+  <tr><td>SVG/namespace (M07)</td><td style="color:var(--ok)">✓ stops</td><td style="color:var(--ok)">✓ blocks inline</td><td style="color:var(--muted)">n/a</td><td style="color:var(--warn)">⚠ SVG support varies</td></tr>
+  <tr><td>Attribute injection (M08)</td><td style="color:var(--ok)">✓ stops</td><td style="color:var(--ok)">✓</td><td style="color:var(--muted)">n/a</td><td style="color:var(--ok)">✓</td></tr>
+  <tr><td>DOM-based XSS (M09)</td><td style="color:var(--danger)">✗ server never sees</td><td style="color:var(--warn)">⚠ blocks inline not sink</td><td style="color:var(--ok)">✓ locks sinks</td><td style="color:var(--warn)">⚠ must be at sink</td></tr>
+  <tr><td>Stored XSS (M10)</td><td style="color:var(--ok)">✓ on output</td><td style="color:var(--ok)">✓</td><td style="color:var(--muted)">n/a</td><td style="color:var(--ok)">✓</td></tr>
+  <tr><td>Filter evasion (M12)</td><td style="color:var(--ok)">✓ (encoding not filtering)</td><td style="color:var(--ok)">✓</td><td style="color:var(--ok)">✓</td><td style="color:var(--warn)">⚠ evasion-specific</td></tr>
+  <tr><td>mXSS (M13)</td><td style="color:var(--danger)">✗</td><td style="color:var(--ok)">✓ blocks execution</td><td style="color:var(--ok)">✓ if policy is strict</td><td style="color:var(--danger)">✗ sanitizer is the problem</td></tr>
+  <tr><td>Prototype pollution (M14)</td><td style="color:var(--danger)">✗</td><td style="color:var(--warn)">⚠ execution blocked if no allowed scripts</td><td style="color:var(--ok)">✓ blocks sink writes</td><td style="color:var(--danger)">✗</td></tr>
+  <tr><td>Supply chain XSS (M16)</td><td style="color:var(--danger)">✗ (your script is trusted)</td><td style="color:var(--warn)">⚠ if CDN not in allowlist</td><td style="color:var(--ok)">✓ if policy enforces</td><td style="color:var(--danger)">✗</td></tr>
+</table>
+
+<div class="nav">
+  <a href="../module_16/tutorial.html">← Module 16: Real-World Incidents</a>
+  <a href="../module_18/tutorial.html">Module 18: Threat Model →</a>
+</div>
+
+</body>
+</html>

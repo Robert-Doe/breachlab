@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>M17 — CSP Interactive Demo</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:32px;max-width:900px}
+  h1{color:var(--accent);font-size:22px;margin-bottom:8px}
+  p{font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6}
+  h2{font-size:14px;color:var(--warn);margin:24px 0 8px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px}
+  textarea{width:100%;height:80px;background:#060d1a;border:1px solid var(--border);border-radius:4px;color:var(--orange);font-family:'Courier New',monospace;font-size:12px;padding:10px;resize:vertical}
+  .policy-input{width:100%;padding:9px;background:#060d1a;border:1px solid var(--border);border-radius:4px;color:var(--accent);font-family:'Courier New',monospace;font-size:12px;margin-bottom:10px}
+  button{padding:8px 18px;background:var(--accent);color:#0b0f1a;font-weight:700;border:none;border-radius:4px;cursor:pointer;font-size:12px;margin-right:8px}
+  .out{margin-top:10px;font-size:12px;min-height:28px;padding:8px;background:#060d1a;border-radius:4px;font-family:'Courier New',monospace;word-break:break-all}
+  .ok-text{color:var(--ok)}
+  .err-text{color:var(--danger)}
+  .table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+  .table th{text-align:left;padding:7px;color:var(--muted);border-bottom:1px solid var(--border)}
+  .table td{padding:7px;border-bottom:1px solid var(--border);font-family:'Courier New',monospace;font-size:11px}
+  .closed{color:var(--ok)}
+  .partial{color:var(--warn)}
+  .open{color:var(--danger)}
+  code{font-family:'Courier New',monospace;font-size:11px;background:#060d1a;color:var(--orange);padding:1px 5px;border-radius:3px}
+</style>
+</head>
+<body>
+<h1>CSP Interactive Demo</h1>
+<p>This page lets you test different CSP directives and see which attack payloads they block. No server needed — uses the Meta CSP header (enforcement is browser-side).</p>
+
+<div class="card">
+  <h2>Step 1 — Choose a payload</h2>
+  <textarea id="payload">&lt;img src=x onerror=alert('XSS fired!')&gt;</textarea>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+    <button onclick="setPayload(`<img src=x onerror=alert('XSS!')>`)">img onerror</button>
+    <button onclick="setPayload(`<script>alert('XSS!')<\/script>`)">script tag</button>
+    <button onclick="setPayload(`<a href=javascript:alert('XSS!')>click me</a>`)">javascript: link</button>
+    <button onclick="setPayload(`<svg onload=alert('XSS!')>`)">svg onload</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Step 2 — Set a CSP policy (or use a preset)</h2>
+  <input id="csp" class="policy-input" value="default-src 'self'; script-src 'self'">
+  <div style="display:flex;flex-wrap:wrap;gap:6px">
+    <button onclick="setCSP(`default-src 'self'; script-src 'self'`)">Minimal</button>
+    <button onclick="setCSP(`default-src 'none'; script-src 'nonce-abc123'`)">Nonce only</button>
+    <button onclick="setCSP(`script-src 'unsafe-inline'`)">unsafe-inline (weak)</button>
+    <button onclick="setCSP(`default-src 'self'; script-src 'self' 'unsafe-inline'`)">self + unsafe-inline</button>
+    <button onclick="setCSP('')">No CSP</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Step 3 — Render the payload</h2>
+  <p>Click "Render" to insert the payload via innerHTML. CSP enforced by this page's policy (meta tag, not HTTP header — enforcement may vary by browser).</p>
+  <button onclick="render()">Render payload</button>
+  <button onclick="clearOut()">Clear</button>
+  <div id="render-out" class="out" style="min-height:50px"></div>
+  <div id="status" class="out" style="margin-top:6px"></div>
+</div>
+
+<div class="card">
+  <h2>CSP Directive Quick Reference</h2>
+  <table class="table">
+    <tr><th>Directive</th><th>Controls</th><th>Recommended value</th></tr>
+    <tr><td>default-src</td><td>Fallback for all resource types</td><td class="closed">'self'</td></tr>
+    <tr><td>script-src</td><td>&lt;script&gt; and JS event handlers</td><td class="closed">'nonce-{random}' or 'strict-dynamic'</td></tr>
+    <tr><td>style-src</td><td>&lt;style&gt; and style= attributes</td><td class="partial">'self' (avoid 'unsafe-inline')</td></tr>
+    <tr><td>img-src</td><td>&lt;img&gt; and CSS background images</td><td class="partial">'self' data: (restrict for exfil prevention)</td></tr>
+    <tr><td>connect-src</td><td>fetch(), XHR, WebSocket, sendBeacon</td><td class="closed">'self' (explicit allowlist)</td></tr>
+    <tr><td>frame-src</td><td>&lt;iframe&gt; and &lt;frame&gt;</td><td class="closed">'none' or specific origins</td></tr>
+    <tr><td>object-src</td><td>&lt;object&gt;, &lt;embed&gt;</td><td class="closed">'none'</td></tr>
+    <tr><td>base-uri</td><td>&lt;base&gt; tag (base URL injection)</td><td class="closed">'none' or 'self'</td></tr>
+    <tr><td>report-uri</td><td>Violation reporting endpoint</td><td class="ok">Set to your logging endpoint</td></tr>
+  </table>
+  <p style="margin-top:12px"><strong style="color:var(--danger)">Avoid:</strong> <code>'unsafe-inline'</code> in script-src (defeats XSS protection), <code>'unsafe-eval'</code> (enables eval), wildcard <code>*</code> in any fetch directive.</p>
+</div>
+
+<script>
+let metaCSP = document.createElement('meta');
+metaCSP.httpEquiv = 'Content-Security-Policy';
+document.head.appendChild(metaCSP);
+
+function setPayload(p) { document.getElementById('payload').value = p; }
+function setCSP(policy) { document.getElementById('csp').value = policy; }
+
+function render() {
+  const payload = document.getElementById('payload').value;
+  const csp = document.getElementById('csp').value;
+
+  if (csp) {
+    metaCSP.content = csp;
+  } else {
+    metaCSP.content = '';
+  }
+
+  const out = document.getElementById('render-out');
+  const status = document.getElementById('status');
+
+  // Listen for CSP violations
+  let violated = false;
+  const handler = (e) => {
+    violated = true;
+    status.innerHTML = '<span class="err-text">CSP violation: ' + (e.violatedDirective || e.effectiveDirective) + ' — ' + (e.blockedURI || 'inline') + '</span>';
+  };
+  document.addEventListener('securitypolicyviolation', handler, { once: true });
+
+  try {
+    out.innerHTML = payload;
+    setTimeout(() => {
+      if (!violated) {
+        status.innerHTML = '<span class="ok-text">Rendered (no violation detected — payload may have executed)</span>';
+      }
+      document.removeEventListener('securitypolicyviolation', handler);
+    }, 200);
+  } catch(e) {
+    status.innerHTML = '<span class="err-text">Error: ' + e.message + '</span>';
+  }
+}
+
+function clearOut() {
+  document.getElementById('render-out').innerHTML = '';
+  document.getElementById('status').innerHTML = '';
+}
+</script>
+</body>
+</html>

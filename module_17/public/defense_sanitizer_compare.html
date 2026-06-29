@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>M17 — Sanitizer Comparison Lab</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--orange:#fb923c}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:32px;max-width:960px}
+  h1{color:var(--accent);font-size:22px;margin-bottom:8px}
+  p{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:12px}
+  h2{font-size:14px;color:var(--warn);margin:24px 0 8px}
+  textarea{width:100%;height:80px;background:#060d1a;border:1px solid var(--border);border-radius:4px;color:var(--orange);font-family:'Courier New',monospace;font-size:12px;padding:10px;resize:vertical}
+  button{padding:7px 14px;background:var(--accent);color:#0b0f1a;font-weight:700;border:none;border-radius:4px;cursor:pointer;font-size:12px;margin-right:6px;margin-bottom:4px}
+  button.preset{background:var(--panel);color:var(--muted);border:1px solid var(--border);font-size:11px}
+  .results{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px}
+  .cell{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:14px}
+  .cell h3{font-size:11px;font-weight:700;margin-bottom:6px}
+  .cell.danger{border-color:var(--danger)} .cell.danger h3{color:var(--danger)}
+  .cell.warn{border-color:var(--warn)} .cell.warn h3{color:var(--warn)}
+  .cell.ok{border-color:var(--ok)} .cell.ok h3{color:var(--ok)}
+  .render-area{background:#060d1a;border-radius:4px;padding:10px;min-height:40px;font-size:12px}
+  .label{font-size:10px;color:var(--muted);margin-top:6px}
+  code{font-family:'Courier New',monospace;font-size:11px;background:#060d1a;color:var(--orange);padding:1px 5px;border-radius:3px}
+  .verdict{font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;display:inline-block;margin-top:6px}
+  .v-unsafe{background:#2a0000;color:var(--danger)}
+  .v-partial{background:#1a1500;color:var(--warn)}
+  .v-safe{background:#001a0d;color:var(--ok)}
+  .presets{margin-bottom:12px}
+</style>
+</head>
+<body>
+<h1>Sanitizer Comparison Lab</h1>
+<p>Compare how different sanitization approaches handle the same payload. The "render area" shows what the browser actually renders — if a payload fires, you'll see the alert.</p>
+
+<div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:20px">
+  <h2 style="margin-top:0">Input Payload</h2>
+  <textarea id="payload">&lt;img src=x onerror=alert('XSS fired — sanitizer failed!')&gt;&lt;b&gt;bold text&lt;/b&gt;</textarea>
+  <div class="presets" style="margin-top:8px">
+    <strong style="font-size:11px;color:var(--muted);display:block;margin-bottom:6px">Presets:</strong>
+    <button class="preset" onclick="set(`<img src=x onerror=alert('XSS!')><b>bold</b>`)">img onerror</button>
+    <button class="preset" onclick="set(`<script>alert('XSS!')<\/script><b>bold</b>`)">script tag</button>
+    <button class="preset" onclick="set(`<svg><script>alert('XSS!')<\/script></svg>`)">SVG script</button>
+    <button class="preset" onclick="set(`<math><mtext><table><mglyph><style></style></mglyph></table></mtext></math><img src=x onerror=alert('mXSS!')>`)">mXSS (MathML)</button>
+    <button class="preset" onclick="set(`<a href=javascript:alert('XSS!')>click me</a>`)">javascript: href</button>
+    <button class="preset" onclick="set(`<div style=&quot;background:url('javascript:alert(1)')&quot;>styled</div>`)">CSS expression</button>
+    <button class="preset" onclick="set(`&lt;img src=x &#111;nerror=alert(1)&gt;`)">HTML entity bypass</button>
+    <button class="preset" onclick="set(`<details open ontoggle=alert('XSS!')>`)">ontoggle</button>
+  </div>
+  <button onclick="runAll()">Run all sanitizers</button>
+  <button onclick="clearAll()" style="background:var(--panel);color:var(--muted);border:1px solid var(--border)">Clear</button>
+</div>
+
+<div class="results" id="results">
+  <!-- populated by JS -->
+</div>
+
+<div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-top:20px">
+  <h2 style="margin-top:0">Why string sanitizers fail</h2>
+  <p>Regex/string-replace sanitizers fail because HTML is not a regular language. The browser's HTML parser handles malformed markup, namespace switching (SVG/MathML), and legacy quirks in ways that cannot be fully captured by a regular expression.</p>
+  <p>The mXSS preset above demonstrates this: the MathML foster parenting sequence creates a context where <code>&lt;style&gt;</code> is raw text in the sanitizer's parser but active HTML in the browser's re-parse. A regex sanitizer sees no script tags and no event handlers — but the browser executes the payload.</p>
+  <p><strong style="color:var(--ok)">Correct approach:</strong> Parse the HTML using a real HTML parser, walk the AST and remove dangerous nodes, then serialize. This is what DOMPurify does — it uses the browser's own parser as the parsing engine, then inspects and strips the resulting DOM.</p>
+</div>
+
+<script>
+const CASES = [
+  {
+    label: '1. No sanitizer',
+    cls: 'danger',
+    fn: s => s,
+    desc: 'Raw innerHTML — no processing',
+    verdict: 'UNSAFE'
+  },
+  {
+    label: '2. Strip &lt;script&gt; tags',
+    cls: 'warn',
+    fn: s => s.replace(/<script[\s\S]*?<\/script>/gi, ''),
+    desc: 'Naive: removes <script> blocks only',
+    verdict: 'PARTIAL'
+  },
+  {
+    label: '3. Strip all tags (no HTML)',
+    cls: 'warn',
+    fn: s => s.replace(/<[^>]+>/g, ''),
+    desc: 'Strips all HTML tags — removes formatting',
+    verdict: 'PARTIAL'
+  },
+  {
+    label: '4. Strip event handlers',
+    cls: 'warn',
+    fn: s => s.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '')
+               .replace(/\s+on\w+=[^\s>]*/gi, ''),
+    desc: 'Regex strips on* attributes — incomplete',
+    verdict: 'PARTIAL'
+  },
+  {
+    label: '5. Allowlist tags only',
+    cls: 'warn',
+    fn: s => {
+      const el = document.createElement('div');
+      el.innerHTML = s;
+      const allowed = ['B','I','EM','STRONG','P','BR','SPAN'];
+      el.querySelectorAll('*').forEach(node => {
+        if (!allowed.includes(node.tagName)) node.remove();
+      });
+      return el.innerHTML;
+    },
+    desc: 'DOM-based allowlist of safe tags (no attrs)',
+    verdict: 'SAFE*'
+  },
+  {
+    label: '6. textContent (no HTML)',
+    cls: 'ok',
+    fn: null, // special: use textContent
+    desc: 'Treats input as literal text — always safe, no HTML preserved',
+    verdict: 'SAFE'
+  }
+];
+
+function set(payload) { document.getElementById('payload').value = payload; }
+
+function runAll() {
+  const payload = document.getElementById('payload').value;
+  const container = document.getElementById('results');
+  container.innerHTML = '';
+
+  CASES.forEach(c => {
+    const cell = document.createElement('div');
+    cell.className = 'cell ' + c.cls;
+
+    const h3 = document.createElement('h3');
+    h3.innerHTML = c.label;
+
+    const area = document.createElement('div');
+    area.className = 'render-area';
+
+    if (c.fn === null) {
+      // textContent path
+      area.textContent = payload;
+    } else {
+      const sanitised = c.fn(payload);
+      area.innerHTML = sanitised;
+    }
+
+    const desc = document.createElement('div');
+    desc.className = 'label';
+    desc.textContent = c.desc;
+
+    const verdict = document.createElement('span');
+    verdict.className = 'verdict v-' + (c.verdict.startsWith('SAFE') ? 'safe' : c.verdict === 'PARTIAL' ? 'partial' : 'unsafe');
+    verdict.textContent = c.verdict;
+
+    cell.appendChild(h3);
+    cell.appendChild(area);
+    cell.appendChild(desc);
+    cell.appendChild(document.createElement('br'));
+    cell.appendChild(verdict);
+    container.appendChild(cell);
+  });
+}
+
+function clearAll() {
+  document.getElementById('results').innerHTML = '';
+}
+</script>
+</body>
+</html>
