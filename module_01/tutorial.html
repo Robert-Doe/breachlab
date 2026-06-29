@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Module 01 — Environment Setup | XSS Mastery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Lato:wght@300;400;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:      #0b0f1a;
+      --bg2:     #111827;
+      --bg3:     #1a2235;
+      --card:    #141c2e;
+      --border:  #1e3a5f;
+      --gold:    #f5c842;
+      --cyan:    #38bdf8;
+      --purple:  #a78bfa;
+      --red:     #f87171;
+      --green:   #4ade80;
+      --teal:    #0d9488;
+      --orange:  #fb923c;
+      --text:    #e2e8f0;
+      --muted:   #7a9bbf;
+      --code-bg: #060d1a;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Lato', sans-serif;
+      font-size: 16px;
+      line-height: 1.75;
+      padding: 0;
+    }
+
+    /* ── Layout ── */
+    .page-wrap { max-width: 860px; margin: 0 auto; padding: 48px 24px 96px; }
+
+    /* ── Module badge ── */
+    .mod-badge {
+      display: inline-block;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 4px;
+      padding: 4px 10px; margin-bottom: 20px;
+    }
+
+    /* ── Headings ── */
+    h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 42px; color: var(--gold);
+      line-height: 1.2; margin-bottom: 12px;
+    }
+    h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 26px; color: var(--cyan);
+      margin: 52px 0 16px; padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    h3 {
+      font-family: 'Lato', sans-serif;
+      font-size: 18px; font-weight: 700;
+      color: var(--purple); margin: 32px 0 10px;
+    }
+    h4 {
+      font-size: 14px; font-weight: 700;
+      color: var(--orange); margin: 20px 0 6px;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+
+    /* ── Subtitle ── */
+    .subtitle {
+      font-size: 17px; color: var(--muted);
+      margin-bottom: 40px; line-height: 1.5;
+    }
+
+    /* ── Prereq bar ── */
+    .prereq-bar {
+      background: var(--card); border: 1px solid var(--border);
+      border-left: 4px solid var(--teal);
+      border-radius: 6px; padding: 16px 20px;
+      margin-bottom: 32px;
+    }
+    .prereq-bar strong { color: var(--teal); font-size: 12px;
+      text-transform: uppercase; letter-spacing: 0.1em; display: block;
+      margin-bottom: 6px; }
+    .prereq-bar p { font-size: 14px; color: var(--muted); }
+
+    /* ── Deliverables ── */
+    .deliverables {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 6px; padding: 20px 24px; margin-bottom: 36px;
+    }
+    .deliverables strong { color: var(--gold); font-size: 13px;
+      text-transform: uppercase; letter-spacing: 0.1em; display: block;
+      margin-bottom: 12px; }
+    .deliverables ul { list-style: none; }
+    .deliverables li { font-size: 14px; padding: 4px 0;
+      padding-left: 20px; position: relative; }
+    .deliverables li::before { content: "→"; position: absolute;
+      left: 0; color: var(--green); font-weight: 700; }
+
+    /* ── Body prose ── */
+    p { margin-bottom: 18px; }
+    strong { color: var(--text); font-weight: 700; }
+    em { color: var(--orange); font-style: normal; font-weight: 600; }
+    a { color: var(--cyan); }
+
+    /* ── Callout boxes ── */
+    .callout {
+      border-radius: 6px; padding: 16px 20px;
+      margin: 28px 0; font-size: 14.5px; line-height: 1.65;
+    }
+    .callout .callout-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; margin-bottom: 8px; display: block;
+    }
+    .callout.warning  { background: #1f0f0f; border-left: 4px solid var(--red); }
+    .callout.warning  .callout-label { color: var(--red); }
+    .callout.tip      { background: #0a1f13; border-left: 4px solid var(--green); }
+    .callout.tip      .callout-label { color: var(--green); }
+    .callout.insight  { background: #0f1240; border-left: 4px solid var(--purple); }
+    .callout.insight  .callout-label { color: var(--purple); }
+    .callout.info     { background: #061826; border-left: 4px solid var(--cyan); }
+    .callout.info     .callout-label { color: var(--cyan); }
+
+    /* ── Code blocks ── */
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px; padding: 20px;
+      overflow-x: auto; margin: 20px 0;
+      font-family: 'Source Code Pro', monospace;
+      font-size: 13.5px; line-height: 1.7;
+    }
+    code {
+      font-family: 'Source Code Pro', monospace;
+      font-size: 13px;
+    }
+    p code, li code {
+      background: var(--code-bg); color: var(--cyan);
+      padding: 2px 6px; border-radius: 3px;
+      border: 1px solid var(--border);
+    }
+
+    /* Syntax colour helpers (manual, no library) */
+    .cm  { color: #4b5563; }   /* comment */
+    .kw  { color: #89dceb; }   /* keyword */
+    .fn  { color: #a78bfa; }   /* function */
+    .st  { color: #a6e3a1; }   /* string */
+    .nu  { color: #fab387; }   /* number/literal */
+    .at  { color: #f5c842; }   /* attribute/decorator */
+    .op  { color: #f87171; }   /* operator */
+
+    /* ── Step list (build/run) ── */
+    .steps { list-style: none; counter-reset: step; margin: 20px 0; }
+    .steps li {
+      counter-increment: step;
+      padding: 14px 16px 14px 56px;
+      position: relative;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 6px; margin-bottom: 10px; font-size: 14.5px;
+    }
+    .steps li::before {
+      content: counter(step);
+      position: absolute; left: 16px; top: 14px;
+      width: 24px; height: 24px; border-radius: 50%;
+      background: var(--border); color: var(--cyan);
+      font-weight: 700; font-size: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .steps li code { font-size: 13px; }
+
+    /* ── Exercises ── */
+    .exercise {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 6px; padding: 20px 24px; margin-bottom: 14px;
+    }
+    .exercise .ex-badge {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; padding: 2px 8px; border-radius: 3px;
+      margin-bottom: 10px; display: inline-block;
+    }
+    .ex-warm  .ex-badge { background: #1a2f1a; color: var(--green); }
+    .ex-core  .ex-badge { background: #1a1a2f; color: var(--cyan); }
+    .ex-stretch .ex-badge { background: #2f1a2f; color: var(--purple); }
+    .exercise h4 { margin-top: 0; }
+    .exercise p  { font-size: 14.5px; margin-bottom: 8px; }
+    .exercise ul { padding-left: 20px; font-size: 14px; }
+    .exercise ul li { margin-bottom: 4px; }
+
+    /* ── What's next ── */
+    .next-box {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-left: 4px solid var(--gold);
+      border-radius: 6px; padding: 22px 24px; margin-top: 48px;
+    }
+    .next-box strong { color: var(--gold); display: block;
+      font-size: 12px; text-transform: uppercase;
+      letter-spacing: 0.1em; margin-bottom: 10px; }
+
+    /* ── File annotation table ── */
+    .file-block {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 6px; margin: 24px 0; overflow: hidden;
+    }
+    .file-block-header {
+      background: var(--card); padding: 10px 16px;
+      font-family: 'Source Code Pro', monospace;
+      font-size: 13px; color: var(--gold);
+      border-bottom: 1px solid var(--border);
+    }
+    .file-block pre { margin: 0; border: none; border-radius: 0; }
+
+    /* ── Tool table ── */
+    table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+    th { background: var(--card); color: var(--cyan); padding: 10px 14px;
+         text-align: left; border-bottom: 1px solid var(--border); }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--bg3); }
+
+    /* ── Nav ── */
+    .top-nav {
+      background: var(--bg2); border-bottom: 1px solid var(--border);
+      padding: 12px 24px; display: flex; align-items: center;
+      justify-content: space-between; font-size: 13px; color: var(--muted);
+    }
+    .top-nav a { color: var(--cyan); text-decoration: none; }
+    .top-nav a:hover { text-decoration: underline; }
+
+    hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+  </style>
+</head>
+<body>
+
+<!-- ── Top navigation ─────────────────────────────────────────────────────── -->
+<nav class="top-nav">
+  <a href="/">← Lab Home</a>
+  <span>XSS Mastery Course</span>
+  <span>Module 01 of 19</span>
+</nav>
+
+<div class="page-wrap">
+
+  <!-- ── Badge + Title ───────────────────────────────────────────────────── -->
+  <div class="mod-badge">Module 01 of 19</div>
+
+  <h1>Environment Setup &amp;<br>How to Think Like an Attacker</h1>
+
+  <p class="subtitle">
+    Set up your complete local XSS lab, learn the tools that professionals
+    use to find and exploit injection flaws, and build the mental model
+    that separates a defender who truly understands attacks from one who
+    just applies checklists.
+  </p>
+
+  <!-- ── Prerequisites ───────────────────────────────────────────────────── -->
+  <div class="prereq-bar">
+    <strong>Prerequisites</strong>
+    <p>
+      You can read basic HTML (know what a <code>&lt;div&gt;</code>, an
+      <code>&lt;a href&gt;</code>, and a <code>&lt;script&gt;</code> tag do).
+      You have used a terminal before. No JavaScript expertise required yet —
+      we will build up from first principles.
+    </p>
+  </div>
+
+  <!-- ── Deliverables ─────────────────────────────────────────────────────── -->
+  <div class="deliverables">
+    <strong>What you will build in this module</strong>
+    <ul>
+      <li>A local Flask lab server (Python) running on <code>localhost:5000</code></li>
+      <li>A local Express lab server (Node.js) running on <code>localhost:5000</code></li>
+      <li>A lab home page accessible in your browser</li>
+      <li>A working DevTools setup with the Network, Console, and Sources panels configured</li>
+      <li>A mental model of the attacker's workflow that will guide every module that follows</li>
+    </ul>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 1 — Why Environment Matters More Than You Think</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    Security research — especially PhD-level research — requires you to be able
+    to reproduce attacks reliably, vary one parameter at a time, and observe
+    the exact outcome. This is the scientific method applied to software. A
+    sloppy lab environment produces sloppy conclusions: "it worked sometimes" is
+    not a publishable result. "It works under exactly these conditions, and here
+    is why" is.
+  </p>
+
+  <p>
+    XSS is particularly tricky to study in the wild: real websites have WAFs,
+    CDNs, rate limiting, and legal restrictions. Your local lab removes every
+    variable except the one you are studying. When a payload fires in your lab,
+    you know <em>exactly</em> why it fired. When it doesn't, you know exactly
+    what stopped it. That precision is the foundation of a strong threat model —
+    the core artifact of your PhD work.
+  </p>
+
+  <p>
+    We run <em>two</em> servers in parallel — Python/Flask and Node.js/Express —
+    because this immediately teaches you something important: <strong>XSS is a
+    browser-side vulnerability</strong>. Both servers produce the same HTML;
+    both are equally vulnerable; both require the same fix. The attack surface
+    lives in the browser's HTML parser and JavaScript engine, not in Flask or
+    Express. Your defense will need to work at that level too.
+  </p>
+
+  <div class="callout insight">
+    <span class="callout-label">Core Insight</span>
+    The browser is a document-execution engine. It was designed in the 1990s to
+    display documents, then progressively extended to run programs. Every XSS
+    vulnerability in this course is, at its root, the browser faithfully
+    executing instructions it found in a document — instructions the attacker
+    placed there because the application failed to distinguish between
+    <em>data</em> and <em>code</em>. Keep this distinction in mind across every
+    module: data/code confusion is the root cause, everything else is a
+    consequence.
+  </div>
+
+  <p>
+    The tools we install in this module are not optional accessories. They are
+    the lenses through which you will observe every attack in this course.
+    Browser DevTools lets you see the DOM as the browser constructed it — which
+    is not the same as the HTML the server sent. Burp Suite lets you intercept
+    and modify requests in flight, so you can inject payloads without touching
+    any source code. Understanding these tools at a deep level is what separates
+    a researcher who can find novel XSS from one who can only reproduce known
+    examples.
+  </p>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 2 — The Tools of the Trade</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    Professional XSS researchers use a small, focused toolkit. You do not need
+    expensive software. Every tool below is free.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Tool</th>
+        <th>Purpose in this course</th>
+        <th>Install</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Python 3.10+</strong></td>
+        <td>Run the Flask lab server</td>
+        <td><code>python.org/downloads</code></td>
+      </tr>
+      <tr>
+        <td><strong>Node.js 18+</strong></td>
+        <td>Run the Express lab server</td>
+        <td><code>nodejs.org</code></td>
+      </tr>
+      <tr>
+        <td><strong>Google Chrome</strong></td>
+        <td>Primary test browser — best DevTools</td>
+        <td><code>google.com/chrome</code></td>
+      </tr>
+      <tr>
+        <td><strong>Firefox</strong></td>
+        <td>Secondary browser — different parser quirks</td>
+        <td><code>mozilla.org/firefox</code></td>
+      </tr>
+      <tr>
+        <td><strong>Burp Suite Community</strong></td>
+        <td>Intercept, replay, and modify HTTP requests</td>
+        <td><code>portswigger.net/burp</code></td>
+      </tr>
+      <tr>
+        <td><strong>VS Code</strong></td>
+        <td>Edit lab source files</td>
+        <td><code>code.visualstudio.com</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout tip">
+    <span class="callout-label">Tip — Windows 11 Terminal</span>
+    Open <strong>Windows Terminal</strong> (search for it in Start) and pin it.
+    It supports multiple tabs — keep one tab for your Python server, one for
+    your Node server, and one free for running commands. All shell commands
+    in this course work in Windows Terminal using PowerShell or cmd.
+    If you install Git for Windows, you also get Git Bash which supports
+    the <code>make</code> command.
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 3 — Browser DevTools as a Security Instrument</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    Browser DevTools (F12 in Chrome and Firefox) was designed for web
+    developers, but every feature has a direct security research application.
+    You need to be fluent in four panels before Module 02:
+  </p>
+
+  <h3>The Elements Panel — Your Live DOM Inspector</h3>
+  <p>
+    The Elements panel shows you the DOM <em>as the browser constructed it</em>,
+    not as the server sent it. This distinction is everything in XSS research.
+    If a server sends <code>&lt;p&gt;Hello &lt;b&gt;World</code> (missing closing
+    tags), the browser silently fixes it. The Elements panel shows you the
+    corrected tree. When you inject a payload into a page, the Elements panel
+    is where you verify whether your payload was parsed the way you intended,
+    got filtered, got encoded, or mutated into something else.
+  </p>
+  <p>
+    Right-click any element → "Edit as HTML" lets you test payloads directly in
+    the live DOM without touching the server. This is how you confirm a payload
+    works before trying to get it past a filter.
+  </p>
+
+  <h3>The Console Panel — Your JavaScript Execution Environment</h3>
+  <p>
+    The Console runs arbitrary JavaScript in the context of the current page.
+    This is exactly what XSS does — it injects JavaScript that runs in the
+    victim's page context. Use the Console to prototype payloads:
+    <code>document.cookie</code> shows you what cookies are accessible,
+    <code>document.domain</code> confirms what origin you are on,
+    <code>window.location</code> shows the full URL. Before you ever inject a
+    payload into a form field, test it in the Console first.
+  </p>
+
+  <h3>The Network Panel — Your Request/Response Inspector</h3>
+  <p>
+    The Network panel captures every HTTP request and response. Click any request
+    to see the exact headers sent and received. This matters for XSS because:
+    the <code>Content-Type</code> response header tells the browser how to parse
+    the response (HTML? JSON? plain text?); the <code>Set-Cookie</code> header
+    shows which cookies have <code>HttpOnly</code> (not accessible to JS) and
+    <code>SameSite</code> attributes; and <code>Content-Security-Policy</code>
+    headers (when present) tell you which scripts the page allows to run.
+    Each of these is a defensive control — or the absence of one.
+  </p>
+
+  <h3>The Sources Panel — Your JavaScript Debugger</h3>
+  <p>
+    The Sources panel lets you set breakpoints on any line of JavaScript running
+    in the page. In DOM XSS (Module 09), you will use this to pause execution
+    at the exact moment attacker-controlled data reaches a dangerous sink like
+    <code>innerHTML</code> or <code>eval()</code>. Without breakpoints, DOM XSS
+    can be invisible — the payload executes and disappears with no network
+    request to capture. The Sources panel makes it observable.
+  </p>
+
+  <div class="callout warning">
+    <span class="callout-label">Warning — Do Not Test on Live Sites</span>
+    Every payload in this course fires <code>alert(document.domain)</code> or
+    <code>alert(document.cookie)</code> as a proof-of-concept. These are benign.
+    However, testing XSS payloads against websites you do not own — even to
+    report a bug — without explicit written permission is illegal in most
+    jurisdictions under the Computer Fraud and Abuse Act (US), the Computer
+    Misuse Act (UK), and equivalent laws elsewhere. Your local lab is the only
+    safe environment for this course. If you want to practice on intentionally
+    vulnerable external platforms, use PortSwigger Web Security Academy
+    (free, legal, purpose-built).
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 4 — How to Think Like an Attacker (The Attacker's Questions)</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    Defenders who were never attackers tend to think about XSS as a list of
+    strings to block. Attackers think about XSS as a set of questions to answer
+    about the target. Learning to ask these questions is the single most
+    important skill in this course — it is what will make your PhD defense
+    contributions novel, because you will be able to identify the assumptions
+    that current defenses make and precisely characterize where those assumptions
+    break down.
+  </p>
+
+  <p>
+    Every time you encounter any user-supplied input that appears in a web page,
+    ask yourself these five questions in order:
+  </p>
+
+  <h3>Question 1: In which HTML context does my input land?</h3>
+  <p>
+    HTML has multiple distinct parsing contexts. The same character has different
+    meanings in different contexts. A <code>&lt;</code> in the <em>body context</em>
+    starts a tag. In an <em>attribute value context</em> inside double quotes, it
+    is harmless data (but a <code>"</code> would break out of the attribute). In
+    a <em>script context</em> (inside <code>&lt;script&gt;</code> tags), neither
+    <code>&lt;</code> nor <code>"</code> alone enables execution — but a
+    <code>&lt;/script&gt;</code> sequence closes the script block. In a
+    <em>style context</em>, only CSS is parsed. The injection technique always
+    depends on the context. We dedicate Module 02 to parser contexts entirely.
+  </p>
+
+  <h3>Question 2: What characters are available to me?</h3>
+  <p>
+    Some applications filter specific characters. <code>&lt;</code> and
+    <code>&gt;</code> are often HTML-encoded to <code>&amp;lt;</code> and
+    <code>&amp;gt;</code>. Single and double quotes may be stripped or escaped.
+    Each available character opens or closes specific attack paths. When you
+    cannot use <code>&lt;</code>, you cannot create new tags — but you may still
+    be able to inject attributes into existing tags. When you cannot use
+    quotes, you may still be able to use unquoted attribute values. The attacker's
+    job is to find the maximal capability within the character set they have
+    available.
+  </p>
+
+  <h3>Question 3: What mechanism can I reach with those characters?</h3>
+  <p>
+    Module 03 introduces the five execution mechanisms that cover every XSS
+    attack ever documented. Given a context and a character set, one or more
+    of those mechanisms may be reachable. The attacker systematically works
+    through them. A thorough defender must ensure all five are addressed.
+  </p>
+
+  <h3>Question 4: What does execution give the attacker?</h3>
+  <p>
+    Executing <code>alert(1)</code> proves the XSS is real. But the actual
+    payload depends on the goal: stealing cookies, forging requests, capturing
+    credentials, persisting via Service Workers, or pivoting to internal
+    networks. Understanding what execution buys the attacker is what lets you
+    calculate the true severity of a vulnerability — which is what a threat
+    model must state precisely.
+  </p>
+
+  <h3>Question 5: What defense is present, and what is its blind spot?</h3>
+  <p>
+    No defense currently deployed covers all five execution mechanisms under all
+    conditions. Every defense has assumptions, and assumptions have blind spots.
+    The attacker's final question is: "given the defenses I can observe (CSP
+    headers, cookie flags, input filters), what is still reachable?" Module 17
+    studies each defense's coverage. Module 18 is specifically about mapping
+    that coverage to the five mechanisms so your intervention can claim — with
+    evidence — that it closes a specific gap.
+  </p>
+
+  <div class="callout insight">
+    <span class="callout-label">PhD Insight — Threat Model Framing</span>
+    In your paper, a threat model is a precise statement of: (1) what the
+    attacker can control, (2) what they cannot control, (3) what the defender's
+    goal is, and (4) under what conditions a defense succeeds or fails. The five
+    attacker questions above map directly onto this structure. When you finish
+    Module 18 and write your threat model, you will have empirical evidence from
+    this lab — real payloads that worked and real defenses that stopped or failed
+    to stop them — to support every claim.
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <h2>Code Walkthrough — lab_server.py</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+  <div class="file-block">
+    <div class="file-block-header">lab_server.py</div>
+    <pre><span class="cm">"""
+XSS Mastery Lab — Module 01
+Flask lab server: minimal home page only.
+"""</span>
+
+<span class="kw">from</span> flask <span class="kw">import</span> Flask, send_from_directory
+<span class="kw">import</span> os
+
+<span class="cm"># Flask() needs __name__ so it knows where to find the 'public/' folder.
+# static_folder="public" tells Flask to serve files from ./public/ directly.</span>
+app = <span class="fn">Flask</span>(__name__, static_folder=<span class="st">"public"</span>)
+
+<span class="at">@app.route</span>(<span class="st">"/"</span>)
+<span class="kw">def</span> <span class="fn">home</span>():
+    <span class="cm"># send_from_directory is safe — it prevents path traversal attacks.
+    # (os.path.join + open() would be vulnerable to ../../etc/passwd.)
+    # We will rely on this safety in later modules too.</span>
+    <span class="kw">return</span> <span class="fn">send_from_directory</span>(<span class="st">"public"</span>, <span class="st">"index.html"</span>)
+
+<span class="at">@app.route</span>(<span class="st">"/ping"</span>)
+<span class="kw">def</span> <span class="fn">ping</span>():
+    <span class="cm"># Health check — returns JSON. We will use this from scripts in M11+.
+    # Flask auto-sets Content-Type: application/json for dict returns.</span>
+    <span class="kw">return</span> {<span class="st">"status"</span>: <span class="st">"ok"</span>, <span class="st">"module"</span>: <span class="nu">1</span>}
+
+<span class="kw">if</span> __name__ == <span class="st">"__main__"</span>:
+    port = <span class="fn">int</span>(os.environ.<span class="fn">get</span>(<span class="st">"PORT"</span>, <span class="nu">5000</span>))
+    <span class="cm"># debug=True: auto-reload on file changes + detailed error pages.
+    # SECURITY NOTE: debug=True in production = remote code execution.
+    # Werkzeug's debugger PIN protects it locally but never deploy this.</span>
+    app.<span class="fn">run</span>(host=<span class="st">"0.0.0.0"</span>, port=port, debug=<span class="kw">True</span>)</pre>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <h2>Code Walkthrough — lab_server.js</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+  <div class="file-block">
+    <div class="file-block-header">lab_server.js</div>
+    <pre><span class="kw">const</span> express = <span class="fn">require</span>(<span class="st">"express"</span>);
+<span class="kw">const</span> path    = <span class="fn">require</span>(<span class="st">"path"</span>);
+
+<span class="kw">const</span> app  = <span class="fn">express</span>();
+<span class="kw">const</span> PORT = process.env.PORT || <span class="nu">5000</span>;
+
+<span class="cm">// express.static serves every file inside /public directly.
+// It sets Content-Type headers automatically based on file extension.
+// Correct Content-Type is a defence: serving .svg as image/svg+xml
+// prevents the browser treating it as HTML. We exploit this in Module 07.</span>
+app.<span class="fn">use</span>(express.<span class="fn">static</span>(path.<span class="fn">join</span>(__dirname, <span class="st">"public"</span>)));
+
+<span class="cm">// Parse URL-encoded form bodies — needed from Module 04 onward.
+// extended:false uses the built-in querystring library (no prototype pollution).
+// extended:true uses qs, which supports nested objects but has had CVEs.</span>
+app.<span class="fn">use</span>(express.<span class="fn">urlencoded</span>({ extended: <span class="kw">false</span> }));
+
+<span class="cm">// Parse JSON request bodies — needed from Module 09 onward.</span>
+app.<span class="fn">use</span>(express.<span class="fn">json</span>());
+
+app.<span class="fn">get</span>(<span class="st">"/"</span>, (req, res) => {
+    <span class="cm">// sendFile requires an absolute path — path.join(__dirname, ...) ensures that.</span>
+    res.<span class="fn">sendFile</span>(path.<span class="fn">join</span>(__dirname, <span class="st">"public"</span>, <span class="st">"index.html"</span>));
+});
+
+app.<span class="fn">get</span>(<span class="st">"/ping"</span>, (req, res) => {
+    <span class="cm">// res.json() sets Content-Type: application/json automatically.</span>
+    res.<span class="fn">json</span>({ status: <span class="st">"ok"</span>, module: <span class="nu">1</span> });
+});
+
+app.<span class="fn">listen</span>(PORT, () => {
+    console.<span class="fn">log</span>(<span class="st">`\n  XSS Mastery Lab — Module 01`</span>);
+    console.<span class="fn">log</span>(<span class="st">`  Listening on http://localhost:</span><span class="nu">${PORT}</span><span class="st">`</span>);
+});</pre>
+  </div>
+
+  <div class="callout tip">
+    <span class="callout-label">Tip — Why two middlewares (urlencoded + json)?</span>
+    Express does not parse request bodies by default — you must opt in. We add
+    both parsers now so every future module can receive either form submissions
+    or JSON API calls without changing the server setup. Notice the
+    <code>extended: false</code> choice — this is a security decision. The
+    <code>qs</code> library (<code>extended: true</code>) supports nested object
+    syntax which has historically enabled prototype pollution attacks. We use
+    the safer flat parser and switch in Module 14 to study exactly that attack.
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <h2>Build &amp; Run Instructions</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+  <h3>Option A — Python / Flask</h3>
+  <ol class="steps">
+    <li>
+      Verify Python 3.10+ is installed:<br>
+      <code>python --version</code><br>
+      Expected: <code>Python 3.10.x</code> or higher
+    </li>
+    <li>
+      Open a terminal in the <code>module_01/</code> directory and install dependencies:<br>
+      <code>pip install -r requirements.txt</code>
+    </li>
+    <li>
+      Start the server:<br>
+      <code>python lab_server.py</code><br>
+      Expected output:<br>
+      <pre style="margin:8px 0">  XSS Mastery Lab — Module 01
+  Listening on http://localhost:5000
+  Press Ctrl+C to stop
+
+ * Running on http://0.0.0.0:5000
+ * Debug mode: on</pre>
+    </li>
+    <li>
+      Open Chrome and navigate to <code>http://localhost:5000</code>.<br>
+      You should see the Lab Home page with "Module 01 · Ready".
+    </li>
+    <li>
+      Verify the health check: navigate to <code>http://localhost:5000/ping</code>.<br>
+      Expected: <code>{"module": 1, "status": "ok"}</code>
+    </li>
+  </ol>
+
+  <h3>Option B — Node.js / Express</h3>
+  <ol class="steps">
+    <li>
+      Verify Node.js 18+ is installed:<br>
+      <code>node --version</code><br>
+      Expected: <code>v18.x.x</code> or higher
+    </li>
+    <li>
+      Install dependencies:<br>
+      <code>npm install</code><br>
+      This creates <code>node_modules/</code> with Express and nodemon.
+    </li>
+    <li>
+      Start the server (pick one):<br>
+      <code>node lab_server.js</code> — starts once<br>
+      <code>npm run dev</code> — starts with auto-reload via nodemon
+    </li>
+    <li>
+      Navigate to <code>http://localhost:5000</code> — same result as Flask.
+    </li>
+  </ol>
+
+  <div class="callout warning">
+    <span class="callout-label">Warning — Port Conflict</span>
+    Only run ONE server at a time. Both Flask and Node listen on port 5000.
+    If you see <code>Address already in use</code>, stop the other server
+    first (Ctrl+C in its terminal tab) before starting the new one.
+    Alternatively, set a different port: <code>PORT=5001 python lab_server.py</code>
+    or <code>PORT=5001 node lab_server.js</code>.
+  </div>
+
+  <h3>Using Make (Git Bash / MSYS2)</h3>
+  <pre><span class="cm"># Install Python deps</span>
+make install-py
+
+<span class="cm"># Run Flask server</span>
+make run-py
+
+<span class="cm"># Install Node deps</span>
+make install-node
+
+<span class="cm"># Run Node server</span>
+make run-node</pre>
+
+  <h3>Configuring DevTools (do this now)</h3>
+  <ol class="steps">
+    <li>
+      Open Chrome at <code>http://localhost:5000</code>. Press <strong>F12</strong>.
+    </li>
+    <li>
+      In the DevTools top bar, click the <strong>⚙ gear icon</strong> (Settings).
+      Under <em>Preferences → Sources</em>, enable
+      <strong>"Enable JavaScript source maps"</strong> and
+      <strong>"Pause on caught exceptions"</strong>.
+    </li>
+    <li>
+      In the Network panel, check <strong>"Disable cache"</strong> (top-left
+      checkbox). Leave this on always during this course — stale cache hides
+      whether your attack or your fix actually reached the browser.
+    </li>
+    <li>
+      In the Console panel, click the filter icon and ensure
+      <strong>All levels</strong> are shown. XSS payloads sometimes produce
+      CSP violation reports as console errors — you want to see them.
+    </li>
+    <li>
+      Type <code>document.domain</code> in the Console and press Enter.
+      You should see <code>localhost</code>. This is the origin context any
+      injected JavaScript would run in.
+    </li>
+  </ol>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <h2>Exercises</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 1 — Confirm Your Lab Is Alive</h4>
+    <p>
+      Start either the Flask or Node server. In Chrome DevTools Console, navigate
+      to <code>http://localhost:5000</code> and run:
+    </p>
+    <pre>fetch('/ping').then(r => r.json()).then(console.log)</pre>
+    <p>
+      You should see <code>{module: 1, status: "ok"}</code> logged.
+      Then open the Network panel and find the <code>/ping</code> request.
+      What is the <code>Content-Type</code> of the response?
+      What does that tell the browser about how to interpret the response body?
+    </p>
+  </div>
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 2 — Read the DOM, Not the Source</h4>
+    <p>
+      View the source of <code>http://localhost:5000</code> (Ctrl+U in Chrome).
+      Then open DevTools Elements panel and compare the two views.
+      Are they identical? Open your browser on any real website (your university
+      homepage, for example) and repeat the comparison. Note at least two
+      differences between the raw HTML source and the live DOM. Write down
+      why those differences matter to an attacker.
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 3 — Modify the Lab Home Page</h4>
+    <p>
+      Open <code>public/index.html</code> in VS Code. Add a fourth card to the
+      grid that links to <code>/module_01/tutorial.html</code> and shows the
+      title "Module 01 — Tutorial". Save the file. If using Flask, the server
+      auto-reloads. If using Node with nodemon, it also auto-reloads. Refresh
+      the browser. Confirm the new card appears.
+    </p>
+    <p>
+      Then: right-click the new card in Chrome → Inspect. In the Elements panel,
+      double-click the card's text and change it to something else. Press Enter.
+      Notice the page changed without reloading. Now reload the page. The change
+      is gone. Explain in writing: where did your change live, and why did reload
+      erase it? (Hint: this is the difference between the live DOM and the server
+      source — and it is directly relevant to how DOM XSS works.)
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 4 — Intercept a Request with Burp Suite</h4>
+    <p>
+      Open Burp Suite Community. Go to <em>Proxy → Intercept</em> and turn
+      interception ON. Configure Chrome to use Burp as an HTTP proxy
+      (Settings → Search "proxy" → Manual proxy: <code>127.0.0.1:8080</code>).
+      Navigate to <code>http://localhost:5000/ping</code> in Chrome.
+      Burp intercepts the request. In the Intercept panel, change the URL path
+      from <code>/ping</code> to <code>/anything-you-like</code> and forward
+      the request. What does the server return? What HTTP status code?
+    </p>
+    <p>
+      This is the core of how attackers inject payloads: they intercept a
+      legitimate request and modify it before it reaches the server. You will
+      use Burp this way in every module from Module 04 onward.
+    </p>
+  </div>
+
+  <div class="exercise ex-stretch">
+    <span class="ex-badge">Stretch</span>
+    <h4>Exercise 5 — Add a Custom Response Header</h4>
+    <p>
+      Modify <strong>both</strong> <code>lab_server.py</code> and
+      <code>lab_server.js</code> to add a custom HTTP response header to every
+      response: <code>X-XSS-Mastery-Module: 01</code>. Verify it appears in
+      the Network panel for both <code>/</code> and <code>/ping</code>.
+    </p>
+    <p>Then research and answer in writing:</p>
+    <ul>
+      <li>What is the <code>X-Content-Type-Options: nosniff</code> header and why does it matter for XSS?</li>
+      <li>What is <code>X-Frame-Options</code> and how does it relate to clickjacking (which chains with XSS)?</li>
+      <li>Add both of these headers to your servers. Verify them in Burp Suite's response view.</li>
+    </ul>
+    <p>
+      In Flask: use <code>@app.after_request</code>. In Express: use
+      <code>app.use((req, res, next) => { res.setHeader(...); next(); })</code>.
+    </p>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <h2>What's Next</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+  <div class="next-box">
+    <strong>Module 02 — How Browsers Parse HTML: The Attack Surface</strong>
+    <p>
+      The lab is running and your tools are configured. Module 02 introduces
+      <code>parser_demo.html</code> — a page that deliberately feeds
+      malformed, ambiguous, and adversarial HTML to the browser and visualises
+      how the parser recovers. You will see with your own eyes that the browser
+      does not reject broken HTML — it silently repairs it according to a spec
+      that runs to hundreds of pages. That repair process is the mechanism that
+      makes XSS possible: the attacker writes something that looks broken to a
+      filter but is perfectly valid to the parser. Understanding this is not
+      optional background knowledge. It is the foundation every attack in this
+      course is built on.
+    </p>
+  </div>
+
+</div><!-- /.page-wrap -->
+</body>
+</html>
