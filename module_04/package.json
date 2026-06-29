@@ -1,0 +1,9 @@
+{
+  "name": "xss-mastery-lab",
+  "version": "4.0.0",
+  "description": "XSS Mastery Course — Module 04",
+  "main": "lab_server.js",
+  "scripts": { "start": "node lab_server.js", "dev": "nodemon lab_server.js" },
+  "dependencies": { "express": "^4.18.2" },
+  "devDependencies": { "nodemon": "^3.0.1" }
+}

