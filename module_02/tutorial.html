@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Module 02 — Browser Parsing | XSS Mastery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Lato:wght@300;400;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#0b0f1a; --bg2:#111827; --bg3:#1a2235; --card:#141c2e;
+      --border:#1e3a5f; --gold:#f5c842; --cyan:#38bdf8; --purple:#a78bfa;
+      --red:#f87171; --green:#4ade80; --teal:#0d9488; --orange:#fb923c;
+      --text:#e2e8f0; --muted:#7a9bbf; --code-bg:#060d1a;
+    }
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:'Lato',sans-serif;
+           font-size:16px; line-height:1.75; }
+    .page-wrap { max-width:860px; margin:0 auto; padding:48px 24px 96px; }
+    .mod-badge { display:inline-block; font-size:11px; font-weight:700;
+                 letter-spacing:0.14em; text-transform:uppercase; color:var(--muted);
+                 border:1px solid var(--border); border-radius:4px;
+                 padding:4px 10px; margin-bottom:20px; }
+    h1 { font-family:'Playfair Display',serif; font-size:42px; color:var(--gold);
+         line-height:1.2; margin-bottom:12px; }
+    h2 { font-family:'Playfair Display',serif; font-size:26px; color:var(--cyan);
+         margin:52px 0 16px; padding-top:8px; border-top:1px solid var(--border); }
+    h3 { font-family:'Lato',sans-serif; font-size:18px; font-weight:700;
+         color:var(--purple); margin:32px 0 10px; }
+    h4 { font-size:14px; font-weight:700; color:var(--orange); margin:20px 0 6px;
+         text-transform:uppercase; letter-spacing:0.06em; }
+    .subtitle { font-size:17px; color:var(--muted); margin-bottom:40px; line-height:1.5; }
+    p { margin-bottom:18px; }
+    strong { color:var(--text); font-weight:700; }
+    em { color:var(--orange); font-style:normal; font-weight:600; }
+    a { color:var(--cyan); }
+    .prereq-bar { background:var(--card); border:1px solid var(--border);
+                  border-left:4px solid var(--teal); border-radius:6px;
+                  padding:16px 20px; margin-bottom:32px; }
+    .prereq-bar strong { color:var(--teal); font-size:12px; text-transform:uppercase;
+                         letter-spacing:0.1em; display:block; margin-bottom:6px; }
+    .prereq-bar p { font-size:14px; color:var(--muted); margin:0; }
+    .deliverables { background:var(--bg3); border:1px solid var(--border);
+                    border-radius:6px; padding:20px 24px; margin-bottom:36px; }
+    .deliverables strong { color:var(--gold); font-size:13px; text-transform:uppercase;
+                           letter-spacing:0.1em; display:block; margin-bottom:12px; }
+    .deliverables ul { list-style:none; }
+    .deliverables li { font-size:14px; padding:4px 0 4px 20px; position:relative; }
+    .deliverables li::before { content:"→"; position:absolute; left:0;
+                                color:var(--green); font-weight:700; }
+    .callout { border-radius:6px; padding:16px 20px; margin:28px 0;
+               font-size:14.5px; line-height:1.65; }
+    .callout .callout-label { font-size:11px; font-weight:700; letter-spacing:0.12em;
+                               text-transform:uppercase; margin-bottom:8px; display:block; }
+    .callout.warning  { background:#1f0f0f; border-left:4px solid var(--red); }
+    .callout.warning  .callout-label { color:var(--red); }
+    .callout.tip      { background:#0a1f13; border-left:4px solid var(--green); }
+    .callout.tip      .callout-label { color:var(--green); }
+    .callout.insight  { background:#0f1240; border-left:4px solid var(--purple); }
+    .callout.insight  .callout-label { color:var(--purple); }
+    .callout.info     { background:#061826; border-left:4px solid var(--cyan); }
+    .callout.info     .callout-label { color:var(--cyan); }
+    pre { background:var(--code-bg); border:1px solid var(--border); border-radius:6px;
+          padding:20px; overflow-x:auto; margin:20px 0;
+          font-family:'Source Code Pro',monospace; font-size:13.5px; line-height:1.7; }
+    code { font-family:'Source Code Pro',monospace; font-size:13px; }
+    p code, li code { background:var(--code-bg); color:var(--cyan); padding:2px 6px;
+                      border-radius:3px; border:1px solid var(--border); }
+    .cm{color:#4b5563} .kw{color:#89dceb} .fn{color:#a78bfa}
+    .st{color:#a6e3a1} .nu{color:#fab387} .at{color:#f5c842}
+    .op{color:#f87171} .hl{color:#f5c842; font-weight:700}
+    .steps { list-style:none; counter-reset:step; margin:20px 0; }
+    .steps li { counter-increment:step; padding:14px 16px 14px 56px;
+                position:relative; background:var(--card);
+                border:1px solid var(--border); border-radius:6px;
+                margin-bottom:10px; font-size:14.5px; }
+    .steps li::before { content:counter(step); position:absolute; left:16px; top:14px;
+                        width:24px; height:24px; border-radius:50%;
+                        background:var(--border); color:var(--cyan);
+                        font-weight:700; font-size:12px;
+                        display:flex; align-items:center; justify-content:center; }
+    .exercise { background:var(--card); border:1px solid var(--border);
+                border-radius:6px; padding:20px 24px; margin-bottom:14px; }
+    .exercise .ex-badge { font-size:10px; font-weight:700; letter-spacing:0.1em;
+                          text-transform:uppercase; padding:2px 8px; border-radius:3px;
+                          margin-bottom:10px; display:inline-block; }
+    .ex-warm   .ex-badge { background:#1a2f1a; color:var(--green); }
+    .ex-core   .ex-badge { background:#1a1a2f; color:var(--cyan); }
+    .ex-stretch .ex-badge { background:#2f1a2f; color:var(--purple); }
+    .exercise h4 { margin-top:0; }
+    .exercise p { font-size:14.5px; margin-bottom:8px; }
+    .exercise ul { padding-left:20px; font-size:14px; }
+    .exercise ul li { margin-bottom:4px; }
+    .next-box { background:var(--bg3); border:1px solid var(--border);
+                border-left:4px solid var(--gold); border-radius:6px;
+                padding:22px 24px; margin-top:48px; }
+    .next-box strong { color:var(--gold); display:block; font-size:12px;
+                       text-transform:uppercase; letter-spacing:0.1em; margin-bottom:10px; }
+    .file-block { background:var(--bg2); border:1px solid var(--border);
+                  border-radius:6px; margin:24px 0; overflow:hidden; }
+    .file-block-header { background:var(--card); padding:10px 16px;
+                         font-family:'Source Code Pro',monospace; font-size:13px;
+                         color:var(--gold); border-bottom:1px solid var(--border); }
+    .file-block pre { margin:0; border:none; border-radius:0; }
+    .pipeline { display:flex; align-items:center; gap:0; margin:24px 0;
+                flex-wrap:wrap; }
+    .pipe-stage { background:var(--card); border:1px solid var(--border);
+                  border-radius:6px; padding:12px 16px; font-size:13px;
+                  flex:1; min-width:110px; text-align:center; }
+    .pipe-stage .stage-name { font-weight:700; color:var(--cyan); font-size:12px; }
+    .pipe-stage .stage-desc { color:var(--muted); font-size:11px; margin-top:4px; }
+    .pipe-arrow { color:var(--muted); font-size:20px; padding:0 6px; }
+    .top-nav { background:var(--bg2); border-bottom:1px solid var(--border);
+               padding:12px 24px; display:flex; align-items:center;
+               justify-content:space-between; font-size:13px; color:var(--muted); }
+    .top-nav a { color:var(--cyan); text-decoration:none; }
+    hr { border:none; border-top:1px solid var(--border); margin:40px 0; }
+    table { width:100%; border-collapse:collapse; margin:20px 0; font-size:14px; }
+    th { background:var(--card); color:var(--cyan); padding:10px 14px;
+         text-align:left; border-bottom:1px solid var(--border); }
+    td { padding:10px 14px; border-bottom:1px solid var(--border); vertical-align:top; }
+    tr:last-child td { border-bottom:none; }
+  </style>
+</head>
+<body>
+
+<nav class="top-nav">
+  <a href="/">← Lab Home</a>
+  <span>XSS Mastery Course</span>
+  <span>Module 02 of 19</span>
+</nav>
+
+<div class="page-wrap">
+
+  <div class="mod-badge">Module 02 of 19</div>
+  <h1>How Browsers Parse HTML:<br>The Attack Surface</h1>
+  <p class="subtitle">
+    Before you can inject anything, you must understand what the browser does
+    with what you give it. The HTML parser is not a strict validator — it is a
+    fault-tolerant recovery engine, and its recovery behaviour is the root of
+    nearly every XSS vulnerability ever found.
+  </p>
+
+  <div class="prereq-bar">
+    <strong>Prerequisites</strong>
+    <p>Module 01 complete. Lab server running on localhost:5000. DevTools open
+       and configured. You know what a DOM is conceptually.</p>
+  </div>
+
+  <div class="deliverables">
+    <strong>What you will build in this module</strong>
+    <ul>
+      <li>A live HTML injector page (<code>parser_demo.html</code>) served from your lab</li>
+      <li>A JavaScript file (<code>quirks.js</code>) demonstrating 5 parser quirks</li>
+      <li>An updated lab server with a deliberate <code>/parse-demo</code> reflected XSS endpoint</li>
+      <li>A solid mental model of the 4 injection contexts and why each is distinct</li>
+      <li>Hands-on observation of the browser silently repairing broken HTML</li>
+    </ul>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 1 — The Browser Is Not a Parser. It Is a Recovery Engine.</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    A strict parser — like an XML parser — rejects malformed input. Give an XML
+    parser an unclosed tag and it throws an error and stops. The browser's HTML
+    parser does the opposite: it <em>never</em> rejects input. It applies a
+    precisely specified error-recovery algorithm defined in the WHATWG HTML
+    Living Standard (which runs to several hundred pages) and produces a valid
+    DOM tree from whatever garbage you give it. This was a deliberate design
+    decision in the early Web: web pages written by humans are full of mistakes,
+    and browsers that refused to render them would lose market share to browsers
+    that tried harder.
+  </p>
+
+  <p>
+    This forgiveness is a security disaster. Every security filter that processes
+    HTML must parse it correctly to decide whether it is safe. But "correctly"
+    means implementing the same recovery algorithm as the browser — and that
+    algorithm is enormous, browser-specific in subtle ways, and namespace-aware
+    (HTML, SVG, and MathML have different rules). A filter that uses a simpler
+    parsing model will see a different HTML tree than the browser does. Payloads
+    crafted to exploit that gap — appearing safe to the filter but dangerous to
+    the browser — are the basis of an entire attack class called
+    <em>mutation XSS</em>, studied in Module 13.
+  </p>
+
+  <p>
+    For now, the key insight is this: <strong>the browser's DOM is the ground
+    truth, not the HTML string.</strong> A security analysis of any web page
+    must ask "what did the browser build?" not "what did the server send?"
+    This is why you open DevTools Elements panel, not View Source, when auditing
+    for XSS.
+  </p>
+
+  <div class="callout insight">
+    <span class="callout-label">PhD Insight — Differential Parsing</span>
+    The gap between how a sanitiser parses HTML and how the browser parses the
+    same HTML is called a <em>differential</em>. Finding differentials is an
+    active research method: you feed the same input to both parsers and compare
+    their output trees. Any difference is a potential bypass. This is how
+    researchers discovered the DOMPurify bypasses of 2019 and 2020 — they fuzzed
+    sanitiser output against live browser behaviour using automated differential
+    testing. Your lab's <code>parser_demo.html</code> is a manual version of
+    this technique.
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 2 — The HTML Parsing Pipeline</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    When the browser receives an HTML document, it processes it through a
+    four-stage pipeline. Understanding each stage tells you where injected
+    content can enter the pipeline and what rules apply at that entry point.
+  </p>
+
+  <div class="pipeline">
+    <div class="pipe-stage">
+      <div class="stage-name">1. Byte Stream Decoder</div>
+      <div class="stage-desc">Converts raw bytes to Unicode characters. Encoding attacks (UTF-7, overlong UTF-8) can inject characters here.</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-stage">
+      <div class="stage-name">2. Tokeniser</div>
+      <div class="stage-desc">Reads characters and emits tokens: start-tag, end-tag, character, comment, DOCTYPE. Mismatched quotes or angle brackets confuse token boundaries.</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-stage">
+      <div class="stage-name">3. Tree Builder</div>
+      <div class="stage-desc">Assembles tokens into a DOM tree. Applies error recovery. Insertion mode (body, in-table, in-SVG…) determines which tags are valid where.</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-stage">
+      <div class="stage-name">4. Script Execution</div>
+      <div class="stage-desc">Script elements, event handlers, and javascript: URIs are handed to the JS engine. This is when XSS executes.</div>
+    </div>
+  </div>
+
+  <p>
+    Injected payloads can enter at Stage 2 (if user input appears inline in the
+    HTML stream), Stage 3 (if input is assigned to <code>innerHTML</code> in
+    JavaScript — DOM XSS), or Stage 4 (if input reaches an <code>eval()</code>
+    call). Each entry point has different rules and different effective defences.
+  </p>
+
+  <h3>The Tokeniser's Insertion Modes</h3>
+  <p>
+    The most important thing to understand about the tree builder is that it
+    operates in different <em>insertion modes</em>. When the parser sees
+    <code>&lt;svg&gt;</code>, it switches into "in SVG" mode, where different
+    parsing rules apply. When it sees <code>&lt;math&gt;</code>, it switches to
+    "in MathML" mode. These modes have different rules about which tags are
+    allowed, how attributes are parsed, and when to switch back to HTML mode.
+  </p>
+  <p>
+    An attacker who injects HTML that triggers a mode switch can cause the parser
+    to interpret subsequent content under unexpected rules. The
+    <code>&lt;math&gt;&lt;mtext&gt;&lt;/math&gt;&lt;img&gt;</code> pattern
+    exploits exactly this: the <code>&lt;/math&gt;</code> closes the MathML
+    context mid-stream and the browser transitions back to HTML mode, parsing
+    whatever follows as HTML — even if a sanitiser thought it was still inside
+    safe MathML. We demonstrate this in Quirk 2 on the demo page.
+  </p>
+
+  <div class="callout warning">
+    <span class="callout-label">Warning — "I'll just check for &lt;script&gt;" Is Not a Defence</span>
+    After this module, the temptation is to build a filter that blocks
+    <code>&lt;script&gt;</code> tags. Resist it. Every subsequent module in
+    this course shows a payload that executes JavaScript without a single
+    <code>&lt;script&gt;</code> tag. The only complete defence operates at the
+    DOM level — controlling which strings reach dangerous sinks — not at the
+    string-matching level. Module 17 explains this fully. For now, just observe.
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 3 — The Four Injection Contexts</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    Every XSS injection point sits in exactly one of four parsing contexts.
+    The context determines which characters the attacker needs to achieve
+    execution, and which characters a defence must neutralise. Learning to
+    identify the context before choosing a payload — or before writing a defence
+    — is the single most important analytical skill in this course.
+  </p>
+
+  <h3>Context 1 — HTML Body</h3>
+  <p>
+    The attacker's input appears directly in the document body, outside any tag.
+    For example: <code>&lt;p&gt;Hello, [INPUT]!&lt;/p&gt;</code>. Here a
+    <code>&lt;</code> character starts a new tag. The attacker can inject any
+    HTML element — <code>&lt;script&gt;</code>, <code>&lt;img&gt;</code>,
+    <code>&lt;svg&gt;</code> — with full control over its attributes. This is
+    the most permissive context and the easiest to exploit.
+  </p>
+  <p>
+    <strong>Defence:</strong> HTML-encode <code>&lt;</code> → <code>&amp;lt;</code>
+    and <code>&gt;</code> → <code>&amp;gt;</code>. The encoded characters display
+    correctly but cannot create new tags.
+  </p>
+
+  <h3>Context 2 — HTML Attribute Value</h3>
+  <p>
+    The attacker's input appears inside a quoted attribute value:
+    <code>&lt;div title="[INPUT]"&gt;</code>. A <code>&lt;</code> character here
+    is just data — it cannot start a new tag while inside an attribute value.
+    <strong>However</strong>, a <code>"</code> (double quote) closes the
+    attribute value. After the closing quote, the attacker is back in the tag
+    body, where they can add new attributes — including event handlers like
+    <code>onmouseover="alert(1)"</code>. Critically: <strong>no angle brackets
+    are needed</strong>. The injection string <code>" onmouseover="alert(1)"</code>
+    is a complete XSS payload without a single <code>&lt;</code> or
+    <code>&gt;</code>.
+  </p>
+  <p>
+    <strong>Defence:</strong> HTML-encode <code>"</code> → <code>&amp;quot;</code>
+    inside attribute values. Never use single-quoted or unquoted attributes for
+    user-supplied values.
+  </p>
+
+  <h3>Context 3 — JavaScript / Script Context</h3>
+  <p>
+    The attacker's input appears inside a <code>&lt;script&gt;</code> block:
+    <code>&lt;script&gt;var name = "[INPUT]";&lt;/script&gt;</code>.
+    Inside a script block, the browser applies JavaScript tokenisation rules,
+    not HTML rules. The dangerous sequence is <code>&lt;/script&gt;</code> —
+    the browser closes the script block immediately upon seeing those characters,
+    regardless of whether they are inside a JavaScript string. An attacker who
+    injects <code>&lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt;</code>
+    closes the existing script block and opens a new one.
+  </p>
+  <p>
+    <strong>Defence:</strong> Never embed user-supplied data inside
+    <code>&lt;script&gt;</code> tags via string concatenation. Serve dynamic
+    data as JSON via a separate API endpoint, not inline in script blocks.
+  </p>
+
+  <h3>Context 4 — CSS / Style Context</h3>
+  <p>
+    The attacker's input appears inside a <code>&lt;style&gt;</code> block or
+    a <code>style=""</code> attribute. Modern browsers cannot execute JavaScript
+    from CSS injection alone (legacy IE <code>expression()</code> is dead).
+    However, CSS injection is not harmless: using CSS attribute selectors and
+    background-image URL requests, an attacker can exfiltrate data character by
+    character — for example, stealing a CSRF token from a hidden input field
+    without executing any JavaScript and without triggering any CSP violation.
+    This technique is covered in Module 12.
+  </p>
+
+  <div class="callout info">
+    <span class="callout-label">Info — Context is Server-Side AND Client-Side</span>
+    These four contexts apply both to server-side reflection (the server embeds
+    input into HTML before sending it to the browser) and to client-side DOM
+    manipulation (JavaScript reads input and inserts it into the DOM). The context
+    rules are identical. The difference is where the input enters the pipeline:
+    server-side injection enters at Stage 2 (tokeniser); DOM injection enters
+    at Stage 3 (tree builder via <code>innerHTML</code>) or Stage 4 (via
+    <code>eval()</code>).
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Concept 4 — Five Parser Quirks That Create Injection Opportunities</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <p>
+    The following five quirks are demonstrated live on
+    <a href="/parser_demo.html" target="_blank">parser_demo.html</a>.
+    Open that page in a separate tab and have DevTools Elements panel visible
+    while reading this section. For each quirk, try to predict what the browser
+    will do before you look at the Elements panel.
+  </p>
+
+  <h3>Quirk 1 — Unclosed Tags Are Silently Completed</h3>
+  <p>
+    The browser closes every unclosed tag at the end of its scope. A filter
+    that looks for balanced open/close tag pairs as a signal of "this is benign
+    markup" gets fooled: <code>&lt;b&gt;text</code> (no closing tag) still
+    creates a real, fully functional <code>&lt;b&gt;</code> element in the DOM.
+    More dangerously: <code>&lt;img src=x onerror=alert(1)</code> (no closing
+    <code>&gt;</code>) is silently completed by the parser — the event handler
+    still executes.
+  </p>
+
+  <h3>Quirk 2 — Mismatched Nesting Is Reorganised</h3>
+  <p>
+    <code>&lt;b&gt;&lt;i&gt;text&lt;/b&gt;&lt;/i&gt;</code> has mismatched
+    nesting — the close tags are in the wrong order. The browser spec defines
+    exactly how to restructure this into valid nesting. Sanitisers that operate
+    on the string before the browser sees it may produce a different tree than
+    the browser produces from the same string. This discrepancy is the mechanism
+    behind mutation XSS.
+  </p>
+
+  <h3>Quirk 3 — Unknown Tags Become Generic Elements with Full Event Support</h3>
+  <p>
+    <code>&lt;xss onmouseover="alert(1)"&gt;</code> creates a real DOM element
+    — an <code>HTMLElement</code> with tag name "xss" — and that element fires
+    the mouseover event handler. The tag name is completely irrelevant. Any
+    string is a valid tag name in HTML5. Filters that allowlist known safe tags
+    and reject unknown ones are correct in spirit but must be paired with
+    attribute filtering, because even "safe" known tags like <code>&lt;div&gt;</code>
+    and <code>&lt;p&gt;</code> execute event handlers.
+  </p>
+
+  <h3>Quirk 4 — Unquoted Attribute Values Are Valid HTML5</h3>
+  <p>
+    <code>&lt;img src=x onerror=alert(1)&gt;</code> uses an unquoted attribute
+    value for <code>onerror</code>. This is valid HTML5. A filter that searches
+    for <code>onerror="</code> (with a quote) will not match <code>onerror=</code>
+    (without a quote). The attacker deliberately uses whichever quoting style
+    the filter doesn't check. You will practise this systematically in Module 12.
+  </p>
+
+  <h3>Quirk 5 — Tag-Soup Inside Attribute Values Can Escape the Attribute</h3>
+  <p>
+    Consider: <code>&lt;div title="&lt;/div&gt;&lt;b&gt;escaped&lt;/b&gt;"&gt;</code>.
+    A string-matching filter might think the <code>&lt;/div&gt;</code> inside the
+    attribute value is safe because it's "just data". But the browser tokeniser
+    still responds to the closing tag sequence — depending on the specific
+    context and browser, content can escape from the attribute into the document
+    body. This is the basis of dangling markup attacks and certain mXSS patterns.
+  </p>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Code Walkthrough — /parse-demo server route</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div class="file-block">
+    <div class="file-block-header">lab_server.py — /parse-demo route (new in M02)</div>
+    <pre><span class="at">@app.route</span>(<span class="st">"/parse-demo"</span>)
+<span class="kw">def</span> <span class="fn">parse_demo</span>():
+    <span class="cm"># request.args is a dict of URL query parameters.
+    # ?html=&lt;b&gt;test&lt;/b&gt; → request.args.get("html") == "&lt;b&gt;test&lt;/b&gt;"
+    # The default keeps the page usable without a parameter.</span>
+    raw = request.args.<span class="fn">get</span>(<span class="st">"html"</span>, <span class="st">"&lt;!-- supply ?html=... --&gt;"</span>)
+
+    <span class="cm"># We f-string 'raw' directly into the page HTML.
+    # This is textbook Reflected XSS — the exact pattern we will study
+    # in Module 04. We do it intentionally here so you can see what
+    # happens BEFORE we study how to exploit it.</span>
+    page = <span class="st">f"""&lt;!DOCTYPE html&gt;
+&lt;html&gt;...
+  &lt;div class="injected"&gt;
+    <span class="hl">{raw}</span>       &lt;!-- INJECTION POINT --&gt;
+  &lt;/div&gt;
+...&lt;/html&gt;"""</span>
+
+    resp = <span class="fn">make_response</span>(page)
+    <span class="cm"># Content-Type tells the browser to parse this as HTML.
+    # Without this header, the browser might display it as plain text.
+    # In Module 07 we study what happens when Content-Type is WRONG
+    # (e.g., serving an SVG as text/html).</span>
+    resp.headers[<span class="st">"Content-Type"</span>] = <span class="st">"text/html; charset=utf-8"</span>
+    <span class="kw">return</span> resp</pre>
+  </div>
+
+  <div class="file-block">
+    <div class="file-block-header">lab_server.js — /parse-demo route (new in M02)</div>
+    <pre>app.<span class="fn">get</span>(<span class="st">"/parse-demo"</span>, (req, res) => {
+    <span class="cm">// req.query is Express's equivalent of Flask's request.args.
+    // It parses the URL query string into a plain object automatically.</span>
+    <span class="kw">const</span> raw = req.query.html || <span class="st">"&lt;!-- supply ?html=... --&gt;"</span>;
+
+    <span class="cm">// Template literal with direct interpolation — same problem as Python.
+    // This is why "never build HTML by string concatenation" is the rule:
+    // any user-supplied string can break out of its intended position.</span>
+    <span class="kw">const</span> page = <span class="st">`...&lt;div class="injected"&gt;
+    <span class="hl">${raw}</span>
+  &lt;/div&gt;...`</span>;
+
+    res.<span class="fn">setHeader</span>(<span class="st">"Content-Type"</span>, <span class="st">"text/html; charset=utf-8"</span>);
+    res.<span class="fn">send</span>(page);
+});</pre>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Code Walkthrough — quirks.js</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div class="file-block">
+    <div class="file-block-header">public/quirks.js — addDemo helper</div>
+    <pre><span class="kw">function</span> <span class="fn">addDemo</span>(title, inputHTML, notes) {
+  <span class="kw">const</span> container = document.<span class="fn">getElementById</span>(<span class="st">"results"</span>);
+  <span class="kw">const</span> card = document.<span class="fn">createElement</span>(<span class="st">"div"</span>);
+
+  <span class="cm">// We use createElement + textContent to safely display the raw HTML
+  // string as visible text (not rendered). textContent encodes &lt; and &gt;
+  // so the string is never parsed as HTML — only shown.</span>
+  <span class="kw">const</span> inputCode = document.<span class="fn">createElement</span>(<span class="st">"pre"</span>);
+  inputCode.textContent = inputHTML;  <span class="cm">// SAFE — not innerHTML</span>
+
+  <span class="cm">// The rendered output box uses innerHTML intentionally.
+  // THIS is what we are studying: what does the browser DO with this string?
+  // Open Elements panel and inspect resultBox after each demo loads.</span>
+  <span class="kw">const</span> resultBox = document.<span class="fn">createElement</span>(<span class="st">"div"</span>);
+  resultBox.innerHTML = inputHTML;    <span class="cm">// INTENTIONALLY UNSAFE — educational</span>
+
+  <span class="cm">// ... card assembly omitted for brevity (see full file)</span>
+}</pre>
+  </div>
+
+  <div class="callout tip">
+    <span class="callout-label">Tip — textContent vs innerHTML</span>
+    Notice the two assignments in <code>addDemo</code>: <code>inputCode.textContent = inputHTML</code>
+    (safe — displays the string as text) and <code>resultBox.innerHTML = inputHTML</code>
+    (unsafe — parses and renders it as HTML). This contrast is intentional. Every
+    time you assign to a DOM property, ask yourself: "does this parse the string
+    as HTML or treat it as text?" The answer determines whether you have
+    introduced an XSS vulnerability. We will return to this question in
+    Module 09 with a complete catalogue of DOM sinks.
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Build &amp; Run</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <ol class="steps">
+    <li>
+      Navigate to <code>module_02/</code> in your terminal.
+    </li>
+    <li>
+      Start either server:<br>
+      <code>python lab_server.py</code>  or  <code>node lab_server.js</code>
+    </li>
+    <li>
+      Open <a href="http://localhost:5000" target="_blank">http://localhost:5000</a>
+      — you will see the lab home page (Module 02 version).
+    </li>
+    <li>
+      Open <a href="http://localhost:5000/parser_demo.html" target="_blank">http://localhost:5000/parser_demo.html</a>
+      with DevTools F12 → Elements panel open.
+    </li>
+    <li>
+      Test the live injector with each of the following strings one at a time.
+      After each, expand the <code>.injected</code> div in the Elements panel:
+      <pre>&lt;b&gt;hello world
+&lt;b&gt;&lt;i&gt;text&lt;/b&gt;&lt;/i&gt;
+&lt;unknown-tag class="test"&gt;content&lt;/unknown-tag&gt;
+&lt;img src=x width=50&gt;</pre>
+    </li>
+    <li>
+      Test the server-side reflector:
+      <code>http://localhost:5000/parse-demo?html=&lt;b&gt;reflected&lt;/b&gt;</code><br>
+      View Source (Ctrl+U) and compare to the Elements panel. Note the difference.
+    </li>
+  </ol>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>Exercises</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 1 — Read the Parsed Tree</h4>
+    <p>
+      In the live injector on <code>parser_demo.html</code>, enter the following
+      string and inspect the result in the Elements panel:
+    </p>
+    <pre>&lt;p&gt;&lt;b&gt;outer &lt;i&gt;inner&lt;/b&gt; still italic?&lt;/i&gt;&lt;/p&gt;</pre>
+    <p>
+      Draw (on paper or a text file) the DOM tree the browser produces. Is it
+      what you expected? Specifically: where does the <code>&lt;/b&gt;</code>
+      close relative to the <code>&lt;i&gt;</code>? What does this tell you
+      about how a sanitiser that produces different nesting could introduce a
+      vulnerability?
+    </p>
+  </div>
+
+  <div class="exercise ex-warm">
+    <span class="ex-badge">Warm-up</span>
+    <h4>Exercise 2 — Context Identification</h4>
+    <p>
+      For each of the following server-side HTML templates, identify the
+      injection context (body / attribute value / script / style) and state
+      which single character would let an attacker break out of it:
+    </p>
+    <ul>
+      <li><code>&lt;title&gt;[INPUT]&lt;/title&gt;</code></li>
+      <li><code>&lt;input value='[INPUT]'&gt;</code></li>
+      <li><code>&lt;a href="/search?q=[INPUT]"&gt;</code></li>
+      <li><code>&lt;script&gt;var data = "[INPUT]";&lt;/script&gt;</code></li>
+      <li><code>&lt;div style="color:[INPUT]"&gt;</code></li>
+    </ul>
+    <p>
+      For item 3 (inside an href attribute): what is unusual about this context
+      compared to the others? (Hint: it is both an attribute value context
+      AND a URL context — two layers of encoding apply.)
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 3 — Add a Sixth Quirk</h4>
+    <p>
+      Open <code>quirks.js</code> and add a sixth demonstration function called
+      <code>demoCommentEscape()</code>. It should demonstrate that HTML comments
+      do not always behave as expected:
+    </p>
+    <pre>&lt;!-- comment --&gt;&lt;b&gt;after comment&lt;/b&gt;
+&lt;!-- &lt;/div&gt; --&gt;
+&lt;!--&gt;&lt;b&gt;does this render?&lt;/b&gt;</pre>
+    <p>
+      For each of the three strings above: does the text render visibly? Does
+      the bold element appear in the Elements panel? Write a one-sentence
+      explanation of what the parser does with each. Call your new function
+      from the <code>DOMContentLoaded</code> listener at the bottom of
+      <code>quirks.js</code>.
+    </p>
+  </div>
+
+  <div class="exercise ex-core">
+    <span class="ex-badge">Core</span>
+    <h4>Exercise 4 — Trace a Reflected Injection</h4>
+    <p>
+      With Burp Suite proxying Chrome, navigate to:
+    </p>
+    <pre>http://localhost:5000/parse-demo?html=hello</pre>
+    <p>
+      In Burp's HTTP history, find this request. Use Burp's "Send to Repeater"
+      feature (right-click → Send to Repeater). In Repeater, change
+      <code>hello</code> to <code>&lt;b&gt;bold&lt;/b&gt;</code> and send.
+      Observe the raw HTTP response. What does the response body contain?
+      Now change it to <code>&lt;i&gt;italic</code> (no closing tag) and send.
+      Compare the two responses and explain the difference in terms of the
+      parser behaviour you just studied.
+    </p>
+  </div>
+
+  <div class="exercise ex-stretch">
+    <span class="ex-badge">Stretch</span>
+    <h4>Exercise 5 — Namespace Switch Observation</h4>
+    <p>
+      Paste the following into the live injector on <code>parser_demo.html</code>
+      and carefully inspect the Elements panel after each one:
+    </p>
+    <pre><span class="cm"><!-- String 1: SVG in HTML body --></span>
+&lt;svg width="100" height="40"&gt;&lt;text y="28" fill="#38bdf8"&gt;SVG text&lt;/text&gt;&lt;/svg&gt;
+
+<span class="cm"><!-- String 2: script inside SVG --></span>
+&lt;svg&gt;&lt;script&gt;document.getElementById('outputBox').style.outline='3px solid red'&lt;/script&gt;&lt;/svg&gt;
+
+<span class="cm"><!-- String 3: MathML then escape --></span>
+&lt;math&gt;&lt;mtext&gt;safe&lt;/mtext&gt;&lt;/math&gt;&lt;b&gt;after math&lt;/b&gt;</pre>
+    <p>
+      For String 2: did the script execute? Check the Console for errors.
+      In Chrome, <code>&lt;script&gt;</code> inside inline SVG assigned via
+      <code>innerHTML</code> does <em>not</em> execute (HTML5 spec). But it
+      <em>does</em> execute when the SVG is loaded as a standalone file or via
+      <code>&lt;img src=...&gt;</code>. This distinction is why file upload XSS
+      (Module 07) is so dangerous. Write a paragraph explaining this difference
+      to a hypothetical colleague.
+    </p>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2>What's Next</h2>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div class="next-box">
+    <strong>Module 03 — The Five Execution Mechanisms (Master Taxonomy)</strong>
+    <p>
+      You now understand how the browser parses HTML and why injected strings
+      can become executable code. Module 03 introduces
+      <code>mechanisms_demo.html</code> — a single page that demonstrates all
+      five ways JavaScript can execute from injected content: tag parsing, event
+      handler attributes, URI scheme evaluation, DOM sink assignment, and
+      context-escape-then-reparse. This taxonomy is the organisational backbone
+      of the entire course. Every attack from Module 04 onward maps to exactly
+      one of these five mechanisms. Every defence in Modules 17–18 will be
+      evaluated by which mechanisms it covers and which it leaves exposed.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

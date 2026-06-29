@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parser Demo — Module 02 | XSS Mastery</title>
+  <style>
+    :root {
+      --bg:#0b0f1a; --bg2:#111827; --card:#141c2e; --border:#1e3a5f;
+      --gold:#f5c842; --cyan:#38bdf8; --purple:#a78bfa; --red:#f87171;
+      --green:#4ade80; --orange:#fb923c; --text:#e2e8f0; --muted:#7a9bbf;
+      --code-bg:#060d1a;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text);
+           font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+           padding:24px; max-width:900px; margin:0 auto; }
+    h1 { font-size:28px; color:var(--gold); margin-bottom:8px; }
+    h2 { font-size:20px; color:var(--cyan); margin:36px 0 12px; }
+    h3 { font-size:15px; color:var(--purple); margin:0 0 8px; }
+    p  { color:var(--muted); font-size:14px; line-height:1.65; margin-bottom:10px; }
+
+    /* Live input section */
+    .live-section { background:var(--card); border:1px solid var(--border);
+                    border-radius:8px; padding:20px; margin:24px 0; }
+    .live-section label { display:block; font-size:12px; font-weight:700;
+                          color:var(--cyan); text-transform:uppercase;
+                          letter-spacing:0.08em; margin-bottom:8px; }
+    textarea { width:100%; background:var(--code-bg); color:var(--green);
+               border:1px solid var(--border); border-radius:5px; padding:12px;
+               font-family:'Courier New',monospace; font-size:13px;
+               resize:vertical; min-height:80px; }
+    .btn-row { display:flex; gap:10px; margin-top:10px; }
+    button { padding:8px 18px; border-radius:5px; border:none; cursor:pointer;
+             font-size:13px; font-weight:700; }
+    .btn-parse { background:var(--cyan); color:#0b0f1a; }
+    .btn-clear { background:var(--border); color:var(--text); }
+    .btn-parse:hover { background:#7dd3fc; }
+    .output-box { background:var(--code-bg); border:1px solid var(--border);
+                  border-radius:5px; padding:14px; margin-top:12px;
+                  min-height:40px; font-size:13px; }
+
+    /* Quirks demos */
+    .demo-card { background:var(--card); border:1px solid var(--border);
+                 border-radius:8px; padding:20px; margin-bottom:16px; }
+    .label { font-size:11px; font-weight:700; text-transform:uppercase;
+             letter-spacing:0.08em; color:var(--muted); margin:10px 0 4px; }
+    pre { background:var(--code-bg); border:1px solid var(--border);
+          border-radius:4px; padding:10px; font-family:'Courier New',monospace;
+          font-size:12.5px; white-space:pre-wrap; word-break:break-all;
+          color:var(--orange); }
+    .result-box { background:var(--bg2); border:1px solid var(--border);
+                  border-radius:4px; padding:10px; min-height:32px; }
+    .notes { margin-top:10px; font-size:13px; color:var(--muted);
+             border-left:3px solid var(--purple); padding-left:10px;
+             line-height:1.6; }
+
+    /* Injection contexts visual */
+    .context-grid { display:grid; grid-template-columns:1fr 1fr;
+                    gap:10px; margin:16px 0; }
+    .ctx-card { background:var(--card); border:1px solid var(--border);
+                border-radius:6px; padding:14px; }
+    .ctx-name { font-size:12px; font-weight:700; color:var(--gold);
+                margin-bottom:6px; }
+    .ctx-example { font-family:'Courier New',monospace; font-size:11.5px;
+                   color:var(--green); background:var(--code-bg);
+                   padding:6px 8px; border-radius:3px; word-break:break-all; }
+    .ctx-desc { font-size:12px; color:var(--muted); margin-top:6px; }
+
+    a { color:var(--cyan); }
+    hr { border:none; border-top:1px solid var(--border); margin:32px 0; }
+  </style>
+</head>
+<body>
+
+  <p style="margin-bottom:16px"><a href="/">← Lab Home</a></p>
+
+  <h1>Parser Demo</h1>
+  <p style="color:var(--muted); font-size:15px; margin-bottom:24px">
+    Module 02 · How Browsers Parse HTML · Use this page alongside the tutorial.
+    Open DevTools (F12) → Elements panel before interacting.
+  </p>
+
+  <!-- ── Live injector ───────────────────────────────────────────────────── -->
+  <h2>Live HTML Injector</h2>
+  <p>
+    Type any HTML string below and click Parse. The output box renders it
+    directly via <code>innerHTML</code> — the same sink used in DOM XSS.
+    Watch the Elements panel to see what the browser constructs.
+  </p>
+
+  <div class="live-section">
+    <label>HTML to inject into the DOM</label>
+    <textarea id="inputHTML" spellcheck="false"
+      placeholder="Try: <b>hello</b>  or  <img src=x onerror=alert(1)>  or  <svg onload=alert(1)>"
+    ></textarea>
+    <div class="btn-row">
+      <button class="btn-parse" onclick="parseInput()">Parse &amp; Render</button>
+      <button class="btn-clear" onclick="clearInput()">Clear</button>
+    </div>
+    <p style="margin-top:8px; font-size:12px; color:var(--red)">
+      ⚠ This box uses raw innerHTML — it will execute JavaScript. That is intentional.
+      Only run payloads you understand. Never paste payloads from untrusted sources.
+    </p>
+    <div class="label">Rendered output (inspect in Elements panel):</div>
+    <div class="output-box" id="outputBox"></div>
+  </div>
+
+  <!-- ── Injection contexts reference ───────────────────────────────────── -->
+  <h2>The Four HTML Injection Contexts</h2>
+  <p>
+    The same characters mean different things in each context.
+    Understanding which context your input lands in is the first step
+    in every XSS attack and every XSS defence.
+  </p>
+
+  <div class="context-grid">
+    <div class="ctx-card">
+      <div class="ctx-name">1 · Body Context</div>
+      <div class="ctx-example">&lt;p&gt;Hello [INPUT]&lt;/p&gt;</div>
+      <div class="ctx-desc">
+        A &lt; here starts a new tag. The attacker can inject any tag —
+        &lt;script&gt;, &lt;img&gt;, &lt;svg&gt;, etc. The most direct
+        injection context.
+      </div>
+    </div>
+    <div class="ctx-card">
+      <div class="ctx-name">2 · Attribute Value Context</div>
+      <div class="ctx-example">&lt;div title="[INPUT]"&gt;</div>
+      <div class="ctx-desc">
+        A &lt; here is harmless. But a &quot; breaks out of the attribute value,
+        letting the attacker add new attributes like
+        <code>onmouseover</code>. No angle brackets needed.
+      </div>
+    </div>
+    <div class="ctx-card">
+      <div class="ctx-name">3 · Script Context</div>
+      <div class="ctx-example">&lt;script&gt;var x="[INPUT]"&lt;/script&gt;</div>
+      <div class="ctx-desc">
+        Inside a &lt;script&gt; tag, the browser applies JavaScript parsing rules.
+        A &lt;/script&gt; sequence closes the block regardless of quotes.
+        Breaking out here gives immediate JS execution.
+      </div>
+    </div>
+    <div class="ctx-card">
+      <div class="ctx-name">4 · Style Context</div>
+      <div class="ctx-example">&lt;style&gt;.x { color:[INPUT] }&lt;/style&gt;</div>
+      <div class="ctx-desc">
+        CSS is parsed here. Modern browsers cannot execute JS via CSS injection,
+        but data exfiltration via CSS attribute selectors is possible
+        (covered in Module 12).
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ── Automated quirk demos (populated by quirks.js) ─────────────────── -->
+  <h2>Parser Quirk Demonstrations</h2>
+  <p>
+    The five cards below are generated by <code>quirks.js</code> at page load.
+    Each one feeds a specific type of malformed HTML to <code>innerHTML</code>
+    and lets you inspect the result in the Elements panel. For each card:
+    look at the <em>input string</em>, predict what the browser will do,
+    then expand the element in the Elements panel and compare to your prediction.
+  </p>
+
+  <div id="results"></div>
+
+  <!-- ── URL-based injector ─────────────────────────────────────────────── -->
+  <hr>
+  <h2>Server-Side Echo (Reflected Injection)</h2>
+  <p>
+    The links below use the <code>/parse-demo</code> server route to reflect
+    HTML back from the server — the same mechanism as reflected XSS. Open each
+    in a new tab, observe the result, then look at the page source (Ctrl+U)
+    vs. the Elements panel.
+  </p>
+  <ul style="font-size:13px; line-height:2.2; padding-left:20px; color:var(--cyan)">
+    <li><a href="/parse-demo?html=%3Cb%3Ehello%3C/b%3E" target="_blank">Simple bold tag</a></li>
+    <li><a href="/parse-demo?html=%3Cimg+src%3Dx+width%3D50+height%3D50%3E" target="_blank">Broken image (no onerror yet)</a></li>
+    <li><a href="/parse-demo?html=%3Cinput+value%3D%22%22+autofocus+onfocus%3D%22this.style.outline%3D%274px+solid+red%27%22%3E" target="_blank">Input with onfocus (no alert — visual only)</a></li>
+    <li><a href="/parse-demo?html=%3Csvg+width%3D100+height%3D40%3E%3Ctext+y%3D28+fill%3D%22%2338bdf8%22%3ESVG+rendered%3C/text%3E%3C/svg%3E" target="_blank">SVG inline</a></li>
+  </ul>
+  <p style="font-size:12px; color:var(--red); margin-top:12px">
+    Notice: the URL bar shows exactly what was sent to the server. In a real
+    reflected XSS attack, this URL is what the attacker sends to a victim.
+    The victim opens it; the browser executes whatever was in the URL.
+  </p>
+
+  <script src="quirks.js"></script>
+  <script>
+    function parseInput() {
+      const val = document.getElementById("inputHTML").value;
+      // Direct innerHTML assignment — this is intentionally unsafe.
+      // This is the exact sink that DOM XSS exploits (Module 09).
+      document.getElementById("outputBox").innerHTML = val;
+    }
+    function clearInput() {
+      document.getElementById("inputHTML").value = "";
+      document.getElementById("outputBox").innerHTML = "";
+    }
+  </script>
+
+</body>
+</html>
