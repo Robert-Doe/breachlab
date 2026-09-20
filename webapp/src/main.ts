@@ -1,21 +1,34 @@
 import "./style.css";
+import { PAYLOAD_BANK, type PayloadCategory, type PayloadEntry } from "./payloadBank.generated";
 
 /**
  * Breachlab — Sandboxed XSS Playground
  *
  * A safe, 100% client-side reimplementation of the attack scenarios taught
  * across the breachlab course modules. Every "vulnerable" sink below runs
- * inside a sandboxed <iframe sandbox="allow-scripts"> (deliberately WITHOUT
- * allow-same-origin) fed via `srcdoc`. That combination gives the injected
- * script an opaque, cross-origin sandbox with no access to this page's real
- * cookies, storage, or DOM — so a payload can genuinely execute and still
- * touch nothing real. Execution is observed only because the sandboxed
- * frame chooses to `postMessage` a report back to its parent — the one
- * channel sandbox-without-same-origin frames are still allowed to use.
- *
- * There is no backend here. Nothing typed into this page is ever sent
- * anywhere, stored anywhere, or shown to any other visitor.
+ * inside an <iframe sandbox="allow-scripts allow-same-origin"> fed via
+ * `srcdoc`. A payload genuinely executes AND genuinely shares this page's
+ * origin, so alert()/confirm()/prompt() pop real browser dialogs (not a
+ * simulated report) and document.cookie reads this page's real —
+ * but entirely fake and disposable — demo session cookie. Nothing here
+ * is real user data: there is no backend, no account system, and nothing
+ * you do ever leaves your own browser tab or reaches any other visitor.
+ * Sandboxing still blocks top-level navigation and popups regardless of
+ * allow-same-origin, so the worst case is "you alert() yourself."
  */
+
+// A clearly-fake demo session, regenerated on every page load, so a
+// cookie-stealing payload has something genuine (but worthless) to steal.
+function seedDemoCookie(): string {
+  const token = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  const value = `lab_${token}`;
+  document.cookie = `demo_session=${value}; path=/; samesite=lax`;
+  return value;
+}
+
+const demoCookieValue = seedDemoCookie();
 
 // ── Escaping helpers used by the "harden this sink" toggle ────────────────
 
@@ -48,10 +61,11 @@ function sanitizeUrl(url: string): string {
   return "#blocked-by-scheme-allowlist";
 }
 
-// The tiny reporting shim injected into every sandboxed srcdoc. It does not
-// touch the vulnerable sink at all — it only overrides the alert/confirm/
-// prompt family so a payload that "fires" reports back instead of opening
-// a real blocking dialog, and relays uncaught script errors too.
+// The tiny reporting shim injected into every sandboxed srcdoc. It does NOT
+// block or replace alert/confirm/prompt — a payload that calls them still
+// pops a real, native browser dialog in your tab, exactly like a real XSS
+// would. It only additionally reports back to the lab page so the on-page
+// status badge can reflect what just happened.
 const HARNESS_SCRIPT = `<script>
 (function () {
   function report(via, detail) {
@@ -62,9 +76,10 @@ const HARNESS_SCRIPT = `<script>
       top.postMessage({ __breachlab: true, status: "fired", via: via, detail: String(detail).slice(0, 200) }, "*");
     } catch (e) {}
   }
-  window.alert = function (msg) { report("alert", msg); };
-  window.confirm = function (msg) { report("confirm", msg); return true; };
-  window.prompt = function (msg) { report("prompt", msg); return null; };
+  var realAlert = window.alert, realConfirm = window.confirm, realPrompt = window.prompt;
+  window.alert = function (msg) { report("alert", msg); return realAlert.call(window, msg); };
+  window.confirm = function (msg) { report("confirm", msg); return realConfirm.call(window, msg); };
+  window.prompt = function (msg, def) { report("prompt", msg); return realPrompt.call(window, msg, def); };
   window.addEventListener("error", function () { /* parse errors are not a fire */ });
 })();
 <\/script>`;
@@ -219,6 +234,16 @@ let hardened = false;
 let payloadOverrides: Record<string, string> = {};
 let runToken = 0;
 
+// Payload library modal state
+let modalCategoryId: string | null = null;
+let modalTab: "payloads" | "attacker" | "threat" | "docs" = "payloads";
+
+function activeCategory(): PayloadCategory | undefined {
+  return PAYLOAD_BANK.find((c) => c.id === modalCategoryId);
+}
+
+const SEVERITY_ORDER: Record<PayloadEntry["severity"], number> = { critical: 3, high: 2, medium: 1, low: 0 };
+
 function activeMechanism(): Mechanism {
   return mechanisms.find((m) => m.id === activeId)!;
 }
@@ -249,20 +274,26 @@ function render() {
       <h1>Breachlab<br />Sandboxed XSS Playground</h1>
       <p class="tagline">
         Five real cross-site-scripting execution mechanisms, pulled straight from the
-        breachlab course modules, running live in your browser — inside an isolated
-        sandbox that can't touch anything real. Attack it, then flip the switch and
-        watch the same payload get neutralised.
+        breachlab course modules, running live in your browser — for real. Popups really
+        pop, and a genuine (but fake) session cookie is really there to steal. Attack it,
+        then flip the switch and watch the same payload get neutralised.
       </p>
       <div class="safety-banner">
         <span class="icon">[!]</span>
         <div>
-          <strong>Authorized, sandboxed, client-side lab.</strong>
+          <strong>Authorized, client-side lab — real execution, fake stakes.</strong>
           Every "vulnerable" page below runs inside an
-          <code style="font-family:var(--mono)">&lt;iframe sandbox="allow-scripts"&gt;</code>
-          with no <code style="font-family:var(--mono)">allow-same-origin</code>, loaded via
-          <code style="font-family:var(--mono)">srcdoc</code>. Nothing you type is sent to a
-          server, stored, or shown to anyone else — it only ever runs in an opaque, isolated
-          frame in your own browser.
+          <code style="font-family:var(--mono)">&lt;iframe sandbox="allow-scripts allow-same-origin"&gt;</code>
+          loaded via <code style="font-family:var(--mono)">srcdoc</code>. That means a payload
+          genuinely executes and can genuinely read this page's
+          <code style="font-family:var(--mono)">document.cookie</code> — try editing a payload
+          to <code style="font-family:var(--mono)">alert(document.cookie)</code>. The sandbox
+          still blocks top-level navigation and new windows either way. There is no backend,
+          no real account, and no real cookie: the value below is generated fresh in your
+          browser on every page load and never leaves it.
+          <div class="fake-cookie">document.cookie on this page right now: <code>demo_session=${escapeHtml(
+            demoCookieValue
+          )}</code></div>
         </div>
       </div>
     </section>
@@ -296,7 +327,7 @@ function render() {
             <span class="status-badge idle" id="status-badge">idle</span>
           </div>
           <div class="output-frame-wrap">
-            <iframe id="output-frame" sandbox="allow-scripts" srcdoc=""></iframe>
+            <iframe id="output-frame" sandbox="allow-scripts allow-same-origin" srcdoc=""></iframe>
             <div class="log-line" id="log-line">Press Run to inject the payload into the sandbox.</div>
           </div>
         </div>
@@ -316,25 +347,139 @@ function render() {
           <button class="btn" id="run-btn">Run ▶</button>
         </div>
         <p class="hint">
-          Edit the payload freely — it only ever runs inside the sandboxed frame above.
-          Try toggling "harden this sink" and running the exact same payload again.
+          Edit the payload freely — it only ever runs inside this page, in your own browser.
+          Try <code>alert(document.cookie)</code> to see real cookie theft against the fake
+          session above, then toggle "harden this sink" and run the exact same payload again.
         </p>
       </div>
     </main>
 
+    <section class="library">
+      <div class="library-head">
+        <h2>Attack Payload Library</h2>
+        <p>
+          122 real, annotated payloads from the breachlab course's Module 19 payload bank, grouped into
+          10 classes of attack. Open a category for the code, the attacker's thought process, the threat
+          model, and links to primary sources — pick a payload and try it live in the sandbox above.
+        </p>
+      </div>
+      <div class="library-grid">
+        ${PAYLOAD_BANK.map((cat) => {
+          const counts: Record<string, number> = {};
+          for (const e of cat.entries) counts[e.severity] = (counts[e.severity] ?? 0) + 1;
+          return `
+          <button class="cat-card" data-cat="${cat.id}" type="button">
+            <div class="cat-card-top">
+              <h3>${escapeHtml(cat.title)}</h3>
+              <span class="sev-badge sev-${cat.baseSeverity}">${cat.baseSeverity}</span>
+            </div>
+            <p>${escapeHtml(cat.blurb)}</p>
+            <div class="cat-card-foot">
+              <span class="count">${cat.entries.length} payloads</span>
+              <span class="sev-mini">
+                ${(["critical", "high", "medium", "low"] as const)
+                  .filter((s) => counts[s])
+                  .map((s) => `<span class="dot sev-${s}" title="${counts[s]} ${s}"></span>`)
+                  .join("")}
+              </span>
+            </div>
+          </button>`;
+        }).join("")}
+      </div>
+    </section>
+
     <footer class="site-footer">
       <p class="footer-safety">
-        This is an authorized, sandboxed, 100% client-side educational demo. No payload is ever
-        sent to a server, persisted, or relayed to any other visitor — every "attack" here runs
-        and dies inside a single isolated <code style="font-family:var(--mono)">&lt;iframe&gt;</code>
-        in your own browser.
+        This is an authorized, 100% client-side educational demo. Execution is real — alerts
+        really pop, document.cookie really reads a real value — but nothing here is: there is
+        no backend, no real account, no real cookie, and no payload is ever sent to a server,
+        persisted, or relayed to any other visitor. Every "attack" lives and dies in your own
+        browser tab.
       </p>
       <div class="footer-meta">breachlab — 19-module XSS course &middot; webapp is a safe reimplementation, not the local lab</div>
     </footer>
+
+    ${renderModal()}
   `;
 
   renderSinkCode();
   wireEvents();
+}
+
+// ── Payload library modal ──────────────────────────────────────────────
+
+function renderModal(): string {
+  const cat = activeCategory();
+  if (!cat) return "";
+
+  const tabs: { id: typeof modalTab; label: string }[] = [
+    { id: "payloads", label: `Payloads (${cat.entries.length})` },
+    { id: "attacker", label: "Attacker's Thought Process" },
+    { id: "threat", label: "Threat Model" },
+    { id: "docs", label: "Docs & Further Reading" },
+  ];
+
+  let body = "";
+  if (modalTab === "payloads") {
+    const sorted = [...cat.entries].sort((a, b) => SEVERITY_ORDER[b.severity] - SEVERITY_ORDER[a.severity] || a.num - b.num);
+    let lastSection = "";
+    body = sorted
+      .map((e) => {
+        const sectionHeader = e.section !== lastSection ? ((lastSection = e.section), `<div class="entry-section">${escapeHtml(e.section)}</div>`) : "";
+        return `
+        ${sectionHeader}
+        <div class="payload-entry">
+          <div class="payload-entry-head">
+            <span class="sev-badge sev-${e.severity}">${e.severity}</span>
+            ${e.tags.map((t) => `<span class="p-tag">${escapeHtml(t.label)}</span>`).join("")}
+          </div>
+          <pre class="payload-code">${escapeHtml(e.payload)}</pre>
+          <div class="payload-meta">
+            ${e.meta.map((m) => `<div class="pm-row"><span class="pm-key">${escapeHtml(m.key)}</span><span class="pm-val">${escapeHtml(m.value)}</span></div>`).join("")}
+          </div>
+          ${
+            e.sandboxMechanism
+              ? `<button class="btn secondary try-btn" data-mech="${e.sandboxMechanism}" data-payload="${escapeAttr(e.payload)}">Try it in the sandbox ▶</button>`
+              : `<div class="hint" style="margin-top:8px">Not directly runnable in the 5-mechanism sandbox above — see Module 19 for the full lab context.</div>`
+          }
+        </div>`;
+      })
+      .join("");
+  } else if (modalTab === "attacker") {
+    body = `<p class="modal-prose">${escapeHtml(cat.rationale)}</p>`;
+  } else if (modalTab === "threat") {
+    body = `<p class="modal-prose">${escapeHtml(cat.threatModel)}</p>`;
+  } else {
+    body = cat.docs
+      .map(
+        (d) => `
+      <div class="doc-card">
+        <span class="doc-card-icon">📄</span>
+        <div class="doc-card-body">
+          <strong>${escapeHtml(d.title)}</strong> — ${escapeHtml(d.description)}<br>
+          <a href="${d.url}" target="_blank" rel="noopener noreferrer">${d.url}</a>
+        </div>
+      </div>`
+      )
+      .join("");
+  }
+
+  return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-panel" role="dialog" aria-modal="true">
+        <div class="modal-head">
+          <div>
+            <div class="modal-eyebrow">${escapeHtml(cat.title)}</div>
+            <h2>${escapeHtml(cat.blurb)}</h2>
+          </div>
+          <button class="modal-close" id="modal-close" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-tabs">
+          ${tabs.map((t) => `<button class="modal-tab ${t.id === modalTab ? "active" : ""}" data-tab="${t.id}" type="button">${t.label}</button>`).join("")}
+        </div>
+        <div class="modal-body">${body}</div>
+      </div>
+    </div>`;
 }
 
 function renderSinkCode() {
@@ -378,6 +523,48 @@ function wireEvents() {
   });
 
   document.getElementById("run-btn")!.addEventListener("click", runPayload);
+
+  document.querySelectorAll<HTMLButtonElement>(".cat-card").forEach((card) => {
+    card.addEventListener("click", () => {
+      modalCategoryId = card.dataset.cat!;
+      modalTab = "payloads";
+      render();
+    });
+  });
+
+  const backdrop = document.getElementById("modal-backdrop");
+  if (backdrop) {
+    backdrop.addEventListener("click", (e) => {
+      if (e.target === backdrop) closeModal();
+    });
+    document.getElementById("modal-close")!.addEventListener("click", closeModal);
+
+    document.querySelectorAll<HTMLButtonElement>(".modal-tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        modalTab = btn.dataset.tab as typeof modalTab;
+        render();
+      });
+    });
+
+    document.querySelectorAll<HTMLButtonElement>(".try-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const mech = btn.dataset.mech!;
+        const payload = btn.dataset.payload!;
+        activeId = mech;
+        payloadOverrides[mech] = payload;
+        hardened = false;
+        modalCategoryId = null;
+        render();
+        document.querySelector(".demo")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        window.setTimeout(runPayload, 400);
+      });
+    });
+  }
+}
+
+function closeModal() {
+  modalCategoryId = null;
+  render();
 }
 
 // ── Running a payload in the sandbox ────────────────────────────────────
@@ -428,5 +615,9 @@ function runPayload() {
     }
   }, 900);
 }
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && modalCategoryId) closeModal();
+});
 
 render();
