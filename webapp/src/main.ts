@@ -2,15 +2,15 @@ import "./style.css";
 import { PAYLOAD_BANK, type PayloadCategory, type PayloadEntry } from "./payloadBank.generated";
 
 /**
- * Breachlab — Sandboxed XSS Playground
+ * Breachlab, Sandboxed XSS Playground
  *
  * A safe, 100% client-side reimplementation of the attack scenarios taught
  * across the breachlab course modules. Every "vulnerable" sink below runs
  * inside an <iframe sandbox="allow-scripts allow-same-origin"> fed via
  * `srcdoc`. A payload genuinely executes AND genuinely shares this page's
  * origin, so alert()/confirm()/prompt() pop real browser dialogs (not a
- * simulated report) and document.cookie reads this page's real —
- * but entirely fake and disposable — demo session cookie. Nothing here
+ * simulated report) and document.cookie reads this page's real,
+ * but entirely fake and disposable, demo session cookie. Nothing here
  * is real user data: there is no backend, no account system, and nothing
  * you do ever leaves your own browser tab or reaches any other visitor.
  * Sandboxing still blocks top-level navigation and popups regardless of
@@ -51,7 +51,7 @@ function escapeAttr(str: string): string {
 function sanitizeUrl(url: string): string {
   const trimmed = url.trim();
   try {
-    // A relative URL has no scheme — allow it.
+    // A relative URL has no scheme, allow it.
     if (/^\/(?!\/)/.test(trimmed)) return trimmed;
     const u = new URL(trimmed, "https://example.invalid/");
     if (u.protocol === "http:" || u.protocol === "https:") return trimmed;
@@ -62,7 +62,7 @@ function sanitizeUrl(url: string): string {
 }
 
 // The tiny reporting shim injected into every sandboxed srcdoc. It does NOT
-// block or replace alert/confirm/prompt — a payload that calls them still
+// block or replace alert/confirm/prompt, a payload that calls them still
 // pops a real, native browser dialog in your tab, exactly like a real XSS
 // would. It only additionally reports back to the lab page so the on-page
 // status badge can reflect what just happened.
@@ -102,14 +102,14 @@ const mechanisms: Mechanism[] = [
   {
     id: "tag-parsing",
     label: "Tag Parsing",
-    title: "Tag Parsing — Script Tag Injection",
-    moduleRef: "Module 04 — /search?q=… (body context)",
+    title: "Tag Parsing, Script Tag Injection",
+    moduleRef: "Module 04, /search?q=… (body context)",
     explanation:
       "When user input is concatenated straight into an HTML document body, the parser doesn't know the difference between \"page content\" and \"a new tag.\" A <script> tag placed in that position parses like any other markup and its contents execute during the initial document parse.",
     defaultPayload: "<script>alert('tag-parsing:fired')</script>",
     hardenLabel: "HTML-entity-encode before insertion",
     sinkCode: (p) =>
-      `# Flask — module_04/lab_server.py — /search?q=...\n` +
+      `# Flask (module_04/lab_server.py) /search?q=...\n` +
       `q = request.args.get("q", "")\n\n` +
       `# DELIBERATE VULNERABILITY: f-string interpolation, no escaping\n` +
       `body = f'<div id="query-echo">{q}</div>'\n\n` +
@@ -120,21 +120,21 @@ const mechanisms: Mechanism[] = [
   {
     id: "event-handlers",
     label: "Event Attributes",
-    title: "Event Handler Attributes — Filter Bypass",
-    moduleRef: "Module 05 — /vuln-display?content=… (naive script filter)",
+    title: "Event Handler Attributes, Filter Bypass",
+    moduleRef: "Module 05, /vuln-display?content=… (naive script filter)",
     explanation:
-      "A common first fix after an XSS report is a regex that strips <script> tags. It stops exactly one vector. Event-handler attributes — onerror, onload, onfocus, and 150+ others — run attacker JS without ever writing the word \"script\", so the filter lets them straight through.",
+      "A common first fix after an XSS report is a regex that strips <script> tags. It stops exactly one vector. Event-handler attributes (onerror, onload, onfocus, and 150+ others) run attacker JS without ever writing the word \"script\", so the filter lets them straight through.",
     defaultPayload: "<img src=x onerror=\"alert('event-handler:fired')\">",
     hardenLabel: "HTML-entity-encode instead of script-only filter",
     sinkCode: (p) =>
-      `# Flask — module_05/lab_server.py — /vuln-display?content=...\n` +
+      `# Flask (module_05/lab_server.py) /vuln-display?content=...\n` +
       `content = request.args.get("content", "")\n\n` +
       `# THE "SANITISER": only strips <script>...</script>\n` +
       `filtered = re.sub(r'<script[\\s\\S]*?</script>', '', content, flags=re.I)\n` +
       `html = f'<div id="rendered">{filtered}</div>'\n\n` +
       `# live payload:\n# content = ${JSON.stringify(p)}`,
     buildBody: (payload, hardened) => {
-      // Simulate the real, naive "script-only" filter from module 05 — it
+      // Simulate the real, naive "script-only" filter from module 05, it
       // always runs, vulnerable or not, because it's the actual bug being
       // taught. The harden toggle adds the fix layered on top of it.
       const scriptStripped = payload.replace(/<script[\s\S]*?<\/script>/gi, "");
@@ -145,16 +145,16 @@ const mechanisms: Mechanism[] = [
   {
     id: "uri-schemes",
     label: "URI Schemes",
-    title: "URI Scheme Injection — href/src",
-    moduleRef: "Module 06 — /link-preview?url=… (no scheme allow-list)",
+    title: "URI Scheme Injection, href/src",
+    moduleRef: "Module 06, /link-preview?url=… (no scheme allow-list)",
     explanation:
-      "Browsers accept several executable URI schemes wherever a URL is expected — href, src, action, formaction. javascript: runs script on navigation; data: can smuggle an entire inline HTML document, script included, into anything that loads a URL as a nested document — such as a link-preview/embed feature. An app that trusts a URL parameter without checking its scheme hands the attacker a first-class execution point. Below, the payload you type becomes the body of an HTML document smuggled in through a data: URI and rendered as an embedded preview frame, exactly like /link-preview would render any URL you gave it.",
+      "Browsers accept several executable URI schemes wherever a URL is expected (href, src, action, formaction. javascript: runs script on navigation; data: can smuggle an entire inline HTML document, script included, into anything that loads a URL as a nested document) such as a link-preview/embed feature. An app that trusts a URL parameter without checking its scheme hands the attacker a first-class execution point. Below, the payload you type becomes the body of an HTML document smuggled in through a data: URI and rendered as an embedded preview frame, exactly like /link-preview would render any URL you gave it.",
     defaultPayload: "<script>alert('uri-scheme:fired')</script>",
     hardenLabel: "Allow-list http(s) schemes only",
     sinkCode: (p) =>
-      `# Flask — module_06/lab_server.py — /link-preview?url=...\n` +
+      `# Flask (module_06/lab_server.py) /link-preview?url=...\n` +
       `url = request.args.get("url", "")\n\n` +
-      `# NO scheme check — anything goes into href / preview src\n` +
+      `# NO scheme check, anything goes into href / preview src\n` +
       `body = f'<a href="{url}">Visit link</a>'\n` +
       `preview = f'<iframe src="{url}"></iframe>'   # rendered inline as a "preview"\n\n` +
       `# live payload smuggled via a data: URI:\n` +
@@ -172,14 +172,14 @@ const mechanisms: Mechanism[] = [
   {
     id: "dom-sinks",
     label: "DOM Sinks",
-    title: "DOM-Based XSS — postMessage → innerHTML",
-    moduleRef: "Module 09 — /message (unchecked postMessage listener)",
+    title: "DOM-Based XSS, postMessage → innerHTML",
+    moduleRef: "Module 09, /message (unchecked postMessage listener)",
     explanation:
-      "DOM XSS never touches the server at all. A source (postMessage, location.hash, a JSON API response) flows straight into a sink (innerHTML, document.write, eval) inside the browser. Here, any frame — including a hostile one — can postMessage HTML into this page, and it lands in innerHTML with no origin check and no sanitisation.",
+      "DOM XSS never touches the server at all. A source (postMessage, location.hash, a JSON API response) flows straight into a sink (innerHTML, document.write, eval) inside the browser. Here, any frame (including a hostile one) can postMessage HTML into this page, and it lands in innerHTML with no origin check and no sanitisation.",
     defaultPayload: "<img src=x onerror=\"alert('dom-sink:fired')\">",
     hardenLabel: "Use textContent (no HTML parsing) instead of innerHTML",
     sinkCode: () =>
-      `// module_09/public/dom_lab.html — postMessage receiver\n` +
+      `// module_09/public/dom_lab.html, postMessage receiver\n` +
       `window.addEventListener("message", function (e) {\n` +
       `  // No origin check, no sanitisation\n` +
       `  document.getElementById("msg-display").innerHTML = e.data;\n` +
@@ -203,14 +203,14 @@ const mechanisms: Mechanism[] = [
   {
     id: "context-escape",
     label: "Context Escape",
-    title: "Context Escape — Attribute Breakout",
-    moduleRef: "Module 04 — /search-attr?q=… (attribute-value context)",
+    title: "Context Escape, Attribute Breakout",
+    moduleRef: "Module 04, /search-attr?q=… (attribute-value context)",
     explanation:
-      "The same string can be safe in one HTML context and dangerous in another. Inside value=\"…\" a bare quote ends the attribute early; whatever follows becomes new markup — here, a fresh onfocus attribute that the browser honours the instant the field receives focus (in real life: the moment a visitor clicks or tabs into the search box; a real page would also often use autofocus to trigger it without any interaction at all). (Mutation XSS, mXSS, is this idea's harder cousin: a payload that a sanitizer judged safe gets mutated back into something executable when the browser re-parses/re-serializes the DOM, e.g. via a second innerHTML round-trip — covered in Module 13 of the full curriculum.)",
+      "The same string can be safe in one HTML context and dangerous in another. Inside value=\"…\" a bare quote ends the attribute early; whatever follows becomes new markup (here, a fresh onfocus attribute that the browser honours the instant the field receives focus (in real life: the moment a visitor clicks or tabs into the search box; a real page would also often use autofocus to trigger it without any interaction at all). (Mutation XSS, mXSS, is this idea's harder cousin: a payload that a sanitizer judged safe gets mutated back into something executable when the browser re-parses/re-serializes the DOM, e.g. via a second innerHTML round-trip) covered in Module 13 of the full curriculum.)",
     defaultPayload: "\" onfocus=\"alert('context-escape:fired')\" x=\"",
     hardenLabel: "HTML-attribute-encode the value",
     sinkCode: (p) =>
-      `# Flask — module_04/lab_server.py — /search-attr?q=...\n` +
+      `# Flask (module_04/lab_server.py) /search-attr?q=...\n` +
       `q = request.args.get("q", "")\n\n` +
       `body = f'<input type="text" name="q" value="{q}">'\n\n` +
       `# live payload:\n# q = ${JSON.stringify(p)}`,
@@ -281,12 +281,12 @@ function render() {
       <div class="safety-banner">
         <span class="icon">[!]</span>
         <div>
-          <strong>Authorized, client-side lab — real execution, fake stakes.</strong>
+          <strong>Authorized, client-side lab, real execution, fake stakes.</strong>
           Every "vulnerable" page below runs inside an
           <code style="font-family:var(--mono)">&lt;iframe sandbox="allow-scripts allow-same-origin"&gt;</code>
           loaded via <code style="font-family:var(--mono)">srcdoc</code>. That means a payload
           genuinely executes and can genuinely read this page's
-          <code style="font-family:var(--mono)">document.cookie</code> — try editing a payload
+          <code style="font-family:var(--mono)">document.cookie</code>, try editing a payload
           to <code style="font-family:var(--mono)">alert(document.cookie)</code>. The sandbox
           still blocks top-level navigation and new windows either way. There is no backend,
           no real account, and no real cookie: the value below is generated fresh in your
@@ -336,7 +336,7 @@ function render() {
       <div class="card">
         <label class="harden-toggle" id="harden-toggle">
           <span class="switch ${hardened ? "on" : ""}"></span>
-          <span><strong>Harden this sink</strong> — ${escapeHtml(m.hardenLabel)}</span>
+          <span><strong>Harden this sink</strong>, ${escapeHtml(m.hardenLabel)}</span>
         </label>
 
         <div class="payload-row">
@@ -347,7 +347,7 @@ function render() {
           <button class="btn" id="run-btn">Run ▶</button>
         </div>
         <p class="hint">
-          Edit the payload freely — it only ever runs inside this page, in your own browser.
+          Edit the payload freely, it only ever runs inside this page, in your own browser.
           Try <code>alert(document.cookie)</code> to see real cookie theft against the fake
           session above, then toggle "harden this sink" and run the exact same payload again.
         </p>
@@ -360,7 +360,7 @@ function render() {
         <p>
           122 real, annotated payloads from the breachlab course's Module 19 payload bank, grouped into
           10 classes of attack. Open a category for the code, the attacker's thought process, the threat
-          model, and links to primary sources — pick a payload and try it live in the sandbox above.
+          model, and links to primary sources, pick a payload and try it live in the sandbox above.
         </p>
       </div>
       <div class="library-grid">
@@ -390,13 +390,13 @@ function render() {
 
     <footer class="site-footer">
       <p class="footer-safety">
-        This is an authorized, 100% client-side educational demo. Execution is real — alerts
-        really pop, document.cookie really reads a real value — but nothing here is: there is
+        This is an authorized, 100% client-side educational demo. Execution is real, alerts
+        really pop, document.cookie really reads a real value, but nothing here is: there is
         no backend, no real account, no real cookie, and no payload is ever sent to a server,
         persisted, or relayed to any other visitor. Every "attack" lives and dies in your own
         browser tab.
       </p>
-      <div class="footer-meta">breachlab — 19-module XSS course &middot; webapp is a safe reimplementation, not the local lab</div>
+      <div class="footer-meta">breachlab, 19-module XSS course &middot; webapp is a safe reimplementation, not the local lab</div>
     </footer>
 
     ${renderModal()}
@@ -440,7 +440,7 @@ function renderModal(): string {
           ${
             e.sandboxMechanism
               ? `<button class="btn secondary try-btn" data-mech="${e.sandboxMechanism}" data-payload="${escapeAttr(e.payload)}">Try it in the sandbox ▶</button>`
-              : `<div class="hint" style="margin-top:8px">Not directly runnable in the 5-mechanism sandbox above — see Module 19 for the full lab context.</div>`
+              : `<div class="hint" style="margin-top:8px">Not directly runnable in the 5-mechanism sandbox above, see Module 19 for the full lab context.</div>`
           }
         </div>`;
       })
@@ -456,7 +456,7 @@ function renderModal(): string {
       <div class="doc-card">
         <span class="doc-card-icon">📄</span>
         <div class="doc-card-body">
-          <strong>${escapeHtml(d.title)}</strong> — ${escapeHtml(d.description)}<br>
+          <strong>${escapeHtml(d.title)}</strong>, ${escapeHtml(d.description)}<br>
           <a href="${d.url}" target="_blank" rel="noopener noreferrer">${d.url}</a>
         </div>
       </div>`
@@ -586,7 +586,7 @@ function runPayload() {
     const data = event.data;
     if (data && typeof data === "object" && data.__breachlab && data.status === "fired") {
       window.removeEventListener("message", listener);
-      setStatus("fired", `Fired via ${data.via}("${data.detail}") — the payload executed inside the sandbox.`);
+      setStatus("fired", `Fired via ${data.via}("${data.detail}"), the payload executed inside the sandbox.`);
     }
   };
   window.addEventListener("message", listener);
@@ -594,7 +594,7 @@ function runPayload() {
   iframe.srcdoc = srcdoc;
 
   // For the DOM-sink mechanism, the "attack" is a hostile frame posting a
-  // message into the vulnerable listener — simulate that delivery once the
+  // message into the vulnerable listener, simulate that delivery once the
   // sandboxed document has loaded.
   if (m.id === "dom-sinks") {
     iframe.onload = () => {
@@ -610,8 +610,8 @@ function runPayload() {
     const badge = document.getElementById("status-badge");
     if (badge && badge.textContent === "idle") {
       setStatus("blocked", hardened
-        ? "Blocked — the hardening transform neutralised this payload."
-        : "No execution detected — this payload didn't trigger alert/confirm/prompt.");
+        ? "Blocked, the hardening transform neutralised this payload."
+        : "No execution detected, this payload didn't trigger alert/confirm/prompt.");
     }
   }, 900);
 }
