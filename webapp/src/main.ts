@@ -273,10 +273,10 @@ function render() {
       <span class="eyebrow">Sandboxed &middot; Client-Only &middot; No Backend</span>
       <h1>Breachlab<br />Sandboxed XSS Playground</h1>
       <p class="tagline">
-        Five real cross-site-scripting execution mechanisms, pulled straight from the
-        breachlab course modules, running live in your browser — for real. Popups really
-        pop, and a genuine (but fake) session cookie is really there to steal. Attack it,
-        then flip the switch and watch the same payload get neutralised.
+        Five cross-site-scripting execution mechanisms, pulled straight from the
+        breachlab course modules, running live in your browser. Popups pop, and a
+        fake session cookie is there to steal. Attack it, then flip the switch
+        and watch the same payload get neutralised.
       </p>
       <div class="safety-banner">
         <span class="icon">[!]</span>
